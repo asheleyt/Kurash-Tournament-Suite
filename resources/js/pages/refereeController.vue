@@ -4563,6 +4563,10 @@ const resultPopupMessage = ref('');
 const isResultSubmitting = ref(false);
 const isResultGateChecking = ref(false);
 const resultSubmitBlockReason = ref<string | null>(null);
+const resultSubmitRequiresReconcile = ref(false);
+const resultSubmitAllowsOfflineContinuation = ref(false);
+const resultSubmitStatusDetail = ref<string | null>(null);
+const resultSubmitStatusReasonCode = ref<string | null>(null);
 
 const savedLogoTeams = computed(() => {
     const fromMap = Object.keys(teamLogoMap.value || {}).filter(
@@ -4750,6 +4754,12 @@ type ControllerApiError = Error & {
     status?: number;
     responseJson?: Record<string, any> | null;
 };
+
+type ResultSubmitQueueMode =
+    | 'connected_authoritative'
+    | 'syncing_previous_result'
+    | 'offline_degraded'
+    | 'reconcile_required';
 
 const CONTROLLER_AUTH_STORAGE_KEY = 'kurash_controller_auth_v1';
 const PENDING_RESULT_SYNC_STORAGE_KEY = 'kurash_pending_result_sync_v1';
@@ -7183,6 +7193,27 @@ const currentMatchId = ref<number | string | null>(null);
 const currentMatchRingNumber = ref<string | null>(null);
 const nextUpcomingMatchId = ref<number | string | null>(null);
 const lastSyncAt = ref<number | null>(null);
+const resultSubmitQueueMode = computed<ResultSubmitQueueMode>(() => {
+    if (isResultSubmitting.value || isResultGateChecking.value) {
+        return 'syncing_previous_result';
+    }
+
+    if (resultSubmitRequiresReconcile.value) {
+        return 'reconcile_required';
+    }
+
+    if (
+        resultSubmitAllowsOfflineContinuation.value ||
+        (syncHasServer.value &&
+            (!isOnline.value ||
+                queueIsDegraded.value ||
+                !!pendingLiveSnapshotRecoveryContextKey.value))
+    ) {
+        return 'offline_degraded';
+    }
+
+    return 'connected_authoritative';
+});
 const canFinishCurrentMatch = computed(() => {
     if (!gameState.winner) return false;
     if (isResultSubmitting.value || isResultGateChecking.value) return false;
@@ -7194,20 +7225,52 @@ const canFinishCurrentMatch = computed(() => {
 });
 const finishMatchActionLabel = computed(() => {
     if (isResultSubmitting.value) return 'Recording...';
-    if (isResultGateChecking.value) return 'Checking Queue...';
-    if (resultSubmitBlockReason.value) return 'Waiting for Queue...';
-    return 'Finish Match';
+
+    switch (resultSubmitQueueMode.value) {
+        case 'syncing_previous_result':
+            return 'Syncing Previous Result...';
+        case 'reconcile_required':
+            return 'Reconcile Queue';
+        case 'offline_degraded':
+            return resultSubmitBlockReason.value
+                ? 'Offline Snapshot Locked'
+                : 'Finish Match Offline';
+        default:
+            return resultSubmitBlockReason.value
+                ? 'Await Event Host'
+                : 'Finish Match';
+    }
 });
 const resultSubmitStatusMessage = computed(() => {
     if (isResultGateChecking.value) {
-        return 'Refreshing the latest Admin queue before recording this result.';
+        return 'Refreshing the latest Event Host queue before recording this result.';
+    }
+
+    if (resultSubmitStatusDetail.value) {
+        return resultSubmitStatusDetail.value;
+    }
+
+    if (
+        resultSubmitQueueMode.value === 'offline_degraded' &&
+        !resultSubmitBlockReason.value
+    ) {
+        const pendingCount = pendingResultSyncCount.value;
+        if (pendingCount > 0) {
+            return `Event Host unreachable. This confirmed cached bout can be finished locally. ${pendingCount} pending result${pendingCount === 1 ? '' : 's'} will replay in declaration order when the host returns.`;
+        }
+
+        return 'Event Host unreachable. This confirmed cached bout can be finished locally and queued for sync when the host returns.';
     }
 
     return resultSubmitBlockReason.value;
 });
-const resultSubmitStatusToneClass = computed(() =>
-    resultSubmitBlockReason.value ? 'text-amber-200' : 'text-cyan-200/80',
-);
+const resultSubmitStatusToneClass = computed(() => {
+    if (resultSubmitQueueMode.value === 'reconcile_required')
+        return 'text-rose-200';
+    if (resultSubmitQueueMode.value === 'offline_degraded')
+        return 'text-amber-200';
+    return resultSubmitBlockReason.value ? 'text-amber-200' : 'text-cyan-200/80';
+});
 watch(
     [
         () => gameState.winner,
@@ -7227,10 +7290,27 @@ watch(
             matchesList.value.find((item: any) =>
                 isMatchIdEqual(item, currentMatchId.value),
             ) || null;
-        resultSubmitBlockReason.value = getMatchReadyBlockReason(
+        const assessment = assessMatchQueueEligibility(
             currentMatch,
             currentMatchId.value,
         );
+        resultSubmitBlockReason.value = assessment.ready ? null : assessment.message;
+        if (assessment.ready) {
+            resultSubmitRequiresReconcile.value = false;
+            if (
+                resultSubmitQueueMode.value !== 'offline_degraded' ||
+                !resultSubmitAllowsOfflineContinuation.value
+            ) {
+                resultSubmitStatusDetail.value = null;
+                resultSubmitStatusReasonCode.value = null;
+            }
+            return;
+        }
+        if (assessment.reasonCode === 'moved_to_different_match') {
+            resultSubmitRequiresReconcile.value = true;
+            resultSubmitStatusDetail.value = assessment.message;
+            resultSubmitStatusReasonCode.value = assessment.reasonCode;
+        }
     },
 );
 const lastSyncLabel = computed(() => {
@@ -8761,16 +8841,47 @@ function formatResultSyncFailureMessage(
     rejectReason: unknown,
     resultTraceId: unknown,
 ) {
-    const base =
+    const initialBase =
         (message || '').toString().trim() ||
         'Result saved locally pending sync.';
     const failureClassText = (syncFailureClass ?? '').toString().trim();
     const rejectReasonText = (rejectReason ?? '').toString().trim();
+    const normalizedFailureClass = failureClassText.toLowerCase();
+    const normalizedRejectReason = rejectReasonText.toLowerCase();
     const resultTraceIdText = (resultTraceId ?? '').toString().trim();
+    let base = initialBase;
+    let usedMappedMessage = false;
+
+    if (normalizedRejectReason === 'match_not_ready') {
+        base =
+            'Event Host says this bout is not ready yet. Reconcile the live queue before scoring again.';
+        usedMappedMessage = true;
+    } else if (normalizedRejectReason === 'winner_id_invalid') {
+        base =
+            'Event Host rejected the winner mapping. Reconcile the live queue before scoring again.';
+        usedMappedMessage = true;
+    } else if (normalizedFailureClass === 'network_failure') {
+        base =
+            'Event Host unreachable. Result saved locally pending sync.';
+        usedMappedMessage = true;
+    } else if (normalizedFailureClass === 'skipped_missing_winner_id') {
+        base =
+            'Canonical competitor IDs are missing. Result saved locally pending sync until the queue is reconciled.';
+        usedMappedMessage = true;
+    } else if (normalizedFailureClass === 'admin_reject') {
+        base =
+            'Event Host rejected this result. Reconcile the live queue before scoring again.';
+        usedMappedMessage = true;
+    } else if (normalizedFailureClass === 'unexpected_response') {
+        base =
+            'Event Host returned an unexpected response. Result saved locally pending sync.';
+        usedMappedMessage = true;
+    }
+
     const extras: string[] = [];
-    if (rejectReasonText) {
+    if (!usedMappedMessage && rejectReasonText) {
         extras.push(`reason: ${rejectReasonText}`);
-    } else if (failureClassText) {
+    } else if (!usedMappedMessage && failureClassText) {
         extras.push(`class: ${failureClassText}`);
     }
     if (resultTraceIdText) {
@@ -8893,6 +9004,11 @@ function getControllerApiErrorStatus(error: unknown): number | null {
         : null;
 }
 
+function getControllerApiErrorCode(error: unknown): string | null {
+    const code = (error as ControllerApiError | undefined)?.code;
+    return typeof code === 'string' && code.trim() ? code.trim() : null;
+}
+
 function getPendingResultSyncErrorMessage(error: unknown) {
     if (error instanceof Error) return error.message || 'Unknown sync error';
     return error == null ? 'Unknown sync error' : String(error);
@@ -8902,7 +9018,12 @@ function shouldQueuePendingResultSync(error: unknown) {
     const status = getControllerApiErrorStatus(error);
     if (status != null && [400, 404, 409, 422].includes(status)) return false;
 
-    const text = getPendingResultSyncErrorMessage(error).toLowerCase();
+    const text = [
+        getPendingResultSyncErrorMessage(error),
+        getControllerApiErrorCode(error) || '',
+    ]
+        .join(' ')
+        .toLowerCase();
     if (!text) return true;
 
     return !(
@@ -9196,9 +9317,18 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
     if (isPendingResultSyncBusy.value) return;
     if (!syncHasServer.value || !isOnline.value) return;
 
-    const retryableItems = pendingResultSyncItems.value.filter(
-        (item) => item.sync_state !== 'blocked',
-    );
+    const retryableItems = pendingResultSyncItems.value
+        .filter((item) => item.sync_state !== 'blocked')
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+            const leftTime = Date.parse(left.item.created_at || '');
+            const rightTime = Date.parse(right.item.created_at || '');
+            if (Number.isFinite(leftTime) && Number.isFinite(rightTime)) {
+                if (leftTime !== rightTime) return leftTime - rightTime;
+            }
+            return left.index - right.index;
+        })
+        .map(({ item }) => item);
     if (retryableItems.length === 0) return;
 
     isPendingResultSyncBusy.value = true;
@@ -9563,16 +9693,35 @@ function getAutoLoadPausedReason(
 
     if (!candidates.length) return null;
 
-    const loadable = candidates.filter((item: any) => canLoadMatch(item));
+    const assessedCandidates = candidates.map((item: any) => ({
+        item,
+        assessment: assessMatchQueueEligibility(item, null, {
+            requireExplicitSignals: shouldRequireExplicitQueueSignalsForProgression(),
+        }),
+    }));
+    const loadable = assessedCandidates.filter(
+        ({ assessment }) => assessment.ready,
+    );
     if (loadable.length) return null;
 
-    const unresolved = candidates.filter((item: any) => {
-        const { one, two } = resolvePlayerNames(item);
-        return !isRealPlayer(one) || !isRealPlayer(two);
-    });
+    const unresolved = assessedCandidates.filter(
+        ({ assessment }) => assessment.reasonCode === 'unresolved_competitors',
+    );
+    const needsConfirmation = assessedCandidates.filter(({ assessment }) =>
+        [
+            'needs_server_confirmation',
+            'participants_unconfirmed',
+            'not_displayable',
+            'missing_canonical_ids',
+        ].includes((assessment.reasonCode || '').toString()),
+    );
+
+    if (needsConfirmation.length) {
+        return 'Auto-load paused: next cached matches still need Event Host confirmation.';
+    }
 
     if (!unresolved.length)
-        return 'Auto-load paused: next matches are not ready.';
+        return 'Auto-load paused: cached queue is inconsistent. Reconnect Event Host to reconcile.';
     return `Auto-load paused: ${unresolved.length} next match${unresolved.length === 1 ? '' : 'es'} still unresolved (TBD/BYE).`;
 }
 
@@ -9601,7 +9750,10 @@ function getWaitingForNextBoutMessage(
 ) {
     const pausedReason = getAutoLoadPausedReason(excludeMatchId);
     if (pausedReason) {
-        return 'Match finished. Waiting for the next resolved bout from the saved queue snapshot.';
+        const detail = pausedReason.replace(/^Auto-load paused:\s*/i, '').trim();
+        return detail
+            ? `Match finished. ${detail}`
+            : 'Match finished. Waiting for the next resolved bout from the saved queue snapshot.';
     }
 
     if (
@@ -10430,12 +10582,38 @@ function getQueueReadyState(match: any) {
     };
 }
 
-function getMatchReadyBlockReason(
+function shouldRequireExplicitQueueSignalsForProgression() {
+    return (
+        syncHasServer.value ||
+        queueSourceMode.value === 'queue_api' ||
+        queueSourceMode.value === 'cached_queue' ||
+        queueSourceMode.value === 'offline_cache' ||
+        queueIsDegraded.value ||
+        !!pendingLiveSnapshotRecoveryContextKey.value
+    );
+}
+
+function assessMatchQueueEligibility(
     match: any,
     selectedMatchId: number | string | null = null,
+    options: {
+        requireExplicitSignals?: boolean;
+    } = {},
 ) {
+    const requireExplicitSignals =
+        options.requireExplicitSignals ??
+        shouldRequireExplicitQueueSignalsForProgression();
+
     if (!match || typeof match !== 'object') {
-        return 'Waiting for the latest Admin queue confirmation for this bout.';
+        return {
+            ready: false,
+            reasonCode: 'missing_match',
+            message: requireExplicitSignals
+                ? 'This bout is not confirmed in the latest queue snapshot yet.'
+                : 'Waiting for the latest Admin queue confirmation for this bout.',
+            state: null,
+            requireExplicitSignals,
+        };
     }
 
     const state = getQueueReadyState(match);
@@ -10444,21 +10622,94 @@ function getMatchReadyBlockReason(
         state.matchId != null &&
         String(state.matchId) !== String(selectedMatchId)
     ) {
-        return 'The live queue moved to a different match. Refreshing the controller before result submission.';
+        return {
+            ready: false,
+            reasonCode: 'moved_to_different_match',
+            message:
+                'Event Host moved the ring to a different bout. Reconcile the queue before recording another result.',
+            state,
+            requireExplicitSignals,
+        };
     }
-    if (state.status === 'completed')
-        return 'This bout is already completed in the live queue.';
-    if (!state.hasResolvedPlayers)
-        return 'Waiting for both competitors to be resolved in the live queue.';
-    if (!state.participantsConfirmed)
-        return 'Waiting for Admin to confirm both competitors for this bout.';
-    if (!state.isDisplayable)
-        return 'Waiting for this bout to become displayable in the live queue.';
-    if (state.playerOneId == null || state.playerTwoId == null) {
-        return 'Waiting for canonical competitor IDs from the live queue.';
+    if (state.status === 'completed') {
+        return {
+            ready: false,
+            reasonCode: 'match_completed',
+            message: 'This bout is already completed in the live queue.',
+            state,
+            requireExplicitSignals,
+        };
+    }
+    if (!state.hasResolvedPlayers) {
+        return {
+            ready: false,
+            reasonCode: 'unresolved_competitors',
+            message: requireExplicitSignals
+                ? 'This bout is unresolved in the saved queue snapshot. Do not continue until Event Host confirms both competitors.'
+                : 'Waiting for both competitors to be resolved in the live queue.',
+            state,
+            requireExplicitSignals,
+        };
+    }
+    if (requireExplicitSignals && !state.hasExplicitSignals) {
+        return {
+            ready: false,
+            reasonCode: 'needs_server_confirmation',
+            message:
+                'This bout depends on a fresh Event Host confirmation that never reached the controller snapshot.',
+            state,
+            requireExplicitSignals,
+        };
+    }
+    if (state.hasExplicitSignals && !state.participantsConfirmed) {
+        return {
+            ready: false,
+            reasonCode: 'participants_unconfirmed',
+            message:
+                'Waiting for Event Host to confirm both competitors for this bout.',
+            state,
+            requireExplicitSignals,
+        };
+    }
+    if (state.hasExplicitSignals && !state.isDisplayable) {
+        return {
+            ready: false,
+            reasonCode: 'not_displayable',
+            message:
+                'Waiting for Event Host to mark this bout ready in the queue.',
+            state,
+            requireExplicitSignals,
+        };
+    }
+    if (
+        requireExplicitSignals &&
+        (state.playerOneId == null || state.playerTwoId == null)
+    ) {
+        return {
+            ready: false,
+            reasonCode: 'missing_canonical_ids',
+            message:
+                'Waiting for canonical competitor IDs from the Event Host queue.',
+            state,
+            requireExplicitSignals,
+        };
     }
 
-    return null;
+    return {
+        ready: true,
+        reasonCode: 'ready',
+        message: null,
+        state,
+        requireExplicitSignals,
+    };
+}
+
+function getMatchReadyBlockReason(
+    match: any,
+    selectedMatchId: number | string | null = null,
+) {
+    const assessment = assessMatchQueueEligibility(match, selectedMatchId);
+    return assessment.ready ? null : assessment.message;
 }
 
 function getTeamBrandingList(source: any): any[] {
@@ -10792,16 +11043,9 @@ function isRealPlayer(name: string) {
 }
 
 function canLoadMatch(m: any) {
-    const state = getQueueReadyState(m);
-    if (state.status === 'completed') return false;
-    if (!state.hasResolvedPlayers) return false;
-    if (!state.hasExplicitSignals) return true;
-    return (
-        state.participantsConfirmed &&
-        state.isDisplayable &&
-        state.playerOneId != null &&
-        state.playerTwoId != null
-    );
+    return assessMatchQueueEligibility(m, null, {
+        requireExplicitSignals: shouldRequireExplicitQueueSignalsForProgression(),
+    }).ready;
 }
 
 function hasPristinePlayerScore(player: PlayerScore) {
@@ -10905,9 +11149,37 @@ async function reconcileAuthoritativeNextMatch(
     return true;
 }
 
+function markResultSubmitReconcileRequired(
+    message: string,
+    reasonCode = 'reconcile_required',
+) {
+    resultSubmitRequiresReconcile.value = true;
+    resultSubmitAllowsOfflineContinuation.value = false;
+    resultSubmitBlockReason.value = message;
+    resultSubmitStatusDetail.value = message;
+    resultSubmitStatusReasonCode.value = reasonCode;
+}
+
+function markResultSubmitOfflineContinuation(
+    message: string | null = null,
+    reasonCode = 'offline_cached_confirmed',
+) {
+    resultSubmitRequiresReconcile.value = false;
+    resultSubmitAllowsOfflineContinuation.value = true;
+    if (message == null) {
+        resultSubmitBlockReason.value = null;
+    }
+    resultSubmitStatusDetail.value = message;
+    resultSubmitStatusReasonCode.value = reasonCode;
+}
+
 function clearResultSubmitGateState() {
     isResultGateChecking.value = false;
     resultSubmitBlockReason.value = null;
+    resultSubmitRequiresReconcile.value = false;
+    resultSubmitAllowsOfflineContinuation.value = false;
+    resultSubmitStatusDetail.value = null;
+    resultSubmitStatusReasonCode.value = null;
 }
 
 async function refreshCurrentMatchSubmitGate(
@@ -10926,22 +11198,32 @@ async function refreshCurrentMatchSubmitGate(
         };
     }
 
+    const localMatch =
+        matchesList.value.find((item: any) =>
+            isMatchIdEqual(item, selectedMatchId),
+        ) || null;
     const tournamentId = selectedTournamentId.value;
     const ringText = (selectedRing.value || '').toString().trim();
     if (!syncHasServer.value || tournamentId == null || !ringText) {
         clearResultSubmitGateState();
-        const localMatch =
-            matchesList.value.find((item: any) =>
-                isMatchIdEqual(item, selectedMatchId),
-            ) || null;
+        const assessment = assessMatchQueueEligibility(localMatch, selectedMatchId, {
+            requireExplicitSignals: false,
+        });
+        resultSubmitBlockReason.value = assessment.ready
+            ? null
+            : assessment.message;
         return {
-            ready: !getMatchReadyBlockReason(localMatch, selectedMatchId),
+            ready: assessment.ready,
             match: localMatch,
         };
     }
 
     isResultGateChecking.value = true;
     resultSubmitBlockReason.value = null;
+    resultSubmitRequiresReconcile.value = false;
+    resultSubmitAllowsOfflineContinuation.value = false;
+    resultSubmitStatusDetail.value = null;
+    resultSubmitStatusReasonCode.value = null;
 
     try {
         const queuePayload = await getRingQueueRemote(tournamentId, ringText);
@@ -10956,18 +11238,27 @@ async function refreshCurrentMatchSubmitGate(
             matchesList.value.find((item: any) =>
                 isMatchIdEqual(item, selectedMatchId),
             ) || null;
-        const reason = getMatchReadyBlockReason(
+        const assessment = assessMatchQueueEligibility(
             refreshedMatch,
             selectedMatchId,
+            {
+                requireExplicitSignals: true,
+            },
         );
+        const reason = assessment.ready ? null : assessment.message;
         resultSubmitBlockReason.value = reason;
+        resultSubmitStatusReasonCode.value = assessment.reasonCode;
+        resultSubmitStatusDetail.value = reason;
+        if (!assessment.ready && assessment.reasonCode === 'moved_to_different_match') {
+            resultSubmitRequiresReconcile.value = true;
+        }
 
         if (reason && options.announceFailures) {
             showBanner(reason, options.bannerType ?? 'info', 5200);
         }
 
         return {
-            ready: !reason,
+            ready: assessment.ready,
             match: refreshedMatch,
         };
     } catch (error) {
@@ -10975,11 +11266,45 @@ async function refreshCurrentMatchSubmitGate(
             error instanceof Error
                 ? error.message
                 : 'Failed to refresh the live queue.';
-        resultSubmitBlockReason.value = `Waiting for live queue confirmation: ${message}`;
+        const fallbackAssessment = assessMatchQueueEligibility(
+            localMatch,
+            selectedMatchId,
+            {
+                requireExplicitSignals: true,
+            },
+        );
+
+        if (fallbackAssessment.ready && localMatch) {
+            markResultSubmitOfflineContinuation();
+
+            if (options.announceFailures) {
+                showBanner(
+                    'Event Host unavailable. Using the last confirmed cached bout for offline continuation.',
+                    options.bannerType ?? 'info',
+                    5200,
+                );
+            }
+
+            return {
+                ready: true,
+                match: localMatch,
+                error,
+                degraded: true,
+            };
+        }
+
+        const detail = fallbackAssessment.message
+            ? `Event Host unreachable. ${fallbackAssessment.message}`
+            : `Event Host unreachable. ${message}`;
+        markResultSubmitOfflineContinuation(
+            detail,
+            fallbackAssessment.reasonCode || 'offline_cached_insufficient',
+        );
+        resultSubmitBlockReason.value = detail;
 
         if (options.announceFailures) {
             showBanner(
-                resultSubmitBlockReason.value,
+                detail,
                 options.bannerType ?? 'error',
                 6500,
             );
@@ -11009,7 +11334,11 @@ function shouldReconcileRejectedResult(
     )
         return true;
 
-    const text = [getPendingResultSyncErrorMessage(error), rejectReason || '']
+    const text = [
+        getPendingResultSyncErrorMessage(error),
+        getControllerApiErrorCode(error) || '',
+        rejectReason || '',
+    ]
         .join(' ')
         .toLowerCase();
 
@@ -11030,6 +11359,10 @@ async function reconcileRejectedResultSubmission(config: {
     tournamentId: number | null;
     ringText: string;
 }) {
+    markResultSubmitReconcileRequired(
+        config.message || 'Live queue rejected this result. Reconcile before scoring again.',
+        'semantic_reject',
+    );
     showFinishModal.value = false;
     showLegacyFinishBanner.value = false;
     gameState.winner = null;
@@ -11037,8 +11370,13 @@ async function reconcileRejectedResultSubmission(config: {
 
     const { ready, match } = await refreshCurrentMatchSubmitGate();
     if (ready && match) {
+        resultSubmitRequiresReconcile.value = false;
+        resultSubmitStatusDetail.value = null;
+        resultSubmitStatusReasonCode.value = null;
         showBanner(
-            `${config.message} Live queue refreshed. Review the bout and finish again once ready.`,
+            resultSubmitQueueMode.value === 'offline_degraded'
+                ? `${config.message} Event Host is offline again. The controller is holding on the last confirmed cached bout.`
+                : `${config.message} Live queue refreshed. Review the bout and finish again once ready.`,
             'info',
             6500,
         );
@@ -11066,6 +11404,7 @@ async function reconcileRejectedResultSubmission(config: {
         const waitingMessage =
             resultSubmitBlockReason.value ||
             getWaitingForNextBoutMessage(config.matchId);
+        markResultSubmitReconcileRequired(waitingMessage, 'semantic_reject');
         await clearCompletedBoutToWaitingState(waitingMessage);
     }
 
@@ -11666,6 +12005,12 @@ async function handleSubmitResult() {
                 controllerSnapshotVersion.value ?? null,
             upstream_generated_at: upstreamGeneratedAt.value ?? null,
             controller_generated_at: controllerGeneratedAt.value ?? null,
+            submit_queue_mode: resultSubmitQueueMode.value,
+            submit_queue_reason_code: resultSubmitStatusReasonCode.value ?? null,
+            submit_queue_degraded:
+                resultSubmitQueueMode.value === 'offline_degraded',
+            submit_queue_reconcile_required:
+                resultSubmitQueueMode.value === 'reconcile_required',
             ...getRendererRuntimeIdentity(),
         };
 

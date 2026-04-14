@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "prebuild": "node scripts/stop-packaged-app.mjs",
-    "prebuild:portable": "node scripts/stop-packaged-app.mjs",
-    "prebuild:nsis": "node scripts/stop-packaged-app.mjs",
+    "prepare:portable-runtime": "node scripts/stage-portable-runtime.mjs",
+    "prebuild": "npm run prepare:portable-runtime && node scripts/stop-packaged-app.mjs",
+    "prebuild:portable": "npm run prepare:portable-runtime && node scripts/stop-packaged-app.mjs",
+    "prebuild:nsis": "npm run prepare:portable-runtime && node scripts/stop-packaged-app.mjs",
     "start": "electron .",
     "verify:packaged-runtime": "node scripts/verify-packaged-runtime.mjs",
-    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-runtime",
-    "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-runtime",
-    "build:nsis": "node scripts/build-nsis.mjs && npm run verify:packaged-runtime"
+    "verify:packaged-bootstrap": "node scripts/verify-packaged-bootstrap.mjs",
+    "verify:packaged-release": "npm run verify:packaged-runtime && npm run verify:packaged-bootstrap",
+    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-release",
+    "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-release",
+    "build:nsis": "node scripts/build-nsis.mjs && npm run verify:packaged-release"
   },
   "build": {
     "directories": {
@@ -93,7 +96,7 @@
         "to": "laravel/artisan"
       },
       {
-        "from": "../portable/runtime",
+        "from": "runtime-stage",
         "to": "portable/runtime"
       }
     ]

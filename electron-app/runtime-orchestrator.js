@@ -297,11 +297,21 @@ class RuntimeOrchestrator {
     await this.runStage('mark app ready', async () => {
       this.debugState.finalStatus = 'ready';
       this.debugState.readyAt = new Date().toISOString();
-      this.logger.info('Packaged runtime marked ready', {
-        localBackendBaseUrl: this.localBackendBaseUrl,
-        phpBin: this.state.phpBin,
-        mariadbBin: this.state.mysqld,
-      });
+      if (this.isPackaged) {
+        this.logger.info('Packaged runtime marked ready', {
+          localBackendBaseUrl: this.localBackendBaseUrl,
+          runtimeRoot: this.state.runtimeRoot,
+          phpBin: this.state.phpBin,
+          mariadbBin: this.state.mysqld,
+          laravelRoot: this.state.laravelRoot,
+        });
+      } else {
+        this.logger.info('Development runtime marked ready', {
+          localBackendBaseUrl: this.localBackendBaseUrl,
+          phpBin: this.state.phpBin,
+          mariadbBin: this.state.mysqld,
+        });
+      }
       this.persistDebugState();
     });
 
@@ -431,17 +441,24 @@ class RuntimeOrchestrator {
       phpIniScanDir: this.childEnv.PHP_INI_SCAN_DIR || null,
     };
 
-    this.logger.info('Resolved packaged runtime paths', {
-      localBackendBaseUrl: this.localBackendBaseUrl,
-      phpBin: this.state.phpBin,
-      phpIni: this.state.phpIni,
-      mysqlBin: this.state.mysqld,
-      mysqlPort: this.ports.db,
-      laravelRoot: this.state.laravelRoot,
-      logsDir: this.logsDir,
-      userDataPath: this.userDataPath,
-      workingDirectory: process.cwd(),
-    });
+    if (this.isPackaged) {
+      const packagedPathChecks = this.collectPackagedRuntimePathChecks();
+      this.debugState.packagedPathChecks = packagedPathChecks;
+      this.logger.info('Resolved packaged runtime paths', {
+        localBackendBaseUrl: this.localBackendBaseUrl,
+        runtimeRoot: this.state.runtimeRoot,
+        portableRuntimeRoot: this.state.portableRuntimeRoot,
+        phpBin: this.state.phpBin,
+        phpIni: this.state.phpIni,
+        mariadbBin: this.state.mysqld,
+        mysqlPort: this.ports.db,
+        laravelRoot: this.state.laravelRoot,
+        logsDir: this.logsDir,
+        userDataPath: this.userDataPath,
+        workingDirectory: process.cwd(),
+        pathChecks: packagedPathChecks,
+      });
+    }
 
     if (this.isPackaged && isLoopback8000(this.childEnv.KURASH_API_BASE)) {
       this.logger.warn('Packaged remote admin API still resolves to a stale loopback endpoint. Clear it or update Fallback Setup.', {
@@ -450,6 +467,25 @@ class RuntimeOrchestrator {
     }
 
     this.persistDebugState();
+  }
+
+  collectPackagedRuntimePathChecks() {
+    if (!this.isPackaged || !this.state) return [];
+
+    return [
+      { label: 'portable runtime root', target: this.state.portableRuntimeRoot, exists: fs.existsSync(this.state.portableRuntimeRoot) },
+      { label: 'Laravel root', target: this.state.laravelRoot, exists: fs.existsSync(this.state.laravelRoot) },
+      { label: 'PHP executable', target: this.state.phpBin, exists: fs.existsSync(this.state.phpBin) },
+      { label: 'PHP ini', target: this.state.phpIni, exists: fs.existsSync(this.state.phpIni) },
+      { label: 'PHP ext directory', target: this.state.phpExtDir, exists: fs.existsSync(this.state.phpExtDir) },
+      { label: 'MariaDB directory', target: this.state.mysqlDir, exists: fs.existsSync(this.state.mysqlDir) },
+      { label: 'MariaDB mysqld.exe', target: this.state.mysqld, exists: fs.existsSync(this.state.mysqld) },
+      { label: 'MariaDB mysql.exe', target: this.state.mysql, exists: fs.existsSync(this.state.mysql) },
+      { label: 'MariaDB mysqladmin.exe', target: this.state.mysqladmin, exists: fs.existsSync(this.state.mysqladmin) },
+      { label: 'MariaDB mysql_install_db.exe', target: this.state.mysqlInstallDb, exists: fs.existsSync(this.state.mysqlInstallDb) },
+      { label: 'MariaDB template', target: this.state.mariadbTemplatePath, exists: fs.existsSync(this.state.mariadbTemplatePath) },
+      { label: 'Laravel storage seed', target: this.state.laravelStorageSeedAppPath, exists: fs.existsSync(this.state.laravelStorageSeedAppPath) },
+    ];
   }
 
   buildChildEnv() {
@@ -567,29 +603,19 @@ class RuntimeOrchestrator {
 
   verifyRequiredBinaries() {
     if (this.isPackaged) {
-      if (!fs.existsSync(this.state.phpBin)) {
-        throw new RuntimeStageError('verify required binaries exist', 'PHP runtime invalid', {
-          missingPath: this.state.phpBin,
-        });
-      }
+      const packagedPathChecks = this.collectPackagedRuntimePathChecks();
+      const missingPackagedPathCheck = packagedPathChecks.find((item) => !item.exists);
+      this.debugState.packagedPathChecks = packagedPathChecks;
+      this.logger.info('Packaged runtime required path checks', {
+        checks: packagedPathChecks,
+        missingCount: packagedPathChecks.filter((item) => !item.exists).length,
+      });
 
-      if (!fs.existsSync(this.state.phpIni)) {
-        throw new RuntimeStageError('verify required binaries exist', 'PHP runtime invalid', {
-          missingPath: this.state.phpIni,
-        });
-      }
-
-      if (!fs.existsSync(this.state.laravelStorageSeedAppPath)) {
-        throw new RuntimeStageError('verify required binaries exist', 'Packaged Laravel storage seed missing', {
-          missingPath: this.state.laravelStorageSeedAppPath,
-        });
-      }
-
-      const requiredMariaDbPaths = [this.state.mysqld, this.state.mysql, this.state.mysqladmin, this.state.mysqlInstallDb];
-      const missingMariaDbPath = requiredMariaDbPaths.find((candidate) => !fs.existsSync(candidate));
-      if (missingMariaDbPath) {
-        throw new RuntimeStageError('verify required binaries exist', 'MariaDB executable not found', {
-          missingPath: missingMariaDbPath,
+      if (missingPackagedPathCheck) {
+        throw new RuntimeStageError('verify required binaries exist', 'Packaged runtime invalid', {
+          missingPath: missingPackagedPathCheck.target,
+          missingLabel: missingPackagedPathCheck.label,
+          packagedPathChecks,
         });
       }
     } else {
@@ -1425,9 +1451,6 @@ module.exports = {
   REQUIRED_PHP_EXTENSION_FILES,
   REQUIRED_PHP_EXTENSIONS,
 };
-
-
-
 
 
 

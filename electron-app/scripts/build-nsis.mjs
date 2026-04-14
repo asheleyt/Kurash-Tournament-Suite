@@ -64,6 +64,11 @@ function getExpectedBlockmapPath(installerPath) {
   return `${installerPath}.blockmap`;
 }
 
+function getPortableValidationExePath() {
+  const executableName = packageJson.build?.executableName || 'Kurash Scoreboard';
+  return join(buildOutputDir, 'win-unpacked', `${executableName}.exe`);
+}
+
 function removeStaleNsisArtifacts() {
   const installerPath = getExpectedInstallerPath();
   const uninstallerPath = getExpectedUninstallerPath(installerPath);
@@ -108,11 +113,30 @@ async function seedUninstallerFromStub(installerPath, uninstallerPath) {
   return existsSync(uninstallerPath);
 }
 
+function assertExpectedArtifactsExist() {
+  const installerPath = getExpectedInstallerPath();
+  const portableExePath = getPortableValidationExePath();
+
+  if (!existsSync(installerPath)) {
+    console.error(`[build-nsis] Missing expected NSIS installer artifact: ${installerPath}`);
+    process.exit(1);
+  }
+
+  if (!existsSync(portableExePath)) {
+    console.error(`[build-nsis] Missing supported portable validation artifact: ${portableExePath}`);
+    process.exit(1);
+  }
+
+  console.log(`[build-nsis] NSIS installer ready: ${installerPath}`);
+  console.log(`[build-nsis] Supported runtime validation artifact: ${portableExePath}`);
+}
+
 async function main() {
   removeStaleNsisArtifacts();
 
   const firstAttempt = runElectronBuilder();
   if (firstAttempt.status === 0) {
+    assertExpectedArtifactsExist();
     return;
   }
 
@@ -134,6 +158,8 @@ async function main() {
   if (secondAttempt.status !== 0) {
     process.exit(secondAttempt.status || 1);
   }
+
+  assertExpectedArtifactsExist();
 }
 
 await main();

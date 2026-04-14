@@ -11,6 +11,19 @@ app.commandLine.appendSwitch('disable-http-cache');
 // Keep packaged userData/runtime paths stable while installer-facing branding moves to KTS.
 app.setName('Kurash Scoreboard');
 
+const requestedUserDataRoot = String(process.env.KURASH_USER_DATA_ROOT || '').trim();
+if (requestedUserDataRoot) {
+  try {
+    app.setPath('userData', requestedUserDataRoot);
+    console.log(`[startup] Overrode Electron userData path: ${requestedUserDataRoot}`);
+  } catch (error) {
+    console.error('[startup] Failed to override Electron userData path.', {
+      requestedUserDataRoot,
+      error: error && error.message ? error.message : String(error),
+    });
+  }
+}
+
 const bootstrapOnly = process.argv.includes('--bootstrap-only') || process.env.KURASH_BOOTSTRAP_ONLY === '1';
 
 let controllerWindow;

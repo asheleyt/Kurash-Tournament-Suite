@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\TournamentMatch;
+use App\Services\TournamentSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -280,6 +281,36 @@ class TournamentControllerResultTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_post_result_with_admin_base_treats_match_not_ready_as_admin_reject_even_on_http_409(): void
+    {
+        Http::fake([
+            'http://admin.test/api/matches/1001/result' => Http::response([
+                'message' => 'Match not ready yet.',
+                'reject_reason' => 'match_not_ready',
+                'result_trace_id' => 'trace-reconcile-1001',
+            ], 409),
+        ]);
+
+        $match = $this->makeSyncableMatch();
+
+        $response = $this->postJson('/api/matches/1001/result?admin_base=http://admin.test/api', [
+            'winner_id' => 501,
+            'winner_side' => 'player1',
+            'red_score' => 10,
+            'blue_score' => 0,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('sync_status', 'pending_offline')
+            ->assertJsonPath('sync_failure_class', 'admin_reject')
+            ->assertJsonPath('reject_reason', 'match_not_ready')
+            ->assertJsonPath('result_trace_id', 'trace-reconcile-1001');
+
+        $match->refresh();
+        $this->assertFalse((bool) $match->is_synced);
+        Http::assertSentCount(1);
+    }
+
     public function test_post_result_with_admin_base_does_not_require_obsolete_follow_up_update(): void
     {
         Http::fake([
@@ -359,6 +390,70 @@ class TournamentControllerResultTest extends TestCase
         $this->assertSame('player1', $match->winner);
         $this->assertFalse((bool) $match->is_synced);
         Http::assertSentCount(0);
+    }
+
+    public function test_sync_pending_results_replays_oldest_unsynced_results_first(): void
+    {
+        $olderMatch = $this->makeSyncableMatch([
+            'remote_id' => 1001,
+            'match_number' => 1,
+        ]);
+        $olderMatch->forceFill([
+            'status' => 'completed',
+            'winner' => 'player1',
+            'result_details' => [
+                'score_p1' => 10,
+                'score_p2' => 0,
+            ],
+            'is_synced' => false,
+        ]);
+        $olderMatch->timestamps = false;
+        $olderMatch->updated_at = now()->subMinutes(2);
+        $olderMatch->save();
+        $olderMatch->timestamps = true;
+
+        $newerMatch = $this->makeSyncableMatch([
+            'remote_id' => 1002,
+            'match_number' => 2,
+        ]);
+        $newerMatch->forceFill([
+            'status' => 'completed',
+            'winner' => 'player2',
+            'result_details' => [
+                'score_p1' => 4,
+                'score_p2' => 10,
+            ],
+            'is_synced' => false,
+        ]);
+        $newerMatch->timestamps = false;
+        $newerMatch->updated_at = now()->subMinute();
+        $newerMatch->save();
+        $newerMatch->timestamps = true;
+
+        $requestUrls = [];
+        Http::fake(function ($request) use (&$requestUrls) {
+            $requestUrls[] = $request->url();
+
+            return Http::response([
+                'success' => true,
+            ], 200);
+        });
+
+        $service = app(TournamentSyncService::class);
+        $service->setBaseUrl('http://admin.test/api');
+        $result = $service->syncPendingResults();
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(2, $result['synced_count']);
+        $this->assertSame([
+            'http://admin.test/api/matches/1001/result',
+            'http://admin.test/api/matches/1002/result',
+        ], $requestUrls);
+
+        $olderMatch->refresh();
+        $newerMatch->refresh();
+        $this->assertTrue((bool) $olderMatch->is_synced);
+        $this->assertTrue((bool) $newerMatch->is_synced);
     }
 
     private function makeSyncableMatch(array $overrides = []): TournamentMatch

@@ -30,6 +30,7 @@ node_modules/
 electron-app/dist/
 electron-app/build-output/
 electron-app/node_modules/
+electron-app/runtime-stage/
 Kurash_Scoreboard_Release/
 *.exe
 *.zip
@@ -49,4 +50,3 @@ portable/runtime/**
 .codex-http-probe/
 .codex-http-serve-probe/
 review_packages/
-

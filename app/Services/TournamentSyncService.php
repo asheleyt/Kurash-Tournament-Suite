@@ -1365,6 +1365,16 @@ class TournamentSyncService
             );
         }
 
+        if (is_array($json) && $rejectReason !== '') {
+            return $this->syncResult(
+                false,
+                $message !== '' ? $message : $fallbackMessage,
+                'admin_reject',
+                $rejectReason,
+                $resultTraceId !== '' ? $resultTraceId : null
+            );
+        }
+
         if (str_contains($contentType, 'text/html') || str_starts_with($bodyStart, '<!doctype') || str_starts_with($bodyStart, '<html')) {
             return $this->syncResult(
                 false,
@@ -1635,6 +1645,8 @@ class TournamentSyncService
         $pendingMatches = TournamentMatch::where('status', 'completed')
             ->where('is_synced', false)
             ->whereNotNull('remote_id')
+            ->orderBy('updated_at')
+            ->orderBy('id')
             ->get();
 
         $syncedCount = 0;

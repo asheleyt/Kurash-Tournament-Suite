@@ -64,6 +64,8 @@ const forbiddenChecks = [
   { label: 'legacy portable bin payload', target: join(resourcesRoot, 'portable', 'bin') },
   { label: 'bundled writable storage framework cache', target: join(laravelRoot, 'storage', 'framework') },
   { label: 'bundled writable storage logs', target: join(laravelRoot, 'storage', 'logs') },
+  { label: 'bundled MariaDB data payload', target: join(packagedMariaDbRoot, 'data') },
+  { label: 'bundled MariaDB copied data payload', target: join(packagedMariaDbRoot, 'data - Copy') },
   { label: 'bundled MariaDB backup payload', target: join(packagedMariaDbRoot, 'backup') },
   { label: 'bundled MariaDB data-old payload', target: join(packagedMariaDbRoot, 'data-old') },
   { label: 'bundled MariaDB tmp payload', target: join(packagedMariaDbRoot, 'tmp') },

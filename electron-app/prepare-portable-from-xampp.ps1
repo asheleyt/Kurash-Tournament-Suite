@@ -2,50 +2,36 @@
 Stages the deterministic portable runtime layout used by the packaged controller/scoreboard app.
 
 Usage (run in PowerShell):
-  1) Verify the local XAMPP PHP / MySQL paths below.
-  2) Run: .\prepare-portable-from-xampp.ps1
-  3) Rebuild Electron: npm run build:electron
+  1) Optionally override the source directories:
+       .\prepare-portable-from-xampp.ps1 -PhpSource 'C:\xampp\php' -MariaDbSource 'C:\xampp\mysql'
+  2) Rebuild Electron after staging:
+       cd electron-app
+       npm run build:portable
+
+The Electron prebuild path now invokes the shared Node runtime stager automatically.
+This wrapper is still useful when you want to force a specific source.
 #>
+
+param(
+  [string]$PhpSource = 'C:\xampp\php',
+  [string]$MariaDbSource = 'C:\xampp\mysql'
+)
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Split-Path -Parent $PSScriptRoot
-
-$phpSrc = 'C:\xampp\php'
-$mysqlSrc = 'C:\xampp\mysql'
-
-$phpDest = Join-Path $repoRoot 'portable\runtime\php'
-$mysqlDest = Join-Path $repoRoot 'portable\runtime\mariadb'
-
-function Assert-Exists([string]$path, [string]$label) {
-  if (-not (Test-Path $path)) {
-    throw "$label not found: $path"
-  }
+$stageScript = Join-Path $PSScriptRoot 'scripts\stage-portable-runtime.mjs'
+if (-not (Test-Path -LiteralPath $stageScript)) {
+  throw "Missing runtime staging script: $stageScript"
 }
 
-Assert-Exists $phpSrc 'XAMPP PHP directory'
-Assert-Exists $mysqlSrc 'XAMPP MySQL directory'
-Assert-Exists (Join-Path $phpSrc 'php.exe') 'XAMPP php.exe'
-Assert-Exists (Join-Path $phpSrc 'php.ini') 'XAMPP php.ini'
-Assert-Exists (Join-Path $mysqlSrc 'bin\mysqld.exe') 'XAMPP mysqld.exe'
-Assert-Exists (Join-Path $mysqlSrc 'bin\mysql.exe') 'XAMPP mysql.exe'
-Assert-Exists (Join-Path $mysqlSrc 'bin\mysqladmin.exe') 'XAMPP mysqladmin.exe'
+$env:KTS_PHP_SOURCE = $PhpSource
+$env:KTS_MARIADB_SOURCE = $MariaDbSource
 
-Write-Host 'Copying PHP runtime from:' $phpSrc
-Write-Host 'to:' $phpDest
-New-Item -ItemType Directory -Force -Path $phpDest | Out-Null
-robocopy $phpSrc $phpDest /E /R:2 /W:2 /COPY:DAT /NFL /NDL | Out-Null
+Write-Host 'Staging deterministic portable runtime bundle via shared build script.'
+Write-Host " - PHP source: $PhpSource"
+Write-Host " - MariaDB source: $MariaDbSource"
 
-Write-Host 'Copying MariaDB runtime from:' $mysqlSrc
-Write-Host 'to:' $mysqlDest
-New-Item -ItemType Directory -Force -Path $mysqlDest | Out-Null
-robocopy $mysqlSrc $mysqlDest /E /XD data data-old backup tmp logs /R:2 /W:2 /COPY:DAT /NFL /NDL | Out-Null
-
-Write-Host 'Deterministic portable runtime staged successfully.'
-Write-Host 'Expected packaged runtime paths:'
-Write-Host " - $(Join-Path $phpDest 'php.exe')"
-Write-Host " - $(Join-Path $phpDest 'php.ini')"
-Write-Host " - $(Join-Path $mysqlDest 'bin\mysqld.exe')"
-Write-Host " - $(Join-Path $mysqlDest 'bin\mysql.exe')"
-Write-Host " - $(Join-Path $mysqlDest 'bin\mysqladmin.exe')"
-
+node $stageScript
+if ($LASTEXITCODE -ne 0) {
+  throw "Portable runtime staging failed with exit code $LASTEXITCODE."
+}

@@ -304,7 +304,8 @@ $resolvedExePath = (Resolve-Path -LiteralPath $ExePath).Path
 $runRoot = Join-Path $env:TEMP ('Kurash WinUnpacked Validation ' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $roamingPath = Join-Path $runRoot 'Roaming Profile With Spaces'
 $localPath = Join-Path $runRoot 'Local Profile With Spaces'
-$logsDir = Join-Path $roamingPath 'Kurash Scoreboard\logs'
+$userDataRoot = Join-Path $roamingPath 'Kurash Scoreboard'
+$logsDir = Join-Path $userDataRoot 'logs'
 $debugPath = Join-Path $logsDir 'portable-env-debug.json'
 $mainLogPath = Join-Path $logsDir 'main.log'
 if ([System.IO.Path]::IsPathRooted($ResultsPath)) {
@@ -323,8 +324,10 @@ $originalAppData = $env:APPDATA
 $originalLocalAppData = $env:LOCALAPPDATA
 $originalBootstrapOnly = $env:KURASH_BOOTSTRAP_ONLY
 $originalBootstrapOnlyHoldMs = $env:KURASH_BOOTSTRAP_ONLY_HOLD_MS
+$originalUserDataRoot = $env:KURASH_USER_DATA_ROOT
 $env:APPDATA = $roamingPath
 $env:LOCALAPPDATA = $localPath
+$env:KURASH_USER_DATA_ROOT = $userDataRoot
 if ($InteractiveMode) {
   Remove-Item Env:KURASH_BOOTSTRAP_ONLY -ErrorAction SilentlyContinue
   Remove-Item Env:KURASH_BOOTSTRAP_ONLY_HOLD_MS -ErrorAction SilentlyContinue
@@ -340,6 +343,7 @@ try {
     runRoot = $runRoot
     appData = $roamingPath
     localAppData = $localPath
+    userData = $userDataRoot
     logsDir = $logsDir
     isAdmin = [bool](([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
     xamppDetected = [bool]((Test-Path 'C:\xampp\mysql\bin\mysqld.exe') -or (Test-Path 'C:\xampp\mysql\bin\mysql.exe'))
@@ -416,4 +420,5 @@ finally {
   $env:LOCALAPPDATA = $originalLocalAppData
   $env:KURASH_BOOTSTRAP_ONLY = $originalBootstrapOnly
   $env:KURASH_BOOTSTRAP_ONLY_HOLD_MS = $originalBootstrapOnlyHoldMs
+  $env:KURASH_USER_DATA_ROOT = $originalUserDataRoot
 }
