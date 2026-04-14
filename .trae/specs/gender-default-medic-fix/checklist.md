@@ -1,0 +1,5 @@
+- [x] Referee Controller defaults Gender to none/empty
+- [x] Scoreboard shows "N/A" for Gender initially
+- [x] Selecting Gender and clicking "Save Input" updates Scoreboard
+- [x] Clicking Medic Timer for Player Right turns Scoreboard P2 Medic Box RED
+- [x] Clicking Medic Timer for Player Left turns Scoreboard P1 Medic Box RED

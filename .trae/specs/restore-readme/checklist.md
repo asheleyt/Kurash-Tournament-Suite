@@ -1,0 +1,2 @@
+- [x] `README.md` exists in the project root.
+- [x] `README.md` contains the correct project documentation sections.

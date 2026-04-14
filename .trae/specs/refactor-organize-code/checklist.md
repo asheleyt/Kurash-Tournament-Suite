@@ -1,0 +1,5 @@
+- [x] `refereeController.vue` is organized with clear section headers.
+- [x] `kurashScoreBoard.vue` is organized with clear section headers.
+- [x] All major functions have explanatory comments.
+- [x] Application compiles without errors.
+- [x] Manual verification confirms no features are broken.

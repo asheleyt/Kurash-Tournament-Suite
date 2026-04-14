@@ -1,0 +1,4 @@
+- [x] Scoreboard: Gender Box displays "N/A" by default (not "MALE").
+- [x] Scoreboard: Gender Box has a "GENDER" label above the value.
+- [x] Scoreboard: Weight Box has a "WEIGHT DIVISION" label above the value.
+- [x] Scoreboard: Header layout maintains balance with new labels.

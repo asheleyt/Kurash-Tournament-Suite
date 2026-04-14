@@ -1,0 +1,7 @@
+- [x] "Reset Timer" button opens a custom dialog instead of a native confirm box.
+- [x] Confirming "Reset Timer" in the dialog correctly resets the timer.
+- [x] Cancelling "Reset Timer" in the dialog does nothing.
+- [x] "Reset All" button opens a custom dialog instead of a native confirm box.
+- [x] Confirming "Reset All" in the dialog correctly resets the entire match state.
+- [x] Cancelling "Reset All" in the dialog does nothing.
+- [x] The dialogs match the application's UI style (using existing components).

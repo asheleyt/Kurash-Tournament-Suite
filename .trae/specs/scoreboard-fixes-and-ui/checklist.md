@@ -1,0 +1,4 @@
+- [x] Scoreboard: "Gender" label updates to "Female" when selected.
+- [x] Scoreboard: "Winner" popup appears when a winner is declared.
+- [x] Scoreboard: Main content is perfectly centered on the screen (horizontally and vertically).
+- [x] Scoreboard: Layout uses full screen width/height without weird gaps.

@@ -1,0 +1,11 @@
+# Tasks
+- [x] Task 1: Create Scoreboard QA Script: Create `tests/qa/scoreboard-check.cjs` to automate verification of `/kurashScoreBoard`.
+  - [x] SubTask 1.1: Adapt from `referee-check.cjs` to target the Scoreboard route.
+  - [x] SubTask 1.2: Add checks for critical UI elements (Timer, Scores, Penalties, Gender/Weight info).
+  - [x] SubTask 1.3: Add visual regression snapshot capability.
+- [x] Task 2: Execute QA Check: Run the newly created QA script against the running application.
+  - [x] SubTask 2.1: Run `node tests/qa/scoreboard-check.cjs`.
+  - [x] SubTask 2.2: Ensure report generation (HTML) is successful.
+- [x] Task 3: Document Findings: Create a Markdown documentation file `reports/QA_SCOREBOARD_REPORT.md` summarizing the QA results.
+  - [x] SubTask 3.1: Convert key findings from HTML report to Markdown format.
+  - [x] SubTask 3.2: Highlight any rendering or responsiveness issues.

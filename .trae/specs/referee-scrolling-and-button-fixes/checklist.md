@@ -1,0 +1,4 @@
+- [x] Referee: Main view scrolls ONLY when Settings are open.
+- [x] Referee: Main view is fixed (no scroll) when Settings are closed.
+- [x] Referee: Score Buttons (H, YO, CH) are taller (`h-24`), allowing better centering.
+- [x] Referee: "Reset" button height matches "Start" button (`h-12`).

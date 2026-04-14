@@ -1,0 +1,4 @@
+- [x] Referee Controller default gender is UNSELECTED
+- [x] Referee Controller default time is 00:00
+- [x] Match Settings Gender radio buttons are unchecked
+- [x] Timer Controls Gender buttons are gray/inactive

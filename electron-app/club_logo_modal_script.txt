@@ -1,0 +1,73 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { Upload, CheckCircle2, ChevronDownIcon, XCircle } from 'lucide-vue-next'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+
+const props = defineProps<{
+  show: boolean
+  clubTeams: string[]
+  teamLogoMap: Record<string, string>
+  teamCodeMap: Record<string, string>
+  uploadingLogo: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:show', value: boolean): void
+  (e: 'upload', team: string, code: string, file: File | null): void
+}>()
+
+const show = computed({
+  get() { return props.show },
+  set(val) { emit('update:show', val) }
+})
+
+const selectedTeam = ref<string>('')
+const selectedClubCode = ref<string>('')
+const selectedLogoFile = ref<File | null>(null)
+const logoPreviewUrl = ref<string>('')
+const clubLogoInput = ref<HTMLInputElement | null>(null)
+
+const savedLogoTeams = computed(() => {
+  const fromMap = Object.keys(props.teamLogoMap || {}).filter(t => !!props.teamLogoMap[t])
+  const fromClubs = (props.clubTeams || []).filter(t => !!props.teamLogoMap[t])
+  return Array.from(new Set([...fromMap, ...fromClubs])).sort()
+})
+
+function resolveImg(val: string) {
+  if (!val) return ''
+  if (val.startsWith('data:')) return val
+  if (val.startsWith('/')) return val
+  return `/images/${val}`
+}
+
+function onLogoFileChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (!target.files?.length) return
+  const file = target.files[0]
+  processClubLogoFile(file)
+}
+
+function handleClubLogoDrop(event: DragEvent) {
+  const file = event.dataTransfer?.files?.[0]
+  if (file && file.type.startsWith('image/')) {
+    processClubLogoFile(file)
+  }
+}
+
+function processClubLogoFile(file: File | null) {
+  selectedLogoFile.value = file
+  if (file) {
+    logoPreviewUrl.value = URL.createObjectURL(file)
+  } else {
+    logoPreviewUrl.value = ''
+  }
+}
+
+function confirmUploadClubLogo() {
+  emit('upload', selectedTeam.value, selectedClubCode.value, selectedLogoFile.value)
+  selectedLogoFile.value = null
+  logoPreviewUrl.value = ''
+}
+</script>
+

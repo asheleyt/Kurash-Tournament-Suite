@@ -1,0 +1,3 @@
+- [x] `Backlog` file reflects completed status for scoring, timer, and reset features.
+- [x] `README.md` includes a "Current Implementation Status" section.
+- [x] `README.md` correctly identifies Tournament/Bracket features as future work.

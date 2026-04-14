@@ -1,0 +1,5 @@
+- [x] Settings Panel shows "Player Right" (Cyan) on the left and "Player Left" (Green) on the right.
+- [x] Confirmation Modal shows flag images next to player names/countries.
+- [x] Typing "Player 1" (with number) triggers a validation error.
+- [x] Typing "Player@" (with symbol) triggers a validation error.
+- [x] Typing "John Doe" (letters/spaces) is valid.

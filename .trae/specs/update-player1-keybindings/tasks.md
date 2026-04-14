@@ -1,0 +1,17 @@
+# Tasks
+- [x] Task 1: Update useKeyboardShortcuts.ts
+  - [x] SubTask 1.1: Map `KeyI` to `player1PenaltyG`.
+  - [x] SubTask 1.2: Map `KeyO` to `player1PenaltyD`.
+  - [x] SubTask 1.3: Map `KeyP` to `player1PenaltyT`.
+  - [x] SubTask 1.4: Map `8` to `player1ScoreH`.
+  - [x] SubTask 1.5: Map `9` to `player1ScoreYO`.
+  - [x] SubTask 1.6: Map `0` to `player1ScoreCH`.
+- [x] Task 2: Update refereeController.vue Visuals
+  - [x] SubTask 2.1: Update Penalty G hotkey label to `I`.
+  - [x] SubTask 2.2: Update Penalty D hotkey label to `O`.
+  - [x] SubTask 2.3: Update Penalty T hotkey label to `P`.
+  - [x] SubTask 2.4: Update Score H hotkey label to `8`.
+  - [x] SubTask 2.5: Update Score YO hotkey label to `9`.
+  - [x] SubTask 2.6: Update Score CH hotkey label to `0`.
+- [x] Task 3: Verification
+  - [x] SubTask 3.1: Run `tests/qa/referee-check.cjs` (update if necessary to test new keys, or manual verify).

@@ -1,0 +1,5 @@
+- [x] Default time is 00:00 on load
+- [x] Clicking Medic button a second time stops/undoes the medic mode
+- [x] Referee Medic Indicator is Player Color when active
+- [x] Referee Medic Indicator turns Red when medic is done
+- [x] Scoreboard Medic Indicator updates (count/filled box) immediately on click

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Starting Kurash Tournament Suite...</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .loader {
+            border: 5px solid #1e293b;
+            border-top: 5px solid #3b82f6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 { margin: 0; font-weight: 300; letter-spacing: 1px; }
+        p { color: #94a3b8; font-size: 0.9em; margin-top: 10px; }
+    </style>
+    <script>
+        // Check if server is up quickly, then redirect as soon as the local app is reachable.
+        const targetUrl = new URLSearchParams(window.location.search).get('url');
+        let attempts = 0;
+        const retryDelayMs = 250;
+        const maxAttempts = Math.ceil(45000 / retryDelayMs); // ~45 seconds
+        
+        function checkServer() {
+            attempts += 1;
+            if (!targetUrl || attempts > maxAttempts) {
+                const h2 = document.querySelector('h2');
+                const p = document.querySelector('p');
+                if (h2) h2.textContent = 'START FAILED';
+                if (p) p.textContent = 'Could not connect to the local tournament services. Please check the packaged files.';
+                return;
+            }
+
+            if (!targetUrl) return;
+            try {
+                const urlObj = new URL(targetUrl);
+                const statusUrl = urlObj.origin + '/api/status';
+                
+                fetch(statusUrl, { mode: 'no-cors', cache: 'no-store' })
+                    .then(response => {
+                        // The splash page is loaded from `file://...` so CORS can block normal
+                        // `fetch()` calls. Using `no-cors` avoids that; if the request succeeds
+                        // (network-level), we can redirect to the real app.
+                        window.location.href = targetUrl;
+                    })
+                    .catch(() => setTimeout(checkServer, retryDelayMs));
+            } catch (e) {
+                setTimeout(checkServer, retryDelayMs);
+            }
+        }
+        
+        // Start checking immediately instead of waiting a full second on every launch.
+        if (targetUrl) checkServer();
+    </script>
+</head>
+<body>
+    <div class="loader"></div>
+    <h2>INITIALIZING SYSTEM</h2>
+    <p>Please wait while KTS starts local tournament services...</p>
+</body>
+</html>

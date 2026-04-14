@@ -1,0 +1,4 @@
+- [x] `refereeController.vue` main container width increased.
+- [x] No excessive whitespace on large screens.
+- [x] UI components still centered and legible.
+- [x] Layout grid adapts responsively.

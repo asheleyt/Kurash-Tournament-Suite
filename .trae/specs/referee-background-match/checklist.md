@@ -1,0 +1,2 @@
+- [x] The referee controller background color is `#1a1f2e`.
+- [x] The referee controller layout remains functional.

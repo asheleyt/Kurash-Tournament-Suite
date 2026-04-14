@@ -1,0 +1,5 @@
+- [x] Reset Timer Dialog uses `v-model:open`.
+- [x] Reset Match Dialog uses `v-model:open`.
+- [x] `Shift+R` opens Reset Timer Dialog.
+- [x] `Shift+Esc` opens Reset Match Dialog.
+- [x] QA verification passes.

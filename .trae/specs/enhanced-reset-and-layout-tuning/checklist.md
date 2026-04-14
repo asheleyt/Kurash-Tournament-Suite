@@ -1,0 +1,3 @@
+- [x] "Reset All" button resets time, gender, scores, and all modes
+- [x] Scoreboard timer starts immediately when Referee starts timer
+- [x] Scoreboard timer syncs with Referee time on toggle

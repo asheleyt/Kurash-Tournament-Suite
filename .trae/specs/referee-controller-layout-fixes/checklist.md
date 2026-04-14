@@ -1,0 +1,3 @@
+- [x] Referee: UI content is vertically centered/distributed to fill the screen (not stuck at top).
+- [x] Referee: Score Buttons (H, YO, CH) display Label and Number stacked clearly without overlap.
+- [x] Referee: Score Buttons use flex layout instead of absolute positioning for labels.

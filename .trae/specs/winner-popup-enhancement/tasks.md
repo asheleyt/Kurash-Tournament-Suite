@@ -1,0 +1,13 @@
+# Tasks
+- [x] Task 1: Add Trophy Icon Component
+  - [x] SubTask 1.1: Verify if `TrophyIconSimple` is suitable or create a new SVG inline in `kurashScoreBoard.vue` or as a component.
+- [x] Task 2: Implement Popup Structure
+  - [x] SubTask 2.1: Replace the existing winner div with the new card layout.
+  - [x] SubTask 2.2: Add the colored border logic (`border-green-500` / `border-cyan-500`).
+  - [x] SubTask 2.3: Add the Trophy Icon at the top.
+  - [x] SubTask 2.4: Add the "WINNER" text with sparkle icons (SVG).
+  - [x] SubTask 2.5: Add the Player Name.
+  - [x] SubTask 2.6: Add the "SCORE" label and "N/A" text.
+- [x] Task 3: Verification
+  - [x] SubTask 3.1: Trigger a win for Player 1 and verify the Green theme.
+  - [x] SubTask 3.2: Trigger a win for Player 2 and verify the Cyan theme.

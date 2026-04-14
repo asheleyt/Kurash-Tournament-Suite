@@ -1,0 +1,12 @@
+# Tasks
+- [x] Task 1: Refactor Reset Timer Dialog
+  - [x] SubTask 1.1: Create a reactive variable `isResetTimerOpen` in `refereeController.vue`.
+  - [x] SubTask 1.2: Bind `v-model:open="isResetTimerOpen"` to the Reset Timer `<Dialog>`.
+- [x] Task 2: Refactor Reset Match Dialog
+  - [x] SubTask 2.1: Create a reactive variable `isResetMatchOpen` in `refereeController.vue`.
+  - [x] SubTask 2.2: Bind `v-model:open="isResetMatchOpen"` to the Reset Match `<Dialog>`.
+- [x] Task 3: Update Keyboard Shortcuts
+  - [x] SubTask 3.1: Modify `useKeyboardShortcuts` call in `refereeController.vue` to set `isResetTimerOpen.value = true` for `resetTimer`.
+  - [x] SubTask 3.2: Modify `useKeyboardShortcuts` call in `refereeController.vue` to set `isResetMatchOpen.value = true` for `resetMatch`.
+- [x] Task 4: Verification
+  - [x] SubTask 4.1: Run `tests/qa/referee-check.cjs` (or update it if needed) to verify the dialog appears on shortcut press.

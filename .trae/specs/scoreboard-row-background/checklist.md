@@ -1,0 +1,3 @@
+- [x] Scoreboard: Player 1 Row (Name, Scores, Flag) has a black opaque background.
+- [x] Scoreboard: Player 2 Row (Name, Scores, Flag) has a black opaque background.
+- [x] Scoreboard: The layout remains intact and centered.

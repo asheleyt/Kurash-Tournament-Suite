@@ -1,0 +1,9 @@
+- [x] Default keybindings work exactly as before (Space for Timer, etc.)
+- [x] Can open Keyboard Settings in the Referee Controller
+- [x] Can successfully rebind an action (e.g., Toggle Timer) to a new key
+- [x] New binding works immediately
+- [x] Old binding for that action stops working
+- [x] Bindings persist after page reload
+- [x] "Restore Defaults" reverts all bindings to original state
+- [x] Conflict detection works (cannot assign same key to multiple active actions without resolution)
+- [x] Modifier keys (Shift+R) are supported and display correctly in UI

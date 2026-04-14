@@ -1,0 +1,4 @@
+- [x] Scoreboard: Player 1 Info Panel reverted to translucent style.
+- [x] Scoreboard: Player 2 Info Panel reverted to translucent style.
+- [x] Scoreboard: Player 1 Medic indicators are GREEN (border/fill).
+- [x] Scoreboard: Player 2 Medic indicators are BLUE (border/fill).

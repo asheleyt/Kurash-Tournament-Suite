@@ -1,0 +1,16 @@
+- [x] Check if `Space` starts and pauses the timer correctly.
+- [x] Check if `Backspace` undoes the last action.
+- [x] Check if `B` toggles Break mode.
+- [x] Check if `J` toggles Jazo mode.
+- [x] Check if `Shift + R` opens the Reset Timer confirmation.
+- [x] Check if `Shift + Esc` opens the Reset Match confirmation.
+- [x] Check if Left Player shortcuts work:
+    - `1` -> H, `2` -> YO, `3` -> CH
+    - `Q` -> G, `W` -> D, `E` -> T
+    - `A` -> Medic, `Z` -> Winner
+- [x] Check if Right Player shortcuts work:
+    - `0` -> H, `9` -> YO, `8` -> CH
+    - `P` -> G, `O` -> D, `I` -> T
+    - `L` -> Medic, `M` -> Winner
+- [x] Check that shortcuts DO NOT trigger when the "Match Settings" panel is open or an input is focused.
+- [x] Check that no conflicting browser shortcuts (e.g., Ctrl+R) are accidentally triggered or blocked unnecessarily.

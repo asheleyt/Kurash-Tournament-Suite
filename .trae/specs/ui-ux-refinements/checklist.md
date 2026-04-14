@@ -1,0 +1,5 @@
+- [x] "Reset" button is renamed to "Reset Timer".
+- [x] "Save Input" button is renamed to "Update Match".
+- [x] Clicking "Reset All" triggers a confirmation alert.
+- [x] Clicking "Reset Timer" triggers a confirmation alert.
+- [x] Disabled buttons are visually distinct.

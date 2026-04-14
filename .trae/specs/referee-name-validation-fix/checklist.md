@@ -1,0 +1,4 @@
+- [x] Player 1 Name input is gray (not red) when empty.
+- [x] Player 2 Name input is gray (not red) when empty.
+- [x] Typing invalid characters (e.g. "123") makes the input border red.
+- [x] Typing valid characters (e.g. "John Doe") makes the input border gray/green.

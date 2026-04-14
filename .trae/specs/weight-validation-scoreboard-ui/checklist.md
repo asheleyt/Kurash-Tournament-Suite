@@ -1,0 +1,3 @@
+- [x] Entering text (e.g., "abc") in the weight field shows an error.
+- [x] Entering a valid number (e.g., "80.5") clears the error.
+- [x] The 'D' button on the Scoreboard is fully opaque (not dimmed) even when the 'T' penalty is not active.

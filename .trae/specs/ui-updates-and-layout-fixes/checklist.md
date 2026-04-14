@@ -1,0 +1,5 @@
+- [x] Scoreboard: Default gender displays "N/A".
+- [x] Scoreboard: H, YO, CH labels are Gold.
+- [x] Referee: "Country" input is now a dropdown labeled "Country Code".
+- [x] Referee: Country Code dropdown lists options without images.
+- [x] Referee: Match Settings layout remains stable with long player names.

@@ -1,0 +1,225 @@
+<!-- Match Completed Modal -->
+    <div v-if="gameState.winner && showFinishModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div class="bg-[#1e293b] border border-yellow-600/40 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150">
+        <div class="p-6 flex items-center gap-4">
+          <div class="h-14 w-14 bg-yellow-500 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+            <TrophyIconSimple class="h-8 w-8 text-white" />
+          </div>
+          <div>
+            <h3 class="text-2xl font-bold text-white uppercase tracking-wider">Match Completed</h3>
+            <p class="text-yellow-200/80">Winner: <span class="text-white font-black">{{ gameState[gameState.winner].name }}</span></p>
+          </div>
+        </div>
+        <div class="p-6 pt-0 flex gap-3">
+          <button @click="onCorrection" class="flex-1 py-3 rounded-xl font-bold text-gray-300 bg-gray-800 hover:bg-gray-700 transition-all">
+            Correction
+          </button>
+          <button @click="onFinish" class="flex-1 py-3 rounded-xl font-black text-white bg-linear-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 shadow-lg shadow-yellow-900/40 transition-all active:scale-95">
+            Finish Match
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showClubLogoModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+      <div class="w-full max-w-5xl lg:max-w-6xl bg-[#0b1220] border border-white/10 rounded-3xl shadow-[0_40px_120px_-30px_rgba(0,0,0,0.85)] overflow-hidden">
+        <div class="px-6 sm:px-8 py-5 bg-white/3 border-b border-white/10 flex items-center justify-between">
+          <div class="min-w-0">
+            <h3 class="text-white text-lg sm:text-xl font-black tracking-wide">Club Logos</h3>
+            <div class="text-xs text-gray-400 font-bold tracking-wide">Upload or map team logos for the scoreboard</div>
+          </div>
+          <button
+            @click="showClubLogoModal = false"
+            class="h-10 w-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all flex items-center justify-center"
+            aria-label="Close"
+          >
+            <XCircle class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="px-6 sm:px-8 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white/3 border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col gap-5">
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <div class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Team</div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <button class="w-full h-11 bg-white/5 border border-white/10 rounded-2xl px-4 text-white font-bold flex items-center justify-between hover:bg-white/10 transition-all">
+                      <span class="flex items-center gap-3 min-w-0">
+                        <span class="w-9 h-9 rounded-xl overflow-hidden border border-white/10 bg-black/30 flex items-center justify-center flex-none">
+                          <img v-if="selectedTeam && teamLogoMap[selectedTeam]" :src="resolveImg(teamLogoMap[selectedTeam])" class="w-full h-full object-contain" />
+                          <span v-else class="text-[10px] text-gray-600 font-black">—</span>
+                        </span>
+                        <span class="text-sm font-black tracking-wide truncate flex-1 min-w-0">{{ selectedTeam || 'Select Team' }}</span>
+                      </span>
+                      <span class="flex items-center gap-2 flex-none">
+                        <span v-if="selectedTeam && teamCodeMap[selectedTeam]" class="px-2 py-0.5 rounded-lg bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-300">
+                          {{ teamCodeMap[selectedTeam] }}
+                        </span>
+                        <ChevronDownIcon class="w-4 h-4 text-gray-400" />
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent class="w-88 bg-[#0b1220] border-white/10 p-2 shadow-2xl rounded-2xl">
+                    <div class="max-h-72 overflow-y-auto custom-scrollbar">
+                      <DropdownMenuItem
+                        v-for="t in clubTeams"
+                        :key="t"
+                        @select="selectedTeam = t"
+                        class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-emerald-500/15 text-gray-300 hover:text-emerald-300 transition-all"
+                      >
+                        <div class="w-9 h-9 rounded-xl overflow-hidden border border-white/10 bg-black/30 flex items-center justify-center flex-none">
+                          <img v-if="teamLogoMap[t]" :src="resolveImg(teamLogoMap[t])" class="w-full h-full object-contain" />
+                          <span v-else class="text-[10px] text-gray-600 font-black">—</span>
+                        </div>
+                        <span class="text-sm font-black tracking-wide truncate flex-1 min-w-0">{{ t }}</span>
+                        <span v-if="teamCodeMap[t]" class="px-2 py-0.5 rounded-lg bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-300 flex-none">
+                          {{ teamCodeMap[t] }}
+                        </span>
+                      </DropdownMenuItem>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Club Code</div>
+                  <input
+                    v-model="selectedClubCode"
+                    type="text"
+                    maxlength="3"
+                    placeholder="ABC"
+                    @input="selectedClubCode = (selectedClubCode || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0,3)"
+                    class="w-full h-11 bg-white/5 border border-white/10 rounded-2xl px-4 text-white font-black tracking-widest focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10 outline-none"
+                  />
+                  <div class="mt-1 text-[11px] text-gray-500 font-semibold">3 letters (optional if uploading)</div>
+                </div>
+
+                <div>
+                  <div class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Upload Logo</div>
+                  <div class="flex items-center gap-3">
+                    <div
+                      @dragover.prevent
+                      @drop.prevent="handleClubLogoDrop"
+                      @click="clubLogoInput?.click()"
+                      class="flex-1 h-11 bg-white/5 border-2 border-dashed border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:bg-emerald-500/5 hover:border-emerald-500/40 transition-all group/clublogo relative overflow-hidden"
+                      title="Upload logo"
+                    >
+                      <input
+                        ref="clubLogoInput"
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        @change="onLogoFileChange"
+                      />
+                      <div v-if="!selectedLogoFile" class="flex items-center gap-3 text-gray-500 text-[10px] font-black px-4">
+                        <div class="p-2 bg-white/5 rounded-lg group-hover/clublogo:bg-emerald-500/20 group-hover/clublogo:text-emerald-400 transition-colors">
+                          <Upload class="w-4 h-4" />
+                        </div>
+                        <span class="group-hover/clublogo:text-gray-300 transition-colors">UPLOAD</span>
+                      </div>
+                      <div v-else class="flex items-center gap-2 text-emerald-400 text-xs font-black px-4 uppercase tracking-wider">
+                        <CheckCircle2 class="w-4 h-4" />
+                        <span>READY</span>
+                      </div>
+                      <div class="absolute bottom-0 left-0 h-0.5 bg-emerald-500 transition-all duration-500 w-0 group-hover/clublogo:w-full"></div>
+                    </div>
+                    <div v-if="selectedLogoFile" class="text-[11px] text-gray-500 font-semibold truncate max-w-44">{{ selectedLogoFile.name }}</div>
+                  </div>
+                  <div v-if="selectedLogoFile" class="mt-1 text-[11px] text-gray-500 font-semibold truncate">Selected: {{ selectedLogoFile.name }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-auto bg-black/20 border border-white/10 rounded-2xl p-4">
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="text-[10px] font-black uppercase tracking-widest text-gray-500">Saved Logos</div>
+                <div class="text-[10px] font-black uppercase tracking-widest text-gray-500">{{ savedLogoTeams.length }}</div>
+              </div>
+              <div class="max-h-48 sm:max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                <button
+                  v-for="t in savedLogoTeams"
+                  :key="t"
+                  type="button"
+                  @click="selectedTeam = t"
+                  class="w-full flex items-center gap-3 p-2.5 rounded-2xl border transition-all text-left mb-2 last:mb-0"
+                  :class="selectedTeam === t ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/0 border-white/10 hover:bg-white/5'"
+                >
+                  <div class="w-12 h-12 rounded-2xl border border-white/10 bg-black/30 flex items-center justify-center overflow-hidden flex-none">
+                    <img v-if="teamLogoMap[t]" :src="resolveImg(teamLogoMap[t])" class="w-full h-full object-contain" />
+                    <span v-else class="text-[10px] font-black uppercase tracking-widest text-gray-600">—</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-black text-white truncate">{{ t }}</div>
+                    <div class="text-[11px] text-gray-400 font-semibold truncate">
+                      {{ (selectedTeam === t && logoPreviewUrl) ? 'Has new upload preview' : 'Saved logo' }}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-none">
+                    <span v-if="teamCodeMap[t]" class="px-2 py-0.5 rounded-lg bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-300">
+                      {{ teamCodeMap[t] }}
+                    </span>
+                  </div>
+                </button>
+
+                <div v-if="!savedLogoTeams.length" class="py-6 text-center">
+                  <div class="text-white font-black">No saved logos yet</div>
+                  <div class="text-xs text-gray-500 font-bold">Upload a logo, then press Save.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white/3 border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div class="text-[10px] font-black uppercase tracking-widest text-gray-500">Logo Preview</div>
+              <div v-if="selectedTeam && teamCodeMap[selectedTeam]" class="px-2.5 py-1 rounded-lg bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-300">
+                {{ teamCodeMap[selectedTeam] }}
+              </div>
+            </div>
+
+            <div class="flex-1 bg-black/25 rounded-2xl border border-white/10 overflow-hidden flex items-center justify-center p-6">
+              <div class="w-full max-w-88 aspect-square rounded-2xl border border-white/10 bg-black/30 overflow-hidden flex items-center justify-center">
+                <img v-if="logoPreviewUrl" :src="logoPreviewUrl" class="w-full h-full object-contain" />
+                <img v-else-if="selectedTeam && teamLogoMap[selectedTeam]" :src="resolveImg(teamLogoMap[selectedTeam])" class="w-full h-full object-contain" />
+                <div v-else class="text-center">
+                  <div class="text-white font-black">No logo</div>
+                  <div class="text-xs text-gray-500 font-bold">Select a team to view its logo</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 text-xs text-gray-400 font-semibold">
+              Tip: Upload a transparent PNG/SVG for best results.
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 sm:px-8 py-5 bg-white/3 border-t border-white/10 flex items-center justify-between gap-4">
+          <button
+            @click="showClubLogoModal = false"
+            class="h-11 px-5 rounded-2xl font-black text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            @click="confirmUploadClubLogo"
+            :disabled="uploadingLogo || !selectedTeam || (!selectedLogoFile && !(selectedClubCode && selectedClubCode.length === 3))"
+            class="h-11 px-6 rounded-2xl font-black text-white bg-emerald-700 hover:bg-emerald-600 shadow-lg shadow-emerald-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ uploadingLogo ? 'Uploading...' : 'Save' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+  <div v-if="showResultPopup" class="fixed top-6 left-1/2 -translate-x-1/2 z-50">
+    <div class="bg-[#1e293b] border border-blue-500/40 rounded-2xl px-5 py-3 text-white shadow-2xl flex items-center gap-3">
+      <CheckCircle2 class="w-5 h-5 text-green-400" />
+      <span class="text-sm font-bold">{{ resultPopupMessage }}</span>
+      <button @click="showResultPopup = false" class="ml-2 h-7 px-3 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10">Close</button>
+    </div>
+  </div>
+
+    

@@ -1,0 +1,3 @@
+- [x] Scoreboard default time is 00:00
+- [x] Referee Controller: Medic Indicator turns RED when Medic Timer is ACTIVE
+- [x] Scoreboard: Medic Indicator turns RED when Medic Timer is ACTIVE

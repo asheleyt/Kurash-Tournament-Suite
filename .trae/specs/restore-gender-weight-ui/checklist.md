@@ -1,0 +1,4 @@
+- [x] Scoreboard: Gender is displayed in a styled box to the LEFT of the Timer.
+- [x] Scoreboard: Weight is displayed in a styled box to the RIGHT of the Timer.
+- [x] Scoreboard: Medic panels are preserved (visible and positioned correctly, likely far left/right).
+- [x] Scoreboard: Timer remains centered and large.

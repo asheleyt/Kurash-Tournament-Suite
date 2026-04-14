@@ -1,0 +1,4 @@
+- [x] `README.md` contains the "Weight Category Logic" section.
+- [x] Male weight classes are correctly listed (-60, -66, -73, -81, -90, -100, +100).
+- [x] Female weight classes are correctly listed (-48, -52, -57, -63, -70, -78, -87, +87).
+- [x] The logic (using max weight) is explained.

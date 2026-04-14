@@ -1,0 +1,8 @@
+- [x] `useKeyboardShortcuts.ts` updated with new mappings.
+- [x] `refereeController.vue` updated with new hotkey labels.
+- [x] `I` toggles Penalty G.
+- [x] `O` toggles Penalty D.
+- [x] `P` toggles Penalty T.
+- [x] `8` adds Score H.
+- [x] `9` adds Score YO.
+- [x] `0` adds Score CH.

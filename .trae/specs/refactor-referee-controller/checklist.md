@@ -1,0 +1,8 @@
+- [x] Check if `ScoreButton` renders and interacts correctly.
+- [x] Check if `PenaltyButton` toggles and cascades (D/T) correctly.
+- [x] Check if `RefereeIcons` (Play, Pause, etc.) display correctly.
+- [x] Check if Country/Flag dropdowns still populate correctly from `countries.ts`.
+- [x] Verify `useBroadcast` sends valid requests with CSRF tokens.
+- [x] Verify error handling (at least basic console logs) for broadcasts.
+- [x] Ensure no duplicate or unused code remains in `refereeController.vue`.
+- [x] Run the application and confirm all referee functionality (Timer, Score, Medic, Jazo, Reset) works without errors.

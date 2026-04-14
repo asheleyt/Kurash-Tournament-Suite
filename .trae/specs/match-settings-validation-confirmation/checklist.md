@@ -1,0 +1,5 @@
+- [x] Empty player names show a red border and error text.
+- [x] Clicking "Update Match" does NOT immediately update the scoreboard.
+- [x] Clicking "Update Match" opens a confirmation modal with correct data summary.
+- [x] Clicking "Cancel" in the modal closes it without updating.
+- [x] Clicking "Confirm" in the modal updates the scoreboard and closes the modal.

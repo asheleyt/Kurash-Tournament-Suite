@@ -1,0 +1,7 @@
+- [x] Backend: `WinnerToggled` & `PlayerInfoUpdated` events created/registered.
+- [x] Referee: Input fields for Player Name, Country, Weight, Gender work.
+- [x] Scoreboard: Player Name, Country, Weight, Gender update in real-time.
+- [x] Logic: Jazo timer pauses automatically when triggered.
+- [x] Logic: Jazo clears automatically when a player scores.
+- [x] Referee: "Winner" button exists for each player.
+- [x] Scoreboard: "Winner" popup displays correctly with Name/Flag and hides on toggle.

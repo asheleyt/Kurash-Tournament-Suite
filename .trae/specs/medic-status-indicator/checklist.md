@@ -1,0 +1,2 @@
+- [x] "Reset Score" button is now "Reset All" in Referee Controller
+- [x] Medic Overlay on Scoreboard shows the countdown timer (e.g., 00:59)

@@ -1,0 +1,2 @@
+- [x] Referee: Opening Settings scrolls the view to the top.
+- [x] Referee: "ENTER" button is renamed to "Save Input".

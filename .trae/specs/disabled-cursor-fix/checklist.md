@@ -1,0 +1,4 @@
+- [x] `pointer-events-none` class is removed from disabled `PenaltyButton`.
+- [x] `cursor-not-allowed` class is present on disabled `PenaltyButton`.
+- [x] Hovering over a disabled button shows the correct "not allowed" cursor.
+- [x] Disabled buttons remain unclickable.

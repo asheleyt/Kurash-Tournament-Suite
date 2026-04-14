@@ -1,0 +1,3 @@
+- [x] Referee Controller aligns to top when Match Settings are open
+- [x] Referee Controller aligns to center when Match Settings are closed
+- [x] Scroll reaches the very top (Player Name input) when Settings are open

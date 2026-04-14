@@ -1,0 +1,5 @@
+- [x] Automated QA script `tests/qa/scoreboard-check.cjs` created and functional.
+- [x] QA check successfully runs against `/kurashScoreBoard` and verifies key elements.
+- [x] Baseline screenshot captured and saved.
+- [x] HTML QA report `reports/qa-scoreboard-report.html` generated.
+- [x] Markdown documentation `reports/QA_SCOREBOARD_REPORT.md` created with summary findings.

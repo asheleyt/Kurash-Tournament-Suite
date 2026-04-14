@@ -1,0 +1,7 @@
+- [x] Backend: `JazoToggled` event created and route registered.
+- [x] Referee: Gender buttons switch timer duration (Male: 4:00, Female: 3:00).
+- [x] Referee: Medic button is smaller, indicators are larger.
+- [x] Logic: Medic popup automatically clears when timer hits 0:00.
+- [x] Logic: "Jazo" popup appears automatically at half-time (2:00 or 1:30) if scores are 0-0.
+- [x] Referee: "Clear Jazo" button removes the Jazo popup from Scoreboard.
+- [x] Scoreboard: "Jazo" popup displays correctly.

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Kurash Tournament Suite - Startup Error</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .card {
+            width: min(900px, 100%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 14px;
+            padding: 18px 20px;
+        }
+        h2 {
+            margin: 0 0 12px 0;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+        .hint {
+            color: #94a3b8;
+            margin: 0 0 12px 0;
+            line-height: 1.4;
+        }
+        pre {
+            background: rgba(2, 6, 23, 0.6);
+            border-radius: 10px;
+            padding: 12px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        button {
+            margin-top: 14px;
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 10px;
+            background: #3b82f6;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Startup failed</h2>
+        <p class="hint">
+            KTS could not start its local services (portable PHP and MariaDB), so the app could not finish opening.
+            Please verify the packaged files include the required executables under <code>portable/runtime</code>.
+        </p>
+        <pre id="msg">Loading error details...</pre>
+        <button onclick="window.close()">Close</button>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const message = params.get('message') || 'Unknown error';
+        document.getElementById('msg').textContent = message;
+    </script>
+</body>
+</html>

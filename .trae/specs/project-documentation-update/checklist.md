@@ -1,0 +1,2 @@
+- [x] `README.md` updated with comprehensive project documentation.
+- [x] `Backlog` file updated with the prioritized backlog items.

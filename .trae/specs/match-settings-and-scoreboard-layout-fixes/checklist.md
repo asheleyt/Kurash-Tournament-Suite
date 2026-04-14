@@ -1,0 +1,2 @@
+- [x] Referee: Match Settings scroll logic uses delayed execution (setTimeout/nextTick) to ensure top visibility.
+- [x] Referee: Scroll target is confirmed to be the root scrolling container.

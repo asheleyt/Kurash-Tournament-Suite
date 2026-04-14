@@ -1,0 +1,7 @@
+- [x] Settings Panel uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] Timer Display uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] Timer Controls uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] Game Controls uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] Player Right Controls uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] Player Left Controls uses `bg-black/20 backdrop-blur-md border border-white/5 shadow-xl`.
+- [x] The overall visual look is a glass-like semi-transparent dark background.

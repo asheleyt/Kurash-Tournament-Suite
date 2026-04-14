@@ -1,0 +1,3 @@
+- [x] Check if "Reset Timer" button shows `[Shift+R]`.
+- [x] Check if "Reset All" button shows `[Shift+Esc]`.
+- [x] Check if layout remains broken (labels should be small and positioned correctly).

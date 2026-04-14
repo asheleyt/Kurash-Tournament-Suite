@@ -1,0 +1,4 @@
+- [x] Winner popup redesigned to match screenshot.
+- [x] Green theme for Player 1.
+- [x] Cyan theme for Player 2.
+- [x] Trophy icon, Sparkles, and "SCORE N/A" displayed correctly.

@@ -1,0 +1,3 @@
+- [x] P1 medic indicators turn Red when P1 medic is active
+- [x] P2 medic indicators turn Red when P2 medic is active
+- [x] Indicators revert to Green/Blue when medic mode is not active

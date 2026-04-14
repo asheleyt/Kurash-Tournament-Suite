@@ -1,0 +1,3 @@
+- [x] Referee Controller: Entering player weights auto-sets "Match Category"
+- [x] Referee Controller: Changing gender updates "Match Category" logic
+- [x] Scoreboard: Displays the auto-calculated Category in "WEIGHT DIVISION"

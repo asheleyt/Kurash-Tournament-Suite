@@ -1,0 +1,5 @@
+- [x] `refereeController.vue` max-width updated to 1600px.
+- [x] Keyboard Shortcuts "Player 1 (Left)" header is Green.
+- [x] Keyboard Shortcuts "Player 2 (Right)" header is Cyan.
+- [x] Global/Other headers remain Blue.
+- [x] QA verification passed.

@@ -1,0 +1,3 @@
+- [x] Scoreboard receives medic count (check console/network or verify UI)
+- [x] Scoreboard receives timerPlayer in timer event
+- [x] Scoreboard receives timerPlayer in medic event

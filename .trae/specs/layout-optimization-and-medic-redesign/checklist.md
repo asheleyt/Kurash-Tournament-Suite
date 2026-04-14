@@ -1,0 +1,3 @@
+- [x] Medic Pop-up is Green when Player 1 (Left) is getting medic
+- [x] Medic Pop-up is Blue when Player 2 (Right) is getting medic
+- [x] Gender and Weight panels are wider (approx 280px+)

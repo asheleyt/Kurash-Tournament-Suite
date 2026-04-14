@@ -1,0 +1,5 @@
+- [x] Referee: Clicking "T" on Player 1 does NOT activate "T" on Player 2 (and vice versa).
+- [x] Referee: Clicking "G", "D", or "T" on Player 1 updates the Scoreboard immediately.
+- [x] Referee: Clicking "G", "D", or "T" on Player 2 updates the Scoreboard immediately.
+- [x] Scoreboard: The bottom row of penalty buttons (G, D, T) is fully visible and not cut off.
+- [x] Scoreboard: Player rows have the same glassmorphism background style (`bg-white/10...`) as the Timer.

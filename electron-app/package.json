@@ -1,0 +1,109 @@
+{
+  "name": "kurash-tournament-suite",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "prebuild": "node scripts/stop-packaged-app.mjs",
+    "prebuild:portable": "node scripts/stop-packaged-app.mjs",
+    "prebuild:nsis": "node scripts/stop-packaged-app.mjs",
+    "start": "electron .",
+    "verify:packaged-runtime": "node scripts/verify-packaged-runtime.mjs",
+    "build": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-runtime",
+    "build:portable": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win portable && npm run verify:packaged-runtime",
+    "build:nsis": "node scripts/build-nsis.mjs && npm run verify:packaged-runtime"
+  },
+  "build": {
+    "directories": {
+      "output": "build-output",
+      "buildResources": "build-resources"
+    },
+    "appId": "com.kurashteam.scoreboard",
+    "productName": "Kurash Tournament Suite",
+    "executableName": "Kurash Scoreboard",
+    "compression": "normal",
+    "electronFuses": {
+      "enableEmbeddedAsarIntegrityValidation": false
+    },
+    "win": {
+      "target": "portable",
+      "icon": "build-resources/kts.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "KTS",
+      "menuCategory": "Kurash Tournament Suite",
+      "uninstallDisplayName": "Kurash Tournament Suite",
+      "artifactName": "KTS-Setup-${version}.${ext}",
+      "differentialPackage": false,
+      "include": "build/installer.nsh",
+      "installerIcon": "build-resources/kts.ico",
+      "uninstallerIcon": "build-resources/kts.ico",
+      "useZip": true
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!build-output/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "laravel/app"
+      },
+      {
+        "from": "../bootstrap",
+        "to": "laravel/bootstrap"
+      },
+      {
+        "from": "../config",
+        "to": "laravel/config"
+      },
+      {
+        "from": "../database",
+        "to": "laravel/database"
+      },
+      {
+        "from": "../public",
+        "to": "laravel/public"
+      },
+      {
+        "from": "../resources",
+        "to": "laravel/resources"
+      },
+      {
+        "from": "../routes",
+        "to": "laravel/routes"
+      },
+      {
+        "from": "../storage/app",
+        "to": "laravel/storage-seed/app"
+      },
+      {
+        "from": "../vendor",
+        "to": "laravel/vendor"
+      },
+      {
+        "from": "../artisan",
+        "to": "laravel/artisan"
+      },
+      {
+        "from": "../portable/runtime",
+        "to": "portable/runtime"
+      }
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Kurash Tournament Suite packaged desktop runtime.",
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1"
+  }
+}
