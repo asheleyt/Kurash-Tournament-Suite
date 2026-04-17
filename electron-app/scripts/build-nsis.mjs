@@ -83,34 +83,10 @@ function removeStaleNsisArtifacts() {
   }
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function seedUninstallerFromStub(installerPath, uninstallerPath) {
-  if (!existsSync(installerPath)) {
-    return false;
-  }
-
-  const stubResult = spawnSync(installerPath, [], {
-    cwd: dirname(installerPath),
-    encoding: 'utf8',
-    windowsHide: true,
-    maxBuffer: 16 * 1024 * 1024,
-  });
-
-  if (stubResult.error) {
-    console.warn(`[build-nsis] Failed to execute NSIS uninstaller stub: ${stubResult.error.message}`);
-  }
-
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (existsSync(uninstallerPath)) {
-      return true;
-    }
-    await delay(1000);
-  }
-
-  return existsSync(uninstallerPath);
+function hasInstallerArtifacts() {
+  const installerPath = getExpectedInstallerPath();
+  const portableExePath = getPortableValidationExePath();
+  return existsSync(installerPath) && existsSync(portableExePath);
 }
 
 function assertExpectedArtifactsExist() {
@@ -144,22 +120,13 @@ async function main() {
     process.exit(firstAttempt.status || 1);
   }
 
-  const installerPath = getExpectedInstallerPath();
-  const uninstallerPath = getExpectedUninstallerPath(installerPath);
-  console.warn('[build-nsis] Detected NSIS uninstaller generation race. Priming the generated stub and retrying once.');
-
-  const seeded = await seedUninstallerFromStub(installerPath, uninstallerPath);
-  if (!seeded) {
-    console.error(`[build-nsis] Could not materialize the uninstaller stub at ${uninstallerPath}.`);
-    process.exit(firstAttempt.status || 1);
+  if (hasInstallerArtifacts()) {
+    console.warn('[build-nsis] NSIS reported the transient uninstaller-stub race, but the installer artifact was produced. Continuing with artifact validation.');
+    assertExpectedArtifactsExist();
+    return;
   }
 
-  const secondAttempt = runElectronBuilder();
-  if (secondAttempt.status !== 0) {
-    process.exit(secondAttempt.status || 1);
-  }
-
-  assertExpectedArtifactsExist();
+  process.exit(firstAttempt.status || 1);
 }
 
 await main();

@@ -26,24 +26,47 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
 node_modules/
 electron-app/dist/
 electron-app/build-output/
+electron-app/build-output-prev-*/
 electron-app/node_modules/
 electron-app/runtime-stage/
+electron-app/electron-app/
+
 Kurash_Scoreboard_Release/
 *.exe
 *.zip
+
 .codex_flag_codes.txt
 
 public/images/player-logos/
 storage/app/player-logos/
 
+# Generated packaged runtime stays ignored
 portable/runtime/**
 !portable/runtime/
 !portable/runtime/README.md
 !portable/runtime/mariadb/
 !portable/runtime/mariadb/my.ini.template
+
+# Deterministic repo-local runtime sources must stay trackable
+!portable/bin/php/
+!portable/bin/php/xampp/
+!portable/bin/php/xampp/**
+
+!portable/bin/mariadb/
+!portable/bin/mariadb/xampp/
+!portable/bin/mariadb/xampp/**
+
+# But do not commit writable/generated MariaDB payloads if they appear in source caches
+portable/bin/mariadb/xampp/data/
+portable/bin/mariadb/xampp/data - Copy/
+portable/bin/mariadb/xampp/data-old/
+portable/bin/mariadb/xampp/backup/
+portable/bin/mariadb/xampp/tmp/
+portable/bin/mariadb/xampp/logs/
 
 .codex-http-curl-debug/
 .codex-http-curl-probe/

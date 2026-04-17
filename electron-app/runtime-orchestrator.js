@@ -24,6 +24,75 @@ const REQUIRED_PHP_EXTENSION_FILES = [
   'php_openssl.dll',
   'php_fileinfo.dll',
 ];
+const REQUIRED_PHP_RUNTIME_DLLS = [
+  'api-ms-win-crt-conio-l1-1-0.dll',
+  'api-ms-win-crt-convert-l1-1-0.dll',
+  'api-ms-win-crt-environment-l1-1-0.dll',
+  'api-ms-win-crt-filesystem-l1-1-0.dll',
+  'api-ms-win-crt-heap-l1-1-0.dll',
+  'api-ms-win-crt-locale-l1-1-0.dll',
+  'api-ms-win-crt-math-l1-1-0.dll',
+  'api-ms-win-crt-multibyte-l1-1-0.dll',
+  'api-ms-win-crt-private-l1-1-0.dll',
+  'api-ms-win-crt-process-l1-1-0.dll',
+  'api-ms-win-crt-runtime-l1-1-0.dll',
+  'api-ms-win-crt-stdio-l1-1-0.dll',
+  'api-ms-win-crt-string-l1-1-0.dll',
+  'api-ms-win-crt-time-l1-1-0.dll',
+  'api-ms-win-crt-utility-l1-1-0.dll',
+  'concrt140.dll',
+  'msvcp140.dll',
+  'msvcp140_1.dll',
+  'msvcp140_2.dll',
+  'msvcp140_atomic_wait.dll',
+  'msvcp140_codecvt_ids.dll',
+  'ucrtbase.dll',
+  'vcruntime140.dll',
+  'vcruntime140_1.dll',
+];
+const WINDOWS_DLL_NOT_FOUND_EXIT_CODES = new Set([3221225781, 3221226505]);
+
+const FORBIDDEN_PHP_PORTABILITY_PATTERNS = [/C:\\xampp/i, /xampp\\php/i, /xampp\/php/i];
+
+function findForbiddenPhpPortabilityMatches(text) {
+  const haystack = String(text || '');
+  const matches = [];
+  for (const pattern of FORBIDDEN_PHP_PORTABILITY_PATTERNS) {
+    const match = haystack.match(pattern);
+    if (match) {
+      matches.push(match[0]);
+    }
+  }
+  return matches;
+}
+
+function diagnosePhpPortabilityFailure(output) {
+  const combined = String(output || '');
+
+  const forbidden = findForbiddenPhpPortabilityMatches(combined);
+  if (forbidden.length > 0) {
+    return {
+      reason: 'PHP config not portable (forbidden XAMPP paths detected)',
+      forbidden,
+    };
+  }
+
+  if (/\bPHP\s+(?:Warning|Fatal error):/i.test(combined) || /\bPHP\s+Startup:/i.test(combined)) {
+    return {
+      reason: 'PHP startup/config warning detected',
+      forbidden: [],
+    };
+  }
+
+  if (/\bUnable to load dynamic library\b/i.test(combined) || /\bUnable to start standard module\b/i.test(combined)) {
+    return {
+      reason: 'PHP extension resolution failed',
+      forbidden: [],
+    };
+  }
+
+  return null;
+}
 
 const MYSQL_READY_TIMEOUT_MS = 90000;
 const LARAVEL_READY_TIMEOUT_MS = 90000;
@@ -55,6 +124,40 @@ function summarizeOutput(value, maxLength = 500) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function normalizeExitCode(exitCode) {
+  if (typeof exitCode !== 'number') {
+    return null;
+  }
+
+  return exitCode < 0 ? (0x100000000 + exitCode) : exitCode;
+}
+
+function diagnoseWindowsDependencyFailure(result = {}) {
+  const combinedOutput = `${result.stdout || ''}\n${result.stderr || ''}\n${result.error?.message || ''}`;
+  const dependencyMatch = combinedOutput.match(
+    /\b(vcruntime140(?:_1)?\.dll|msvcp140(?:_[\w]+)?\.dll|ucrtbase\.dll|api-ms-win-crt-[\w-]+\.dll)\b/i
+  );
+  const normalizedExitCode = normalizeExitCode(result.status);
+
+  if (dependencyMatch) {
+    return {
+      dependency: dependencyMatch[1],
+      reason: `Packaged PHP failed to launch: missing VC++ runtime dependency (${dependencyMatch[1]})`,
+      normalizedExitCode,
+    };
+  }
+
+  if (WINDOWS_DLL_NOT_FOUND_EXIT_CODES.has(normalizedExitCode)) {
+    return {
+      dependency: null,
+      reason: 'Packaged PHP failed to launch: missing dependency DLL',
+      normalizedExitCode,
+    };
+  }
+
+  return null;
 }
 
 function normalizeRemoteApiBase(rawValue) {
@@ -330,6 +433,7 @@ class RuntimeOrchestrator {
       ? path.join(process.resourcesPath, 'portable')
       : path.join(__dirname, '..', 'portable');
     const portableRuntimeRoot = path.join(portableRoot, 'runtime');
+    const runtimeManifestPath = path.join(portableRuntimeRoot, 'runtime-manifest.json');
 
     const phpDir = path.join(portableRuntimeRoot, 'php');
     const phpBin = path.join(phpDir, 'php.exe');
@@ -367,6 +471,7 @@ class RuntimeOrchestrator {
       laravelRoot,
       portableRoot,
       portableRuntimeRoot,
+      runtimeManifestPath,
       phpDir,
       phpBin: useSystemPhp ? 'php' : phpBin,
       phpIni,
@@ -401,6 +506,7 @@ class RuntimeOrchestrator {
       laravelRoot,
       portableRoot,
       portableRuntimeRoot,
+      runtimeManifestPath,
       phpDir,
       phpBin: this.state.phpBin,
       phpIni,
@@ -474,10 +580,16 @@ class RuntimeOrchestrator {
 
     return [
       { label: 'portable runtime root', target: this.state.portableRuntimeRoot, exists: fs.existsSync(this.state.portableRuntimeRoot) },
+      { label: 'runtime manifest', target: this.state.runtimeManifestPath, exists: fs.existsSync(this.state.runtimeManifestPath) },
       { label: 'Laravel root', target: this.state.laravelRoot, exists: fs.existsSync(this.state.laravelRoot) },
       { label: 'PHP executable', target: this.state.phpBin, exists: fs.existsSync(this.state.phpBin) },
       { label: 'PHP ini', target: this.state.phpIni, exists: fs.existsSync(this.state.phpIni) },
       { label: 'PHP ext directory', target: this.state.phpExtDir, exists: fs.existsSync(this.state.phpExtDir) },
+      ...REQUIRED_PHP_RUNTIME_DLLS.map((dllName) => ({
+        label: `PHP runtime DLL ${dllName}`,
+        target: path.join(this.state.phpDir, dllName),
+        exists: fs.existsSync(path.join(this.state.phpDir, dllName)),
+      })),
       { label: 'MariaDB directory', target: this.state.mysqlDir, exists: fs.existsSync(this.state.mysqlDir) },
       { label: 'MariaDB mysqld.exe', target: this.state.mysqld, exists: fs.existsSync(this.state.mysqld) },
       { label: 'MariaDB mysql.exe', target: this.state.mysql, exists: fs.existsSync(this.state.mysql) },
@@ -612,11 +724,16 @@ class RuntimeOrchestrator {
       });
 
       if (missingPackagedPathCheck) {
-        throw new RuntimeStageError('verify required binaries exist', 'Packaged runtime invalid', {
+        const missingPhpRuntimeDependency = /^PHP runtime DLL /i.test(missingPackagedPathCheck.label);
+        throw new RuntimeStageError(
+          'verify required binaries exist',
+          missingPhpRuntimeDependency ? 'Packaged PHP dependency DLL missing' : 'Packaged runtime invalid',
+          {
           missingPath: missingPackagedPathCheck.target,
           missingLabel: missingPackagedPathCheck.label,
           packagedPathChecks,
-        });
+          }
+        );
       }
     } else {
       if (this.state.useSystemPhp) {
@@ -634,6 +751,12 @@ class RuntimeOrchestrator {
     });
 
     if (missingExtensionFiles.length > 0) {
+      if (this.isPackaged) {
+        throw new RuntimeStageError('verify required binaries exist', 'Packaged PHP extension DLL missing', {
+          missingExtensionFiles,
+        });
+      }
+
       this.logger.warn('Portable PHP extension files are missing and build verification should fail before packaging.', {
         missingExtensionFiles,
       });
@@ -641,8 +764,68 @@ class RuntimeOrchestrator {
   }
 
   runPhpPreflight() {
+    const phpVersionArgs = ['-v'];
     const phpIniArgs = ['--ini'];
     const phpModulesArgs = ['-m'];
+
+    if (!this.state.useSystemPhp && fs.existsSync(this.state.phpIni)) {
+      let iniText = '';
+      try {
+        iniText = fs.readFileSync(this.state.phpIni, 'utf8');
+      } catch (error) {
+        throw new RuntimeStageError('run PHP preflight', 'PHP ini unreadable', {
+          phpIni: this.state.phpIni,
+          error: error && error.message ? error.message : String(error),
+        });
+      }
+
+      const forbiddenIniMatches = findForbiddenPhpPortabilityMatches(iniText);
+      if (forbiddenIniMatches.length > 0) {
+        throw new RuntimeStageError('run PHP preflight', 'PHP config not portable', {
+          phpIni: this.state.phpIni,
+          forbiddenIniMatches,
+        });
+      }
+    }
+
+    const versionResult = this.runCommandCapture(this.state.phpBin, phpVersionArgs, {
+      cwd: this.state.laravelRoot,
+      env: this.childEnv,
+    });
+    this.logger.writeProcessSection('php', `${this.state.phpBin} ${phpVersionArgs.join(' ')}`, `${versionResult.stdout || ''}${versionResult.stderr || ''}`);
+
+    if (versionResult.error || versionResult.status !== 0) {
+      const dependencyFailure = diagnoseWindowsDependencyFailure(versionResult);
+      throw new RuntimeStageError(
+        'run PHP preflight',
+        dependencyFailure ? dependencyFailure.reason : 'PHP runtime invalid',
+        {
+          command: `${this.state.phpBin} ${phpVersionArgs.join(' ')}`,
+          exitCode: versionResult.status,
+          normalizedExitCode: normalizeExitCode(versionResult.status),
+          phpBin: this.state.phpBin,
+          logsDir: this.logsDir,
+          dependencyFailure: !!dependencyFailure,
+          dependencyDll: dependencyFailure ? dependencyFailure.dependency : null,
+          error: versionResult.error ? versionResult.error.message : summarizeOutput(versionResult.stderr || versionResult.stdout),
+        }
+      );
+    }
+
+    if (!this.state.useSystemPhp) {
+      const combinedOutput = `${versionResult.stdout || ''}${versionResult.stderr || ''}`;
+      const portabilityFailure = diagnosePhpPortabilityFailure(combinedOutput);
+      if (portabilityFailure) {
+        throw new RuntimeStageError('run PHP preflight', portabilityFailure.reason, {
+          command: `${this.state.phpBin} ${phpVersionArgs.join(' ')}`,
+          phpBin: this.state.phpBin,
+          phpIni: this.state.phpIni,
+          logsDir: this.logsDir,
+          forbiddenMatches: portabilityFailure.forbidden,
+          output: summarizeOutput(combinedOutput),
+        });
+      }
+    }
 
     const iniResult = this.runCommandCapture(this.state.phpBin, phpIniArgs, {
       cwd: this.state.laravelRoot,
@@ -651,11 +834,77 @@ class RuntimeOrchestrator {
     this.logger.writeProcessSection('php', `${this.state.phpBin} ${phpIniArgs.join(' ')}`, `${iniResult.stdout || ''}${iniResult.stderr || ''}`);
 
     if (iniResult.error || iniResult.status !== 0) {
-      throw new RuntimeStageError('run PHP preflight', 'PHP runtime invalid', {
-        command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
-        exitCode: iniResult.status,
-        error: iniResult.error ? iniResult.error.message : summarizeOutput(iniResult.stderr || iniResult.stdout),
-      });
+      const dependencyFailure = diagnoseWindowsDependencyFailure(iniResult);
+      throw new RuntimeStageError(
+        'run PHP preflight',
+        dependencyFailure ? dependencyFailure.reason : 'PHP runtime invalid',
+        {
+          command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
+          exitCode: iniResult.status,
+          normalizedExitCode: normalizeExitCode(iniResult.status),
+          phpBin: this.state.phpBin,
+          logsDir: this.logsDir,
+          dependencyFailure: !!dependencyFailure,
+          dependencyDll: dependencyFailure ? dependencyFailure.dependency : null,
+          error: iniResult.error ? iniResult.error.message : summarizeOutput(iniResult.stderr || iniResult.stdout),
+        }
+      );
+    }
+
+    if (!this.state.useSystemPhp) {
+      const combinedOutput = `${iniResult.stdout || ''}${iniResult.stderr || ''}`;
+      const portabilityFailure = diagnosePhpPortabilityFailure(combinedOutput);
+      if (portabilityFailure) {
+        throw new RuntimeStageError('run PHP preflight', portabilityFailure.reason, {
+          command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
+          phpBin: this.state.phpBin,
+          phpIni: this.state.phpIni,
+          logsDir: this.logsDir,
+          forbiddenMatches: portabilityFailure.forbidden,
+          output: summarizeOutput(combinedOutput),
+        });
+      }
+
+      const iniStdout = String(iniResult.stdout || '');
+      const loadedMatch = iniStdout.match(/^Loaded Configuration File:\s*(.+)$/im);
+      const loadedPath = loadedMatch ? loadedMatch[1].trim() : '';
+
+      if (!loadedPath || loadedPath.toLowerCase() === '(none)') {
+        throw new RuntimeStageError('run PHP preflight', 'PHP did not load php.ini', {
+          command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
+          phpBin: this.state.phpBin,
+          phpIni: this.state.phpIni,
+          logsDir: this.logsDir,
+          output: summarizeOutput(`${iniResult.stdout || ''}${iniResult.stderr || ''}`),
+        });
+      }
+
+      const expectedIni = normalizeForIni(this.state.phpIni).toLowerCase();
+      const actualIni = normalizeForIni(loadedPath).toLowerCase();
+      if (actualIni !== expectedIni) {
+        throw new RuntimeStageError('run PHP preflight', 'PHP loaded unexpected php.ini', {
+          command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
+          phpBin: this.state.phpBin,
+          phpIni: this.state.phpIni,
+          expectedIni,
+          actualIni,
+          logsDir: this.logsDir,
+        });
+      }
+
+      const scanMatch = iniStdout.match(/^Scan for additional \.ini files in:\s*(.+)$/im);
+      if (scanMatch) {
+        const scanPath = scanMatch[1].trim();
+        if (scanPath && scanPath.toLowerCase() !== '(none)') {
+          throw new RuntimeStageError('run PHP preflight', 'PHP is scanning additional ini directories', {
+            command: `${this.state.phpBin} ${phpIniArgs.join(' ')}`,
+            phpBin: this.state.phpBin,
+            phpIni: this.state.phpIni,
+            scanPath,
+            logsDir: this.logsDir,
+          });
+        }
+      }
     }
 
     const modulesResult = this.runCommandCapture(this.state.phpBin, phpModulesArgs, {
@@ -665,11 +914,36 @@ class RuntimeOrchestrator {
     this.logger.writeProcessSection('php', `${this.state.phpBin} ${phpModulesArgs.join(' ')}`, `${modulesResult.stdout || ''}${modulesResult.stderr || ''}`);
 
     if (modulesResult.error || modulesResult.status !== 0) {
-      throw new RuntimeStageError('run PHP preflight', 'PHP runtime invalid', {
-        command: `${this.state.phpBin} ${phpModulesArgs.join(' ')}`,
-        exitCode: modulesResult.status,
-        error: modulesResult.error ? modulesResult.error.message : summarizeOutput(modulesResult.stderr || modulesResult.stdout),
-      });
+      const dependencyFailure = diagnoseWindowsDependencyFailure(modulesResult);
+      throw new RuntimeStageError(
+        'run PHP preflight',
+        dependencyFailure ? dependencyFailure.reason : 'PHP runtime invalid',
+        {
+          command: `${this.state.phpBin} ${phpModulesArgs.join(' ')}`,
+          exitCode: modulesResult.status,
+          normalizedExitCode: normalizeExitCode(modulesResult.status),
+          phpBin: this.state.phpBin,
+          logsDir: this.logsDir,
+          dependencyFailure: !!dependencyFailure,
+          dependencyDll: dependencyFailure ? dependencyFailure.dependency : null,
+          error: modulesResult.error ? modulesResult.error.message : summarizeOutput(modulesResult.stderr || modulesResult.stdout),
+        }
+      );
+    }
+
+    if (!this.state.useSystemPhp) {
+      const combinedOutput = `${modulesResult.stdout || ''}${modulesResult.stderr || ''}`;
+      const portabilityFailure = diagnosePhpPortabilityFailure(combinedOutput);
+      if (portabilityFailure) {
+        throw new RuntimeStageError('run PHP preflight', portabilityFailure.reason, {
+          command: `${this.state.phpBin} ${phpModulesArgs.join(' ')}`,
+          phpBin: this.state.phpBin,
+          phpIni: this.state.phpIni,
+          logsDir: this.logsDir,
+          forbiddenMatches: portabilityFailure.forbidden,
+          output: summarizeOutput(combinedOutput),
+        });
+      }
     }
 
     const loadedExtensions = new Set(
@@ -689,6 +963,7 @@ class RuntimeOrchestrator {
     this.logger.info('PHP preflight passed', {
       phpBin: this.state.phpBin,
       phpIni: this.state.phpIni,
+      commands: ['-v', '--ini', '-m'],
       extensions: REQUIRED_PHP_EXTENSIONS,
     });
   }
@@ -1437,6 +1712,11 @@ class RuntimeOrchestrator {
 
 function formatRuntimeError(error, logsDir) {
   const fallbackMessage = error && error.message ? error.message : String(error);
+  if (error && error.details && error.details.dependencyFailure) {
+    const dependencyText = error.details.dependencyDll ? ` (${error.details.dependencyDll})` : '';
+    const commandText = error.details.command ? ` Command: ${error.details.command}.` : '';
+    return `${error.stage}: ${error.reason}${dependencyText}. PHP: ${error.details.phpBin}.${commandText} Check logs in ${logsDir}.`;
+  }
   if (error && error.stage && error.reason) {
     return `${error.stage}: ${error.reason}. Check logs in ${logsDir}.`;
   }
@@ -1451,7 +1731,3 @@ module.exports = {
   REQUIRED_PHP_EXTENSION_FILES,
   REQUIRED_PHP_EXTENSIONS,
 };
-
-
-
-
