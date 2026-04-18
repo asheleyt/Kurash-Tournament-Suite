@@ -164,6 +164,30 @@ function Wait-ForRuntimePortsReleased {
   return $false
 }
 
+function Start-ManagedProcess {
+  param(
+    [string]$BinaryPath,
+    [string]$WorkingDirectory
+  )
+
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = $BinaryPath
+  $startInfo.WorkingDirectory = $WorkingDirectory
+  $startInfo.UseShellExecute = $false
+
+  foreach ($entry in [System.Environment]::GetEnvironmentVariables().GetEnumerator()) {
+    $startInfo.EnvironmentVariables[$entry.Key] = [string]$entry.Value
+  }
+
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $startInfo
+  if (-not $process.Start()) {
+    throw "Could not start packaged binary: $BinaryPath"
+  }
+
+  return $process
+}
+
 function Stop-Tree {
   param([int]$ProcessIdToStop)
 
@@ -244,8 +268,10 @@ function Run-Iteration {
   $process = $null
   try {
     Wait-ForRuntimePortsReleased -TimeoutSeconds 20 | Out-Null
-    $process = Start-Process -FilePath $BinaryPath -WorkingDirectory (Split-Path -Parent $BinaryPath) -PassThru
+    $launchStartedAt = (Get-Date).ToUniversalTime()
+    $process = Start-ManagedProcess -BinaryPath $BinaryPath -WorkingDirectory (Split-Path -Parent $BinaryPath)
     $state = Wait-ForRuntimeState -DebugPath $DebugPath -TimeoutSeconds $TimeoutSeconds
+    $launchObservedAt = (Get-Date).ToUniversalTime()
     $controllerWindow = if ($Interactive -and $state.status -eq 'ready') {
       Wait-ForControllerWindowAppearance -MainLogPath $MainLogPath -TimeoutSeconds 30
     } else {
@@ -280,6 +306,9 @@ function Run-Iteration {
       state = $state.status
       failure = if ($state.debug) { $state.debug.failure } else { $null }
       readyAt = if ($state.debug) { $state.debug.readyAt } else { $null }
+      launchStartedAt = $launchStartedAt.ToString('o')
+      launchObservedAt = $launchObservedAt.ToString('o')
+      launchDurationMs = $null
       controllerWindow = $controllerWindow
       probeUp = $probeUp
       probeController = $probeController
@@ -287,6 +316,18 @@ function Run-Iteration {
       validationFailures = @()
       validationPassed = $false
     }
+
+    $readyTimestamp = $null
+    if ($result.readyAt) {
+      try {
+        $readyTimestamp = [DateTimeOffset]::Parse($result.readyAt)
+      } catch {
+      }
+    }
+    if ($null -eq $readyTimestamp) {
+      $readyTimestamp = [DateTimeOffset]$launchObservedAt
+    }
+    $result.launchDurationMs = [math]::Max([int][math]::Round(($readyTimestamp.UtcDateTime - $launchStartedAt).TotalMilliseconds), 0)
 
     $result.validationFailures = @(Get-IterationValidationFailures -Result $result)
     $result.validationPassed = $result.validationFailures.Count -eq 0

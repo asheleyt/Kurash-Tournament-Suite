@@ -55,6 +55,10 @@ function getExpectedInstallerPath() {
   return join(buildOutputDir, expandInstallerArtifactName());
 }
 
+function getLegacyInstallerPath() {
+  return join(buildOutputDir, `${packageJson.build?.productName || packageJson.productName || packageJson.name} ${packageJson.version}.exe`);
+}
+
 function getExpectedUninstallerPath(installerPath) {
   const parsed = parse(installerPath);
   return join(parsed.dir, `${parsed.name}.__uninstaller${parsed.ext}`);
@@ -71,10 +75,13 @@ function getPortableValidationExePath() {
 
 function removeStaleNsisArtifacts() {
   const installerPath = getExpectedInstallerPath();
+  const legacyInstallerPath = getLegacyInstallerPath();
   const uninstallerPath = getExpectedUninstallerPath(installerPath);
   const blockmapPath = getExpectedBlockmapPath(installerPath);
+  const legacyUninstallerPath = getExpectedUninstallerPath(legacyInstallerPath);
+  const legacyBlockmapPath = getExpectedBlockmapPath(legacyInstallerPath);
 
-  for (const target of [installerPath, uninstallerPath, blockmapPath]) {
+  for (const target of [installerPath, uninstallerPath, blockmapPath, legacyInstallerPath, legacyUninstallerPath, legacyBlockmapPath]) {
     if (!existsSync(target)) {
       continue;
     }

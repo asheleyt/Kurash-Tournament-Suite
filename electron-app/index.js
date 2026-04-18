@@ -8,8 +8,10 @@ const { WindowManager } = require('./window-manager');
 const { RuntimeOrchestrator, formatRuntimeError } = require('./runtime-orchestrator');
 
 app.commandLine.appendSwitch('disable-http-cache');
-// Keep packaged userData/runtime paths stable while installer-facing branding moves to KTS.
-app.setName('Kurash Scoreboard');
+// Keep the visible Electron app name aligned with Windows-facing branding while preserving
+// the existing userData/runtime root for compatibility with current local installs.
+app.setName('Kurash Tournament Suite');
+app.setPath('userData', path.join(app.getPath('appData'), 'Kurash Scoreboard'));
 
 const requestedUserDataRoot = String(process.env.KURASH_USER_DATA_ROOT || '').trim();
 if (requestedUserDataRoot) {

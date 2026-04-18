@@ -99,12 +99,37 @@ function summarizeProbeFailures(probes) {
     }));
 }
 
+function parseArgs(argv) {
+  const options = {};
+
+  for (let index = 2; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const nextValue = argv[index + 1];
+
+    if (arg === '--resources-path' && nextValue) {
+      options.resourcesPath = nextValue;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--results-path' && nextValue) {
+      options.resultsPath = nextValue;
+      index += 1;
+      continue;
+    }
+  }
+
+  return options;
+}
+
 async function runIteration(label, userDataPath) {
   const app = createFakeApp(userDataPath);
   const orchestrator = new RuntimeOrchestrator(app);
+  const launchStartedAt = new Date();
 
   try {
     const runtime = await orchestrator.start();
+    const launchObservedAt = new Date();
     await delay(1500);
     const probes = {
       up: await requestStatus(`${runtime.localBackendBaseUrl}/up`),
@@ -122,6 +147,9 @@ async function runIteration(label, userDataPath) {
       label,
       status: 'ready',
       runtime,
+      launchStartedAt: launchStartedAt.toISOString(),
+      launchObservedAt: launchObservedAt.toISOString(),
+      launchDurationMs: Math.max(launchObservedAt.getTime() - launchStartedAt.getTime(), 0),
       probes,
       validationPassed: validationFailures.length === 0,
       validationFailures,
@@ -153,17 +181,32 @@ async function runIteration(label, userDataPath) {
 }
 
 async function main() {
+  const options = parseArgs(process.argv);
   const repoRoot = path.resolve(__dirname, '..', '..');
-  const resourcesPath = path.resolve(repoRoot, 'electron-app', 'build-output', 'win-unpacked', 'resources');
+  const resourcesPath = path.resolve(
+    options.resourcesPath || path.resolve(repoRoot, 'electron-app', 'build-output', 'win-unpacked', 'resources')
+  );
+  const resultsPath = path.resolve(
+    options.resultsPath || path.resolve(repoRoot, 'electron-app', 'build-output', 'runtime-orchestrator-validation.json')
+  );
+
+  if (!fs.existsSync(resourcesPath)) {
+    throw new Error(`Missing runtime harness resources path: ${resourcesPath}`);
+  }
+
   process.resourcesPath = resourcesPath;
 
   const runRoot = path.join(os.tmpdir(), `Kurash Runtime Validation ${new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)}`);
   const userDataPath = path.join(runRoot, 'Roaming Profile With Spaces', 'Kurash Scoreboard');
   ensureDir(userDataPath);
+  ensureDir(path.dirname(resultsPath));
 
   const results = {
     resourcesPath,
+    resultsPath,
+    runRoot,
     userDataPath,
+    userData: userDataPath,
     isAdmin: false,
     xamppDetected: fs.existsSync('C:\\xampp\\mysql\\bin\\mysqld.exe') || fs.existsSync('C:\\xampp\\mysql\\bin\\mysql.exe'),
     firstRun: null,
@@ -188,6 +231,9 @@ async function main() {
         status: firstRun.status,
         baseUrl: firstRun.runtime.localBackendBaseUrl,
         logsDir: firstRun.runtime.logsDir,
+        launchStartedAt: firstRun.launchStartedAt,
+        launchObservedAt: firstRun.launchObservedAt,
+        launchDurationMs: firstRun.launchDurationMs,
         probes: firstRun.probes,
         validationPassed: firstRun.validationPassed,
         validationFailures: firstRun.validationFailures,
@@ -205,6 +251,9 @@ async function main() {
         status: secondRun.status,
         baseUrl: secondRun.runtime.localBackendBaseUrl,
         logsDir: secondRun.runtime.logsDir,
+        launchStartedAt: secondRun.launchStartedAt,
+        launchObservedAt: secondRun.launchObservedAt,
+        launchDurationMs: secondRun.launchDurationMs,
         probes: secondRun.probes,
         validationPassed: secondRun.validationPassed,
         validationFailures: secondRun.validationFailures,
@@ -222,6 +271,9 @@ async function main() {
         status: recoveryRun.status,
         baseUrl: recoveryRun.runtime.localBackendBaseUrl,
         logsDir: recoveryRun.runtime.logsDir,
+        launchStartedAt: recoveryRun.launchStartedAt,
+        launchObservedAt: recoveryRun.launchObservedAt,
+        launchDurationMs: recoveryRun.launchDurationMs,
         probes: recoveryRun.probes,
         validationPassed: recoveryRun.validationPassed,
         validationFailures: recoveryRun.validationFailures,
@@ -288,7 +340,6 @@ async function main() {
     recoveryPassed: results.recoveryRun?.status === 'ready' && results.recoveryRun?.validationPassed === true,
   };
 
-  const resultsPath = path.resolve(repoRoot, 'electron-app', 'build-output', 'runtime-orchestrator-validation.json');
   fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
   console.log(resultsPath);
 

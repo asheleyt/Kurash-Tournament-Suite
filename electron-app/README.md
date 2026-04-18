@@ -53,7 +53,7 @@ This command now hard-fails unless all packaged release gates pass:
 npm run build:electron:nsis
 ```
 
-Builds the client-facing NSIS installer for Kurash Tournament Suite (KTS).
+Builds the client-facing NSIS installer for Kurash Tournament Suite.
 
 This installer uses a zip-based payload instead of the differential-update package path, which makes client installs a bit friendlier at the cost of a somewhat larger setup file.
 
@@ -143,7 +143,7 @@ Expected client flow:
 1. Run the installer.
 2. If Windows SmartScreen appears, click `More info`, then `Run anyway`.
 3. Finish the install.
-4. Launch `KTS` from the desktop shortcut or Start Menu.
+4. Launch `Kurash Tournament Suite` from the desktop shortcut or Start Menu.
 
 The installer is unsigned in this pass, so SmartScreen guidance is expected.
 
