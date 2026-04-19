@@ -50,6 +50,16 @@ const PHP_REQUIRED_RUNTIME_DLLS = [
   'vcruntime140.dll',
   'vcruntime140_1.dll',
 ];
+const phpExcludedTopLevelEntries = new Set([
+  'CompatInfo',
+  'data',
+  'dev',
+  'docs',
+  'extras',
+  'scripts',
+  'tests',
+  'windowsXamppPhp',
+]);
 const PHP_SOURCE_REQUIRED_ENTRIES = [
   'deplister.exe',
   'php.exe',
@@ -534,7 +544,9 @@ function assertStagedPhpRuntimeLaunchable() {
 }
 
 function stagePhpRuntime(sourceRoot) {
-  copyDirectory(sourceRoot, phpRuntimeRoot);
+  copyDirectory(sourceRoot, phpRuntimeRoot, {
+    excludedTopLevelEntries: phpExcludedTopLevelEntries,
+  });
 }
 
 function stagePhpRuntimeDlls(sourceRoot) {
@@ -589,6 +601,7 @@ function writeRuntimeManifest({ phpSource, mariadbSource, phpRuntimeDllSource, p
         requiredPhpModules: PHP_REQUIRED_MODULES,
         requiredPhpRuntimeDlls: PHP_REQUIRED_RUNTIME_DLLS,
         requiredPhpEntries: PHP_STAGED_REQUIRED_ENTRIES,
+        excludedPhpTopLevelEntries: [...phpExcludedTopLevelEntries],
         requiredMariadbEntries: mariadbDestinationRequiredEntries,
         phpSourceDiagnostics,
         mariadbSourceDiagnostics,
@@ -604,14 +617,20 @@ function writeRuntimeManifest({ phpSource, mariadbSource, phpRuntimeDllSource, p
 function assertRuntimeComplete() {
   const phpMissing = missingEntries(phpRuntimeRoot, PHP_STAGED_REQUIRED_ENTRIES);
   const mariadbMissing = missingEntries(mariadbRuntimeRoot, mariadbDestinationRequiredEntries);
+  const phpForbidden = [...phpExcludedTopLevelEntries].filter((entryName) =>
+    existsSync(join(phpRuntimeRoot, entryName))
+  );
   const mariadbForbidden = [...mariadbExcludedTopLevelEntries].filter((entryName) =>
     existsSync(join(mariadbRuntimeRoot, entryName))
   );
 
-  if (phpMissing.length > 0 || mariadbMissing.length > 0 || mariadbForbidden.length > 0) {
+  if (phpMissing.length > 0 || mariadbMissing.length > 0 || phpForbidden.length > 0 || mariadbForbidden.length > 0) {
     console.error('[stage-portable-runtime] Portable runtime staging completed with missing or forbidden files.');
     if (phpMissing.length > 0) {
       console.error(` - PHP runtime missing: ${phpMissing.join(', ')}`);
+    }
+    if (phpForbidden.length > 0) {
+      console.error(` - PHP runtime includes excluded duplicate payloads: ${phpForbidden.join(', ')}`);
     }
     if (mariadbMissing.length > 0) {
       console.error(` - MariaDB runtime missing: ${mariadbMissing.join(', ')}`);

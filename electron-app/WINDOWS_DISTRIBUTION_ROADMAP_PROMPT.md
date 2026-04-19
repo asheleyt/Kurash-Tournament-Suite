@@ -29,6 +29,7 @@ Focus the roadmap across these tracks:
 ## Required Inputs
 
 - Use `electron-app/build-output/distribution-baseline.local.json` if it exists.
+- Use `electron-app/build-output/distribution-size-analysis.local.json` if it exists.
 - Use `electron-app/build-output/portable-validation-results.json` as the local packaged launch baseline.
 - Use the currently selected Windows packaging icon metadata when discussing brand/readiness. Report the exact selected ICO file and confirm whether it is a multi-size Windows ICO.
 
@@ -50,6 +51,12 @@ The packaged size breakdown must be reported as:
 - top 10 largest files
 - grouped totals for app code, PHP runtime, MariaDB runtime, and bundled assets
 
+If `distribution-size-analysis.local.json` exists, also report:
+
+- current `app.asar` composition
+- exact duplicate PHP bytes under `php/windowsXamppPhp`
+- largest packaged vendor/tooling candidates
+
 ## Recommendation Classification
 
 Every recommendation must be labeled as exactly one of:
@@ -69,5 +76,10 @@ Produce a roadmap document with these sections:
 4. Safe local changes already completed in this pass
 5. Risks, blockers, and ownership gaps
 6. Verification plan for clean-machine truth
+
+If low-risk implementation work already landed in the same pass, distinguish clearly between:
+
+- completed local changes
+- remaining roadmap recommendations
 
 Do not broaden implementation beyond low-risk local changes in this pass.

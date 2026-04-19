@@ -8,6 +8,7 @@
         "build:electron:portable": "npm run build && npm --prefix electron-app run build:portable",
         "build:electron:nsis": "npm run build && npm --prefix electron-app run build:nsis",
         "measure:electron:baseline": "npm --prefix electron-app run measure:baseline",
+        "analyze:electron:size": "npm --prefix electron-app run analyze:size",
         "verify:electron:release-discipline": "npm --prefix electron-app run verify:release-discipline",
         "package:client": "npm run build:electron:nsis",
         "package:demo": "npm run build:electron:portable && powershell -ExecutionPolicy Bypass -File .\\electron-app\\scripts\\create-demo-package.ps1",

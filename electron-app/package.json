@@ -9,6 +9,7 @@
     "prebuild:nsis": "npm run prepare:portable-runtime && node scripts/stop-packaged-app.mjs",
     "start": "electron .",
     "measure:baseline": "powershell -ExecutionPolicy Bypass -File .\\scripts\\measure-distribution-baseline.ps1",
+    "analyze:size": "node scripts/analyze-distribution-size.mjs",
     "verify:packaged-runtime": "node scripts/verify-packaged-runtime.mjs",
     "verify:packaged-bootstrap": "node scripts/verify-packaged-bootstrap.mjs",
     "verify:release-discipline": "node scripts/verify-release-discipline.mjs",
@@ -39,7 +40,7 @@
       "perMachine": false,
       "selectPerMachineByDefault": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
@@ -56,6 +57,7 @@
     "files": [
       "**/*",
       "!dist/**",
+      "!runtime-stage/**",
       "!build-output/**"
     ],
     "extraResources": [
@@ -93,7 +95,12 @@
       },
       {
         "from": "../vendor",
-        "to": "laravel/vendor"
+        "to": "laravel/vendor",
+        "filter": [
+          "**/*",
+          "!laravel/pint",
+          "!laravel/pint/**"
+        ]
       },
       {
         "from": "../artisan",
