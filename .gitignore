@@ -36,6 +36,7 @@ electron-app/runtime-stage/
 electron-app/electron-app/
 
 Kurash_Scoreboard_Release/
+KTSI/
 *.exe
 *.zip
 

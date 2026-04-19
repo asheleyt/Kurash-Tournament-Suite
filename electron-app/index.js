@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const { app, BrowserWindow, globalShortcut, ipcMain, session } = require('electron');
 const { ControllerAuthStore } = require('./controller-auth-store');
 const { DisplayManager } = require('./display-manager');
@@ -27,17 +28,272 @@ if (requestedUserDataRoot) {
 }
 
 const bootstrapOnly = process.argv.includes('--bootstrap-only') || process.env.KURASH_BOOTSTRAP_ONLY === '1';
+const singleInstanceLockAcquired = app.requestSingleInstanceLock();
+
+if (!singleInstanceLockAcquired) {
+  console.log('[startup] Another Kurash Tournament Suite instance is already running. Exiting secondary process before bootstrap.');
+  app.quit();
+}
+
+const STARTUP_STATES = Object.freeze({
+  IDLE: 'idle',
+  BOOTING: 'booting',
+  READY: 'ready',
+  FAILED: 'failed',
+  QUITTING: 'quitting',
+});
 
 let controllerWindow;
+let startupWindow;
 let settingsStore;
 let controllerAuthStore;
 let displayManager;
 let windowManager;
 let runtimeOrchestrator;
 let resultSyncDiagnosticsRegistered = false;
+let startupState = STARTUP_STATES.IDLE;
+let bootAttemptCounter = 0;
+let activeBootAttemptId = 0;
+let bootSequencePromise = null;
+let isQuitting = false;
 
 function getLogger() {
   return runtimeOrchestrator ? runtimeOrchestrator.logger : console;
+}
+
+function logStartupEvent(level, message, meta = {}) {
+  const logger = getLogger();
+  const method = typeof logger[level] === 'function' ? logger[level].bind(logger) : console.log;
+  method(message, {
+    startupState,
+    activeBootAttemptId,
+    isPackaged: app.isPackaged,
+    ...meta,
+  });
+}
+
+function setStartupState(nextState, meta = {}) {
+  const previousState = startupState;
+  startupState = nextState;
+  logStartupEvent('info', 'Startup state changed.', {
+    previousState,
+    nextState,
+    ...meta,
+  });
+}
+
+function isWindowAlive(win) {
+  return !!(win && typeof win.isDestroyed === 'function' && !win.isDestroyed());
+}
+
+function isActiveBootAttempt(attemptId) {
+  return attemptId > 0 && activeBootAttemptId === attemptId && startupState !== STARTUP_STATES.QUITTING;
+}
+
+function buildFileUrl(filename, params = {}) {
+  const fileUrl = pathToFileURL(path.join(__dirname, filename));
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    fileUrl.searchParams.set(key, String(value));
+  });
+  return fileUrl.toString();
+}
+
+function showAndFocusWindow(win) {
+  if (!isWindowAlive(win)) {
+    return false;
+  }
+
+  if (typeof win.isMinimized === 'function' && win.isMinimized()) {
+    win.restore();
+  }
+
+  if (!win.isVisible()) {
+    if (win.__kurashCanShow === false) {
+      win.__kurashPendingShow = true;
+    } else {
+      win.show();
+    }
+  }
+
+  if (win.__kurashCanShow !== false && typeof win.focus === 'function') {
+    win.focus();
+  }
+
+  return true;
+}
+
+function focusActiveAppWindow() {
+  if (startupState === STARTUP_STATES.READY && showAndFocusWindow(controllerWindow)) {
+    return true;
+  }
+
+  if (showAndFocusWindow(startupWindow)) {
+    return true;
+  }
+
+  return showAndFocusWindow(controllerWindow);
+}
+
+function getCurrentRuntimeDescriptor() {
+  if (!runtimeOrchestrator || !runtimeOrchestrator.state) {
+    return null;
+  }
+
+  return {
+    localBackendBaseUrl: runtimeOrchestrator.localBackendBaseUrl,
+    logsDir: runtimeOrchestrator.logsDir,
+    runtimePaths: runtimeOrchestrator.state,
+  };
+}
+
+function createStartupWindow() {
+  if (bootstrapOnly) {
+    return null;
+  }
+
+  if (isWindowAlive(startupWindow)) {
+    return startupWindow;
+  }
+
+  const win = new BrowserWindow({
+    title: 'Kurash Tournament Suite',
+    width: 920,
+    height: 560,
+    minWidth: 760,
+    minHeight: 440,
+    show: false,
+    frame: false,
+    autoHideMenuBar: true,
+    fullscreen: false,
+    fullscreenable: false,
+    maximizable: false,
+    resizable: false,
+    backgroundColor: '#0f172a',
+    paintWhenInitiallyHidden: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  const revealStartupWindow = () => {
+    if (startupWindow !== win) {
+      return;
+    }
+    showAndFocusWindow(win);
+  };
+
+  startupWindow = win;
+  win.setMenu(null);
+  win.once('ready-to-show', revealStartupWindow);
+  win.webContents.once('did-finish-load', revealStartupWindow);
+  win.on('closed', () => {
+    const shouldQuitBecauseBootNotReady = startupWindow === win
+      && (startupState === STARTUP_STATES.BOOTING || startupState === STARTUP_STATES.FAILED);
+
+    if (startupWindow === win) {
+      startupWindow = null;
+    }
+
+    if (shouldQuitBecauseBootNotReady && !isQuitting) {
+      logStartupEvent('warn', 'Startup/failure window was closed before the app became ready. Quitting current boot attempt.');
+      activeBootAttemptId = 0;
+      app.quit();
+    }
+  });
+
+  win.loadURL(buildFileUrl('startup.html'));
+  return win;
+}
+
+function closeStartupWindow() {
+  if (!isWindowAlive(startupWindow)) {
+    startupWindow = null;
+    return;
+  }
+
+  const win = startupWindow;
+  startupWindow = null;
+  win.close();
+}
+
+function showStartupFailure(message, attemptId) {
+  if (!isActiveBootAttempt(attemptId) || bootstrapOnly) {
+    return;
+  }
+
+  const win = createStartupWindow();
+  if (!isWindowAlive(win)) {
+    return;
+  }
+
+  setStartupState(STARTUP_STATES.FAILED, { attemptId });
+  win.loadURL(buildFileUrl('error.html', { message }));
+  showAndFocusWindow(win);
+}
+
+function waitForWindowReady(win, label) {
+  return new Promise((resolve, reject) => {
+    if (!isWindowAlive(win)) {
+      reject(new Error(`${label} was destroyed before it became ready.`));
+      return;
+    }
+
+    let settled = false;
+
+    const cleanup = () => {
+      win.removeListener('ready-to-show', handleReady);
+      win.removeListener('closed', handleClosed);
+      if (win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.removeListener('did-finish-load', handleReady);
+        win.webContents.removeListener('did-fail-load', handleFailLoad);
+      }
+    };
+
+    const finishResolve = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    const finishReject = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+
+    const handleReady = () => finishResolve();
+    const handleClosed = () => finishReject(new Error(`${label} closed before startup completed.`));
+    const handleFailLoad = (_event, errorCode, errorDescription, validatedUrl, isMainFrame) => {
+      if (isMainFrame === false) {
+        return;
+      }
+
+      finishReject(
+        new Error(
+          `${label} failed to load (${errorDescription || errorCode})${validatedUrl ? `: ${validatedUrl}` : ''}`
+        )
+      );
+    };
+
+    win.once('ready-to-show', handleReady);
+    win.once('closed', handleClosed);
+    win.webContents.once('did-finish-load', handleReady);
+    win.webContents.on('did-fail-load', handleFailLoad);
+
+    if (win.__kurashCanShow === true || win.isVisible()) {
+      finishResolve();
+    }
+  });
 }
 
 function isDevToolsShortcutInput(input) {
@@ -449,7 +705,15 @@ function registerControllerAuthIpc() {
   );
 }
 
-async function createWindows(baseUrl) {
+async function createWindows(baseUrl, attemptId) {
+  if (!isActiveBootAttempt(attemptId)) {
+    logStartupEvent('warn', 'Skipped window creation because the boot attempt is no longer active.', {
+      attemptId,
+      baseUrl,
+    });
+    return null;
+  }
+
   const preloadPath = path.join(__dirname, 'preload.js');
   const logger = runtimeOrchestrator ? runtimeOrchestrator.logger : console;
 
@@ -467,89 +731,182 @@ async function createWindows(baseUrl) {
   registerDisplayIpc();
   registerControllerAuthIpc();
 
-  const controllerSplashUrl = `file://${path.join(__dirname, 'splash.html')}?url=${encodeURIComponent(baseUrl + '/refereeController')}`;
-  const scoreboardSplashUrl = `file://${path.join(__dirname, 'splash.html')}?url=${encodeURIComponent(baseUrl + '/kurashScoreBoard')}`;
-  const ringMatchOrderSplashUrl = `file://${path.join(__dirname, 'splash.html')}?url=${encodeURIComponent(baseUrl + '/ringMatchOrder')}`;
+  const controllerUrl = `${String(baseUrl).replace(/\/+$/, '')}/refereeController`;
+  const scoreboardSplashUrl = buildFileUrl('splash.html', { url: `${String(baseUrl).replace(/\/+$/, '')}/kurashScoreBoard` });
+  const ringMatchOrderSplashUrl = buildFileUrl('splash.html', { url: `${String(baseUrl).replace(/\/+$/, '')}/ringMatchOrder` });
 
-  controllerWindow = windowManager.createControllerWindow(controllerSplashUrl);
+  controllerWindow = windowManager.createControllerWindow(controllerUrl);
   windowManager.createScoreboardWindow(scoreboardSplashUrl);
   windowManager.createRingMatchOrderWindow(ringMatchOrderSplashUrl);
   windowManager.registerDisplayListeners();
 
-  controllerWindow.on('closed', () => {
+  const activeControllerWindow = controllerWindow;
+  activeControllerWindow.on('closed', () => {
+    if (controllerWindow === activeControllerWindow) {
+      controllerWindow = null;
+    }
     app.quit();
   });
 
   registerGlobalShortcuts();
+  await waitForWindowReady(activeControllerWindow, 'Controller window');
+
+  if (!isActiveBootAttempt(attemptId)) {
+    logStartupEvent('warn', 'Controller window became ready after the boot attempt was invalidated.', {
+      attemptId,
+      controllerUrl,
+    });
+    if (isWindowAlive(activeControllerWindow)) {
+      activeControllerWindow.close();
+    }
+    return null;
+  }
+
+  showAndFocusWindow(activeControllerWindow);
+  return activeControllerWindow;
 }
 
-function createErrorWindow(message) {
-  const win = new BrowserWindow({
-    title: 'Kurash Tournament Suite - Startup Error',
-    frame: false,
-    fullscreen: true,
-    backgroundColor: '#0f172a',
-    webPreferences: { nodeIntegration: false },
-  });
+async function ensureBootSequence() {
+  if (!singleInstanceLockAcquired) {
+    return null;
+  }
 
-  const errorUrl = `file://${path.join(__dirname, 'error.html')}?message=${encodeURIComponent(message)}`;
-  win.loadURL(errorUrl);
-  win.setMenu(null);
-}
+  if (startupState === STARTUP_STATES.READY) {
+    logStartupEvent('info', 'Boot sequence requested after startup completed; reusing existing runtime state.');
+    return getCurrentRuntimeDescriptor();
+  }
 
-app.whenReady().then(async () => {
-  runtimeOrchestrator = new RuntimeOrchestrator(app);
+  if (startupState === STARTUP_STATES.FAILED || startupState === STARTUP_STATES.QUITTING) {
+    logStartupEvent('warn', 'Ignored boot request because the app is already in a terminal startup state.');
+    return null;
+  }
 
-  try {
-    const runtime = await runtimeOrchestrator.start();
+  if (bootSequencePromise) {
+    logStartupEvent('info', 'Boot sequence already in progress; returning the active boot promise.');
+    return bootSequencePromise;
+  }
 
+  const attemptId = ++bootAttemptCounter;
+  activeBootAttemptId = attemptId;
+  setStartupState(STARTUP_STATES.BOOTING, { attemptId });
+
+  if (!runtimeOrchestrator) {
+    runtimeOrchestrator = new RuntimeOrchestrator(app);
+  }
+
+  if (!bootstrapOnly) {
+    createStartupWindow();
+  }
+
+  bootSequencePromise = (async () => {
     try {
-      await session.defaultSession.clearCache();
-      runtimeOrchestrator.logger.info('Cleared Electron HTTP cache after runtime bootstrap.');
+      logStartupEvent('info', 'Beginning guarded runtime bootstrap.', { attemptId });
+      const runtime = await runtimeOrchestrator.start();
+
+      if (!isActiveBootAttempt(attemptId)) {
+        logStartupEvent('warn', 'Discarded runtime bootstrap completion from a stale boot attempt.', { attemptId });
+        return getCurrentRuntimeDescriptor();
+      }
+
+      registerResultSyncDiagnostics(runtime.localBackendBaseUrl);
+
+      if (bootstrapOnly) {
+        setStartupState(STARTUP_STATES.READY, { attemptId, bootstrapOnly: true });
+        const holdMsRaw = Number.parseInt(process.env.KURASH_BOOTSTRAP_ONLY_HOLD_MS || '5000', 10);
+        const holdMs = Number.isFinite(holdMsRaw) && holdMsRaw >= 0 ? holdMsRaw : 5000;
+        runtimeOrchestrator.logger.info('Bootstrap-only packaged validation mode is active. Exiting without creating windows.', {
+          attemptId,
+          holdMs,
+          localBackendBaseUrl: runtime.localBackendBaseUrl,
+        });
+        setTimeout(() => app.quit(), holdMs);
+        return runtime;
+      }
+
+      await createWindows(runtime.localBackendBaseUrl, attemptId);
+
+      void session.defaultSession.clearCache()
+        .then(() => {
+          runtimeOrchestrator.logger.info('Cleared Electron HTTP cache after controller launch handoff.', { attemptId });
+        })
+        .catch((error) => {
+          runtimeOrchestrator.logger.warn('Failed to clear Electron HTTP cache after controller launch handoff.', {
+            attemptId,
+            error: error && error.message ? error.message : String(error),
+          });
+        });
+
+      if (!isActiveBootAttempt(attemptId)) {
+        logStartupEvent('warn', 'Skipped startup window teardown because the boot attempt is no longer active.', {
+          attemptId,
+        });
+        return runtime;
+      }
+
+      setStartupState(STARTUP_STATES.READY, { attemptId });
+      closeStartupWindow();
+      return runtime;
     } catch (error) {
-      runtimeOrchestrator.logger.warn('Failed to clear Electron HTTP cache.', {
-        error: error && error.message ? error.message : String(error),
-      });
+      if (!isActiveBootAttempt(attemptId)) {
+        logStartupEvent('warn', 'Ignored runtime bootstrap error from a stale boot attempt.', {
+          attemptId,
+          error: error && error.message ? error.message : String(error),
+        });
+        return null;
+      }
+
+      const logsDir = runtimeOrchestrator ? runtimeOrchestrator.logsDir : path.join(app.getPath('userData'), 'logs');
+      const formattedMessage = formatRuntimeError(error, logsDir);
+
+      if (runtimeOrchestrator) {
+        runtimeOrchestrator.logger.error('Runtime bootstrap failed before the controller window became ready.', {
+          attemptId,
+          stage: error && error.stage ? error.stage : null,
+          reason: error && error.reason ? error.reason : (error && error.message ? error.message : String(error)),
+          details: error && error.details ? error.details : null,
+        });
+      } else {
+        console.error(error);
+      }
+
+      if (bootstrapOnly) {
+        setStartupState(STARTUP_STATES.FAILED, { attemptId, bootstrapOnly: true });
+        app.exit(1);
+        return null;
+      }
+
+      showStartupFailure(formattedMessage, attemptId);
+      return null;
+    } finally {
+      if (bootSequencePromise) {
+        bootSequencePromise = null;
+      }
     }
+  })();
 
-    registerResultSyncDiagnostics(runtime.localBackendBaseUrl);
+  return bootSequencePromise;
+}
 
-    if (bootstrapOnly) {
-      const holdMsRaw = Number.parseInt(process.env.KURASH_BOOTSTRAP_ONLY_HOLD_MS || '5000', 10);
-      const holdMs = Number.isFinite(holdMsRaw) && holdMsRaw >= 0 ? holdMsRaw : 5000;
-      runtimeOrchestrator.logger.info('Bootstrap-only packaged validation mode is active. Exiting without creating windows.', {
-        holdMs,
-        localBackendBaseUrl: runtime.localBackendBaseUrl,
-      });
-      setTimeout(() => app.quit(), holdMs);
-      return;
-    }
-
-    await createWindows(runtime.localBackendBaseUrl);
-  } catch (error) {
-    const logsDir = runtimeOrchestrator ? runtimeOrchestrator.logsDir : path.join(app.getPath('userData'), 'logs');
-    const formattedMessage = formatRuntimeError(error, logsDir);
-
-    if (runtimeOrchestrator) {
-      runtimeOrchestrator.logger.error('Runtime bootstrap failed before windows were created.', {
-        stage: error && error.stage ? error.stage : null,
-        reason: error && error.reason ? error.reason : (error && error.message ? error.message : String(error)),
-        details: error && error.details ? error.details : null,
-      });
-    } else {
-      console.error(error);
-    }
-
-    if (bootstrapOnly) {
-      app.exit(1);
-      return;
-    }
-
-    createErrorWindow(formattedMessage);
+app.on('second-instance', () => {
+  logStartupEvent('info', 'Received second-instance launch request.');
+  if (!focusActiveAppWindow()) {
+    logStartupEvent('warn', 'No existing startup or controller window was available to focus for the second instance.');
   }
 });
 
+app.on('activate', () => {
+  if (!focusActiveAppWindow() && startupState === STARTUP_STATES.IDLE) {
+    void ensureBootSequence();
+  }
+});
+
+app.whenReady().then(async () => {
+  await ensureBootSequence();
+});
+
 app.on('will-quit', () => {
+  isQuitting = true;
+  setStartupState(STARTUP_STATES.QUITTING);
   globalShortcut.unregisterAll();
 
   if (windowManager) {

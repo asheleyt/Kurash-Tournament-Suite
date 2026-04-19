@@ -97,6 +97,7 @@ function diagnosePhpPortabilityFailure(output) {
 const MYSQL_READY_TIMEOUT_MS = 90000;
 const LARAVEL_READY_TIMEOUT_MS = 90000;
 const REVERB_READY_TIMEOUT_MS = 30000;
+const STARTUP_RETRY_DELAY_MS = 250;
 
 function ensureDir(targetPath) {
   if (!fs.existsSync(targetPath)) {
@@ -340,6 +341,8 @@ class RuntimeOrchestrator {
     this.serverProcess = null;
     this.reverbProcess = null;
     this.localBackendBaseUrl = `http://127.0.0.1:${this.ports.server}`;
+    this.startPromise = null;
+    this.startedRuntime = null;
     this.debugState = {
       startedAt: new Date().toISOString(),
       mode: this.isPackaged ? 'packaged' : 'development',
@@ -357,6 +360,32 @@ class RuntimeOrchestrator {
   }
 
   async start() {
+    if (this.startedRuntime) {
+      this.logger.info('Runtime bootstrap already completed; reusing resolved runtime descriptor.', {
+        localBackendBaseUrl: this.startedRuntime.localBackendBaseUrl,
+      });
+      return this.startedRuntime;
+    }
+
+    if (this.startPromise) {
+      this.logger.info('Runtime bootstrap already in progress; returning the active startup promise.', {
+        localBackendBaseUrl: this.localBackendBaseUrl,
+      });
+      return this.startPromise;
+    }
+
+    this.startPromise = this.startInternal();
+
+    try {
+      this.startedRuntime = await this.startPromise;
+      return this.startedRuntime;
+    } catch (error) {
+      this.startPromise = null;
+      throw error;
+    }
+  }
+
+  async startInternal() {
     await this.runStage('resolve packaged/runtime paths', async () => {
       this.resolvePaths();
     });
@@ -418,11 +447,14 @@ class RuntimeOrchestrator {
       this.persistDebugState();
     });
 
-    return {
+    const runtimeDescriptor = {
       localBackendBaseUrl: this.localBackendBaseUrl,
       logsDir: this.logsDir,
       runtimePaths: this.state,
     };
+
+    this.startPromise = null;
+    return runtimeDescriptor;
   }
 
   resolvePaths() {
@@ -457,6 +489,7 @@ class RuntimeOrchestrator {
     const mysqlRunDir = path.join(mysqlRuntimePath, 'run');
     const mysqlConfigPath = path.join(mysqlRuntimePath, 'my.ini');
     const mysqlInitMarker = path.join(mysqlRuntimePath, 'initialized.json');
+    const mysqlSeedDataDir = path.join(mysqlDir, 'backup');
     const laravelStorageSeedAppPath = this.isPackaged
       ? path.join(laravelRoot, 'storage-seed', 'app')
       : path.join(laravelRoot, 'storage', 'app');
@@ -492,6 +525,7 @@ class RuntimeOrchestrator {
       mysqlRunDir,
       mysqlConfigPath,
       mysqlInitMarker,
+      mysqlSeedDataDir,
       laravelStorageSeedAppPath,
       laravelStorageSeedMarker,
       envPath,
@@ -527,6 +561,7 @@ class RuntimeOrchestrator {
       mysqlRunDir,
       mysqlConfigPath,
       mysqlInitMarker,
+      mysqlSeedDataDir,
       laravelStorageSeedAppPath,
       laravelStorageSeedMarker,
       hotFilePath,
@@ -992,26 +1027,7 @@ class RuntimeOrchestrator {
     this.logger.openProcessStream('php');
     this.logger.openProcessStream('reverb');
     this.logger.openProcessStream('mysql');
-
-    const cacheFiles = [
-      this.childEnv.APP_SERVICES_CACHE,
-      this.childEnv.APP_PACKAGES_CACHE,
-      this.childEnv.APP_CONFIG_CACHE,
-      this.childEnv.APP_ROUTES_CACHE,
-      this.childEnv.APP_EVENTS_CACHE,
-    ];
-    cacheFiles.forEach((cacheFile) => {
-      if (fs.existsSync(cacheFile)) {
-        fs.rmSync(cacheFile, { force: true });
-      }
-    });
-
-    if (fs.existsSync(this.state.hotFilePath)) {
-      fs.rmSync(this.state.hotFilePath, { force: true });
-      this.logger.info('Removed stale Vite hot file from runtime payload', {
-        hotFilePath: this.state.hotFilePath,
-      });
-    }
+    this.clearIsolatedLaravelRuntimeArtifacts();
 
     this.logger.info('Ensured writable runtime directories under userData', {
       storagePath: this.state.laravelStoragePath,
@@ -1037,6 +1053,60 @@ class RuntimeOrchestrator {
         fs.copyFileSync(sourceEntryPath, targetEntryPath);
       }
     }
+  }
+
+  clearDirectoryContents(targetPath) {
+    if (!fs.existsSync(targetPath)) {
+      return 0;
+    }
+
+    let removedEntries = 0;
+    const entries = fs.readdirSync(targetPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(targetPath, entry.name);
+      fs.rmSync(entryPath, { recursive: true, force: true });
+      removedEntries += 1;
+    }
+
+    return removedEntries;
+  }
+
+  clearIsolatedLaravelRuntimeArtifacts() {
+    const cacheFiles = [
+      this.childEnv.APP_SERVICES_CACHE,
+      this.childEnv.APP_PACKAGES_CACHE,
+      this.childEnv.APP_CONFIG_CACHE,
+      this.childEnv.APP_ROUTES_CACHE,
+      this.childEnv.APP_EVENTS_CACHE,
+    ];
+    const removedCacheFiles = [];
+
+    cacheFiles.forEach((cacheFile) => {
+      if (fs.existsSync(cacheFile)) {
+        fs.rmSync(cacheFile, { force: true });
+        removedCacheFiles.push(cacheFile);
+      }
+    });
+
+    const clearedViewEntries = this.clearDirectoryContents(this.childEnv.VIEW_COMPILED_PATH);
+    const cacheStorePath = path.join(this.state.laravelStoragePath, 'framework', 'cache', 'data');
+    const clearedCacheStoreEntries = this.clearDirectoryContents(cacheStorePath);
+
+    let removedHotFile = false;
+    if (fs.existsSync(this.state.hotFilePath)) {
+      fs.rmSync(this.state.hotFilePath, { force: true });
+      removedHotFile = true;
+    }
+
+    this.logger.info('Prepared isolated Laravel runtime artifacts for launch', {
+      removedCacheFiles,
+      clearedCompiledViewEntries: clearedViewEntries,
+      clearedFileCacheEntries: clearedCacheStoreEntries,
+      removedHotFile,
+      viewCompiledPath: this.childEnv.VIEW_COMPILED_PATH,
+      cacheStorePath,
+      hotFilePath: this.state.hotFilePath,
+    });
   }
 
   directoryHasMeaningfulEntries(targetPath) {
@@ -1144,6 +1214,55 @@ class RuntimeOrchestrator {
     }
   }
 
+  seedMariaDbDataFromBundledBackupIfAvailable() {
+    if (!this.isPackaged) {
+      return false;
+    }
+
+    if (!fs.existsSync(this.state.mysqlSeedDataDir)) {
+      this.logger.info('Bundled MariaDB backup seed is not present; falling back to mysql_install_db.', {
+        seedPath: this.state.mysqlSeedDataDir,
+      });
+      return false;
+    }
+
+    if (!this.directoryHasMeaningfulEntries(this.state.mysqlSeedDataDir)) {
+      this.logger.warn('Bundled MariaDB backup seed is empty or incomplete; falling back to mysql_install_db.', {
+        seedPath: this.state.mysqlSeedDataDir,
+      });
+      return false;
+    }
+
+    this.logger.info('Seeding MariaDB datadir from bundled packaged backup.', {
+      source: this.state.mysqlSeedDataDir,
+      target: this.state.mysqlDataDir,
+    });
+
+    try {
+      this.resetDirectory(this.state.mysqlDataDir);
+      this.copyDirectoryContents(this.state.mysqlSeedDataDir, this.state.mysqlDataDir);
+
+      if (!this.mysqlDataLooksInitialized()) {
+        this.cleanPartialDbInitialization('bundled backup seed copy completed without required sentinel files');
+        return false;
+      }
+
+      this.logger.info('Bundled MariaDB backup seed copied into the writable datadir.', {
+        source: this.state.mysqlSeedDataDir,
+        target: this.state.mysqlDataDir,
+      });
+      return true;
+    } catch (error) {
+      this.cleanPartialDbInitialization('bundled backup seed copy failed');
+      this.logger.warn('Bundled MariaDB backup seed copy failed; falling back to mysql_install_db.', {
+        source: this.state.mysqlSeedDataDir,
+        target: this.state.mysqlDataDir,
+        error: error.message,
+      });
+      return false;
+    }
+  }
+
   async initializeDbDataIfNeeded() {
     if (!this.state.manageMysql) {
       this.logger.info('Skipping managed MariaDB initialization because development mode is using an external DB runtime.');
@@ -1161,15 +1280,23 @@ class RuntimeOrchestrator {
       return;
     }
 
-    if (!fs.existsSync(this.state.mysqlInstallDb)) {
-      throw new RuntimeStageError('initialize DB data if first run', 'MariaDB initialization failed', {
-        missingPath: this.state.mysqlInstallDb,
-        error: 'mysql_install_db.exe is required for this MariaDB runtime bootstrap path.',
-      });
+    if (fs.existsSync(this.state.mysqlInitMarker) && !this.mysqlDataLooksInitialized()) {
+      this.cleanPartialDbInitialization('stale initialization marker without required datadir sentinel files');
     }
 
     if (!fs.existsSync(this.state.mysqlInitMarker) && this.directoryHasEntries(this.state.mysqlDataDir)) {
       this.cleanPartialDbInitialization('stale unmarked data directory before initialization');
+    }
+
+    if (this.seedMariaDbDataFromBundledBackupIfAvailable()) {
+      return;
+    }
+
+    if (!fs.existsSync(this.state.mysqlInstallDb)) {
+      throw new RuntimeStageError('initialize DB data if first run', 'MariaDB initialization failed', {
+        missingPath: this.state.mysqlInstallDb,
+        error: 'mysql_install_db.exe is required when the bundled MariaDB seed cannot be used.',
+      });
     }
 
     const initArgs = [
@@ -1358,7 +1485,7 @@ class RuntimeOrchestrator {
           port: this.ports.db,
           elapsedMs: Date.now() - startTime,
         });
-        await delay(1000);
+        await delay(STARTUP_RETRY_DELAY_MS);
         continue;
       }
 
@@ -1376,7 +1503,7 @@ class RuntimeOrchestrator {
           exitCode: pingResult.status,
           error: pingResult.error ? pingResult.error.message : summarizeOutput(pingResult.stderr || pingResult.stdout),
         });
-        await delay(1000);
+        await delay(STARTUP_RETRY_DELAY_MS);
         continue;
       }
 
@@ -1387,7 +1514,7 @@ class RuntimeOrchestrator {
           exitCode: queryResult.status,
           error: queryResult.error ? queryResult.error.message : summarizeOutput(queryResult.stderr || queryResult.stdout),
         });
-        await delay(1000);
+        await delay(STARTUP_RETRY_DELAY_MS);
         continue;
       }
 
@@ -1423,21 +1550,29 @@ class RuntimeOrchestrator {
   }
 
   async startLaravelServer() {
-    const optimizeClearArgs = ['artisan', 'optimize:clear'];
-    this.logger.info('Clearing Laravel bootstrap caches before HTTP server start', {
-      command: this.state.phpBin,
-      args: optimizeClearArgs,
-      cwd: this.state.laravelRoot,
-      storagePath: this.state.laravelStoragePath,
-      bootstrapCachePath: this.state.bootstrapCachePath,
-    });
-
-    const optimizeClearResult = this.runArtisanSync(optimizeClearArgs, 'artisan optimize:clear');
-    if (optimizeClearResult.error || optimizeClearResult.status !== 0) {
-      throw new RuntimeStageError('start Laravel HTTP server', 'Laravel bootstrap cache clear failed', {
-        exitCode: optimizeClearResult.status,
-        error: optimizeClearResult.error ? optimizeClearResult.error.message : summarizeOutput(optimizeClearResult.stderr || optimizeClearResult.stdout),
+    if (this.isPackaged) {
+      this.logger.info('Skipping artisan optimize:clear for packaged startup because isolated runtime artifacts were cleared directly.', {
+        storagePath: this.state.laravelStoragePath,
+        bootstrapCachePath: this.state.bootstrapCachePath,
+        viewCompiledPath: this.childEnv.VIEW_COMPILED_PATH,
       });
+    } else {
+      const optimizeClearArgs = ['artisan', 'optimize:clear'];
+      this.logger.info('Clearing Laravel bootstrap caches before HTTP server start', {
+        command: this.state.phpBin,
+        args: optimizeClearArgs,
+        cwd: this.state.laravelRoot,
+        storagePath: this.state.laravelStoragePath,
+        bootstrapCachePath: this.state.bootstrapCachePath,
+      });
+
+      const optimizeClearResult = this.runArtisanSync(optimizeClearArgs, 'artisan optimize:clear');
+      if (optimizeClearResult.error || optimizeClearResult.status !== 0) {
+        throw new RuntimeStageError('start Laravel HTTP server', 'Laravel bootstrap cache clear failed', {
+          exitCode: optimizeClearResult.status,
+          error: optimizeClearResult.error ? optimizeClearResult.error.message : summarizeOutput(optimizeClearResult.stderr || optimizeClearResult.stdout),
+        });
+      }
     }
 
     const serveArgs = ['artisan', 'serve', '--host=127.0.0.1', `--port=${this.ports.server}`];
@@ -1498,7 +1633,7 @@ class RuntimeOrchestrator {
         });
       }
 
-      await delay(1000);
+      await delay(STARTUP_RETRY_DELAY_MS);
     }
 
     throw new RuntimeStageError('wait for Laravel health endpoint', 'Laravel health endpoint failed', {
@@ -1556,7 +1691,7 @@ class RuntimeOrchestrator {
         port: this.ports.reverb,
         elapsedMs: Date.now() - startTime,
       });
-      await delay(1000);
+      await delay(STARTUP_RETRY_DELAY_MS);
     }
 
     throw new RuntimeStageError('start Reverb', 'Reverb failed to start', {

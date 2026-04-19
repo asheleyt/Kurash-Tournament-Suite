@@ -36,6 +36,10 @@ const PHP_REQUIRED_RUNTIME_DLLS = [
   'vcruntime140.dll',
   'vcruntime140_1.dll',
 ];
+const MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES = [
+  join('backup', 'mysql'),
+  join('backup', 'ibdata1'),
+];
 const dllNotFoundExitCodes = new Set([3221225781, 3221226505]);
 
 const FORBIDDEN_PORTABLE_PATTERNS = [/C:\\xampp/i, /xampp\\php/i, /xampp\/php/i];
@@ -179,9 +183,16 @@ const requiredChecks = [
   { label: 'packaged MariaDB mysqladmin.exe', target: packagedMysqlAdminExe },
   { label: 'packaged MariaDB mysql_install_db.exe', target: packagedMysqlInstallDbExe },
   { label: 'packaged MariaDB config template', target: join(packagedMariaDbRoot, 'my.ini.template') },
+  ...MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES.map((entry) => ({
+    label: `packaged MariaDB backup seed ${entry}`,
+    target: join(packagedMariaDbRoot, entry),
+  })),
   { label: 'production icon source', target: sourceIcon },
   { label: 'nsis installer icon source', target: nsisInstallerIcon },
   { label: 'nsis uninstaller icon source', target: nsisUninstallerIcon },
+  { label: 'startup asset source', target: join(electronAppDir, 'startup.html') },
+  { label: 'startup icon asset source', target: join(electronAppDir, 'startup-assets', 'kts-icon.png') },
+  { label: 'startup wordmark asset source', target: join(electronAppDir, 'startup-assets', 'kurash-wordmark.png') },
   { label: 'splash asset source', target: join(electronAppDir, 'splash.html') },
   { label: 'error asset source', target: join(electronAppDir, 'error.html') },
   { label: 'preload asset source', target: join(electronAppDir, 'preload.js') },
@@ -194,7 +205,6 @@ const forbiddenChecks = [
   { label: 'bundled writable storage logs', target: join(laravelRoot, 'storage', 'logs') },
   { label: 'bundled MariaDB data payload', target: join(packagedMariaDbRoot, 'data') },
   { label: 'bundled MariaDB copied data payload', target: join(packagedMariaDbRoot, 'data - Copy') },
-  { label: 'bundled MariaDB backup payload', target: join(packagedMariaDbRoot, 'backup') },
   { label: 'bundled MariaDB data-old payload', target: join(packagedMariaDbRoot, 'data-old') },
   { label: 'bundled MariaDB tmp payload', target: join(packagedMariaDbRoot, 'tmp') },
 ];
@@ -312,6 +322,17 @@ function validateRuntimeManifest() {
   const expectedDlls = [...PHP_REQUIRED_RUNTIME_DLLS].sort();
   if (manifestDlls.length !== expectedDlls.length || manifestDlls.some((entry, index) => entry !== expectedDlls[index])) {
     failures.push('runtime manifest requiredPhpRuntimeDlls does not match the expected packaged DLL manifest');
+  }
+
+  const manifestMariadbSeedEntries = Array.isArray(manifest.bundledMariadbSeedEntries)
+    ? [...manifest.bundledMariadbSeedEntries].sort()
+    : [];
+  const expectedMariadbSeedEntries = [...MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES].sort();
+  if (
+    manifestMariadbSeedEntries.length !== expectedMariadbSeedEntries.length
+    || manifestMariadbSeedEntries.some((entry, index) => entry !== expectedMariadbSeedEntries[index])
+  ) {
+    failures.push('runtime manifest bundledMariadbSeedEntries does not match the expected packaged MariaDB seed manifest');
   }
 
   return failures;

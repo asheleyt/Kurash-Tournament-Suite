@@ -56,6 +56,7 @@ const phpExcludedTopLevelEntries = new Set([
   'dev',
   'docs',
   'extras',
+  'pear',
   'scripts',
   'tests',
   'windowsXamppPhp',
@@ -78,12 +79,17 @@ const mariadbRequiredEntries = [
   join('bin', 'mysqladmin.exe'),
   join('bin', 'mysql_install_db.exe'),
 ];
+const MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES = [
+  join('backup', 'mysql'),
+  join('backup', 'ibdata1'),
+];
 const mariadbDestinationRequiredEntries = [
   ...mariadbRequiredEntries,
+  ...MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES,
   'my.ini.template',
 ];
 
-const mariadbExcludedTopLevelEntries = new Set(['backup', 'data', 'data - Copy', 'data-old', 'logs', 'tmp']);
+const mariadbExcludedTopLevelEntries = new Set(['data', 'data - Copy', 'data-old', 'logs', 'tmp']);
 const dllNotFoundExitCodes = new Set([3221225781, 3221226505]);
 
 function normalizeRelativePath(targetPath) {
@@ -603,6 +609,7 @@ function writeRuntimeManifest({ phpSource, mariadbSource, phpRuntimeDllSource, p
         requiredPhpEntries: PHP_STAGED_REQUIRED_ENTRIES,
         excludedPhpTopLevelEntries: [...phpExcludedTopLevelEntries],
         requiredMariadbEntries: mariadbDestinationRequiredEntries,
+        bundledMariadbSeedEntries: MARIADB_BUNDLED_SEED_REQUIRED_ENTRIES,
         phpSourceDiagnostics,
         mariadbSourceDiagnostics,
         phpRuntimeDllSourceDiagnostics,

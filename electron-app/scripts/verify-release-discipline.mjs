@@ -8,9 +8,15 @@ const buildOutputDir = join(electronAppDir, 'build-output');
 const packageJsonPath = join(electronAppDir, 'package.json');
 const installerIncludePath = join(electronAppDir, 'build', 'installer.nsh');
 const runtimeManifestPath = join(buildOutputDir, 'win-unpacked', 'resources', 'portable', 'runtime', 'runtime-manifest.json');
+const packagedMariaDbRoot = join(buildOutputDir, 'win-unpacked', 'resources', 'portable', 'runtime', 'mariadb');
 const duplicatePhpFolderPath = join(buildOutputDir, 'win-unpacked', 'resources', 'portable', 'runtime', 'php', 'windowsXamppPhp');
 const pintPackagePath = join(buildOutputDir, 'win-unpacked', 'resources', 'laravel', 'vendor', 'laravel', 'pint');
-const expectedExcludedPhpEntries = ['CompatInfo', 'data', 'dev', 'docs', 'extras', 'scripts', 'tests', 'windowsXamppPhp'];
+const expectedExcludedPhpEntries = ['CompatInfo', 'data', 'dev', 'docs', 'extras', 'pear', 'scripts', 'tests', 'windowsXamppPhp'];
+const expectedBundledMariadbSeedEntries = ['backup/mysql', 'backup/ibdata1'];
+
+function normalizeManifestPath(value) {
+  return String(value || '').replace(/\\/g, '/');
+}
 
 function readJsonFile(targetPath, label) {
   if (!existsSync(targetPath)) {
@@ -132,10 +138,30 @@ if (runtimeManifest) {
       `Runtime manifest must record ${entry} as an excluded PHP top-level payload.`
     );
   }
+
+  for (const entry of expectedBundledMariadbSeedEntries) {
+    check(
+      Array.isArray(runtimeManifest.bundledMariadbSeedEntries) &&
+        runtimeManifest.bundledMariadbSeedEntries.map(normalizeManifestPath).includes(entry),
+      `Runtime manifest must record ${entry} as a bundled MariaDB seed payload.`
+    );
+  }
 }
 
 check(!existsSync(duplicatePhpFolderPath), `Duplicate PHP payload should not exist in packaged runtime: ${duplicatePhpFolderPath}`);
 check(!existsSync(pintPackagePath), `Laravel Pint should be excluded from the packaged vendor payload: ${pintPackagePath}`);
+for (const entry of expectedBundledMariadbSeedEntries) {
+  check(
+    existsSync(join(packagedMariaDbRoot, entry)),
+    `Bundled MariaDB seed payload should exist in packaged runtime: ${entry}`
+  );
+}
+for (const entry of ['data', 'data - Copy', 'data-old', 'tmp']) {
+  check(
+    !existsSync(join(packagedMariaDbRoot, entry)),
+    `Writable MariaDB top-level payload should not exist in packaged runtime: ${entry}`
+  );
+}
 for (const entry of expectedExcludedPhpEntries.filter((entry) => entry !== 'windowsXamppPhp')) {
   check(
     !existsSync(join(buildOutputDir, 'win-unpacked', 'resources', 'portable', 'runtime', 'php', entry)),
@@ -181,5 +207,6 @@ console.log(` - Launch metrics source: ${baseline.launchMetricsSource}`);
 console.log(` - First launch: ${baseline.firstLaunchDurationMs} ms`);
 console.log(` - Relaunch: ${baseline.relaunchDurationMs} ms`);
 console.log(` - Duplicate PHP payload trimmed: ${!existsSync(duplicatePhpFolderPath) ? 'yes' : 'no'}`);
+console.log(` - MariaDB backup seed bundled: ${existsSync(join(packagedMariaDbRoot, 'backup', 'mysql')) ? 'yes' : 'no'}`);
 console.log(` - Laravel Pint packaged: ${existsSync(pintPackagePath) ? 'yes' : 'no'}`);
 console.log(` - Icon source: ${baseline.iconSelection?.selectedIcoPath}`);

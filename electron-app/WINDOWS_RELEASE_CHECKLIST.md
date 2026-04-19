@@ -17,9 +17,11 @@ This checklist does not cover signing, public/web branding, or broad payload-tri
 Run these from a normal local shell before a Windows packaging handoff:
 
 1. `npm run build:electron:nsis`
-2. `npm run measure:electron:baseline`
-3. `npm run analyze:electron:size`
-4. `npm run verify:electron:release-discipline`
+2. `npm run analyze:electron:size`
+3. `npm run measure:electron:baseline`
+4. `npm --prefix electron-app run verify:packaged-runtime`
+5. `npm --prefix electron-app run verify:packaged-bootstrap`
+6. `npm run verify:electron:release-discipline`
 
 Expected local evidence artifacts:
 
@@ -68,12 +70,28 @@ Expected size-analysis conditions:
 - Confirm shortcut cleanup is correct whether or not the desktop shortcut was chosen
 - Confirm `%APPDATA%\Kurash Scoreboard` is preserved unless a separate migration plan says otherwise
 
+## Pass 6 manual smoke checks
+
+- Fresh-install smoke pass completed on local test device
+- Fresh-install smoke pass completed on a clean tester machine
+- Uninstall/reinstall smoke pass completed on local test device
+- Confirmed the installer launches and completes cleanly
+- Confirmed the app launches after install and the controller UI opens successfully
+- Confirmed desktop shortcut creation works and the shortcut is removed on uninstall
+- Confirmed uninstall works cleanly before the reinstall attempt
+- Confirmed reinstall works cleanly after the uninstall smoke pass
+
+## Follow-up issues
+
+- Investigate slow startup, especially on first launch from the desktop shortcut
+- Fix the multi-launch concurrency bug where repeated shortcut clicks can trigger overlapping startup attempts and a false MariaDB readiness failure
+
 ## Release discipline checks
 
 - Confirm no stale legacy installer artifact remains in `electron-app/build-output`
 - Confirm the active packaging icon source remains `electron-app/build-resources/KTS_Icon.ico`
 - Confirm the packaged runtime does not contain `resources/portable/runtime/php/windowsXamppPhp`
-- Confirm the packaged runtime does not contain `resources/portable/runtime/php/CompatInfo`, `data`, `dev`, `docs`, `extras`, `scripts`, or `tests`
+- Confirm the packaged runtime does not contain `resources/portable/runtime/php/CompatInfo`, `data`, `dev`, `docs`, `extras`, `pear`, `scripts`, or `tests`
 - Confirm the packaged vendor payload does not contain `resources/laravel/vendor/laravel/pint`
 - Confirm the local baseline JSON was regenerated in the same pass as the installer build being reviewed
 - Confirm the local size-analysis JSON was regenerated in the same pass as the installer build being reviewed

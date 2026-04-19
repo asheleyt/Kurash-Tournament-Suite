@@ -220,7 +220,7 @@ class WindowManager extends EventEmitter {
 
   createControllerWindow(url) {
     const primaryDisplay = this.displayManager.getPrimaryDisplay();
-    this.controllerWindow = new BrowserWindow({
+    const controllerWindow = new BrowserWindow({
       title: 'Gilam Controller',
       show: false,
       frame: false,
@@ -230,6 +230,7 @@ class WindowManager extends EventEmitter {
       kiosk: false,
       resizable: false,
       backgroundColor: '#0f172a',
+      paintWhenInitiallyHidden: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -239,11 +240,26 @@ class WindowManager extends EventEmitter {
         backgroundThrottling: false,
       },
     });
-    this.controllerWindow.setMenu(null);
-    this.applyWindowBounds(this.controllerWindow, cloneBounds(primaryDisplay.bounds), { alwaysOnTop: false });
-    this.controllerWindow.loadURL(url);
-    this.controllerWindow.webContents.on('did-finish-load', () => this.pushStateToController());
-    return this.controllerWindow;
+
+    controllerWindow.__kurashCanShow = false;
+    controllerWindow.__kurashPendingShow = false;
+    const markControllerReadyToShow = () => {
+      if (controllerWindow.isDestroyed()) return;
+      controllerWindow.__kurashCanShow = true;
+      if (controllerWindow.__kurashPendingShow && !controllerWindow.isVisible()) {
+        controllerWindow.show();
+      }
+    };
+
+    controllerWindow.once('ready-to-show', markControllerReadyToShow);
+    controllerWindow.webContents.once('did-finish-load', markControllerReadyToShow);
+
+    this.controllerWindow = controllerWindow;
+    controllerWindow.setMenu(null);
+    this.applyWindowBounds(controllerWindow, cloneBounds(primaryDisplay.bounds), { alwaysOnTop: false, show: false });
+    controllerWindow.loadURL(url);
+    controllerWindow.webContents.on('did-finish-load', () => this.pushStateToController());
+    return controllerWindow;
   }
 
   createScoreboardWindow(url) {
