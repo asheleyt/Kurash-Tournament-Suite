@@ -43,6 +43,45 @@ const STARTUP_STATES = Object.freeze({
   QUITTING: 'quitting',
 });
 
+const STARTUP_STAGE_SEQUENCE = Object.freeze([
+  'resolve packaged/runtime paths',
+  'verify required binaries exist',
+  'run PHP preflight',
+  'ensure writable runtime directories exist',
+  'initialize DB data if first run',
+  'start MariaDB',
+  'wait for real DB readiness',
+  'start Laravel HTTP server',
+  'wait for Laravel health endpoint',
+  'start Reverb',
+  'mark app ready',
+]);
+
+const STARTUP_STAGE_DESCRIPTIONS = Object.freeze({
+  'resolve packaged/runtime paths': 'Resolving local runtime layout.',
+  'verify required binaries exist': 'Verifying packaged service binaries.',
+  'run PHP preflight': 'Checking PHP runtime readiness.',
+  'ensure writable runtime directories exist': 'Preparing writable local service directories.',
+  'initialize DB data if first run': 'Preparing local database files for launch.',
+  'start MariaDB': 'Starting the local database service.',
+  'wait for real DB readiness': 'Waiting for the local database to become ready.',
+  'start Laravel HTTP server': 'Starting the controller web service.',
+  'wait for Laravel health endpoint': 'Waiting for the controller health checks to pass.',
+  'start Reverb': 'Starting the live relay service.',
+  'mark app ready': 'Finalizing startup and preparing the controller window.',
+});
+
+const STARTUP_VIEW_DEFAULTS = Object.freeze({
+  mode: 'booting',
+  heading: 'STARTING CONTROLLER',
+  subtitle: 'Preparing local services. The controller will open automatically when ready.',
+  statusLabel: 'BOOT IN PROGRESS',
+  statusText: 'Preparing runtime services for controller launch.',
+  helperNote: 'Repeated launches will refocus this window.',
+  footerNote: 'First launch after install may take a little longer.',
+  progress: 8,
+});
+
 let controllerWindow;
 let startupWindow;
 let settingsStore;
@@ -56,6 +95,7 @@ let bootAttemptCounter = 0;
 let activeBootAttemptId = 0;
 let bootSequencePromise = null;
 let isQuitting = false;
+let startupViewState = { ...STARTUP_VIEW_DEFAULTS };
 
 function getLogger() {
   return runtimeOrchestrator ? runtimeOrchestrator.logger : console;
@@ -149,6 +189,76 @@ function getCurrentRuntimeDescriptor() {
   };
 }
 
+function buildStartupStagePatch(stageName, status = 'in_progress') {
+  const stageIndex = STARTUP_STAGE_SEQUENCE.indexOf(stageName);
+  if (stageIndex === -1) {
+    return null;
+  }
+
+  const totalStages = STARTUP_STAGE_SEQUENCE.length;
+  const completedProgress = Math.round(((stageIndex + 1) / totalStages) * 100);
+  const activeProgress = Math.max(STARTUP_VIEW_DEFAULTS.progress, Math.min(99, Math.round((stageIndex / totalStages) * 100) + 8));
+
+  return {
+    mode: status === 'failed' ? 'failure' : 'booting',
+    statusLabel: stageName === 'mark app ready' && status !== 'failed' ? 'FINALIZING STARTUP' : 'BOOT IN PROGRESS',
+    statusText: STARTUP_STAGE_DESCRIPTIONS[stageName] || 'Preparing runtime services for controller launch.',
+    progress: status === 'success' ? completedProgress : activeProgress,
+  };
+}
+
+function syncStartupWindowView(targetWindow = startupWindow) {
+  if (!isWindowAlive(targetWindow) || !targetWindow.webContents || targetWindow.webContents.isDestroyed()) {
+    return;
+  }
+
+  const serializedState = JSON.stringify(startupViewState);
+  const applyStateScript = `(() => {
+    if (!window.KTSStartupScreen || typeof window.KTSStartupScreen.applyState !== 'function') {
+      return false;
+    }
+    window.KTSStartupScreen.applyState(${serializedState});
+    return true;
+  })()`;
+
+  targetWindow.webContents.executeJavaScript(applyStateScript, true).catch((error) => {
+    if (!isWindowAlive(targetWindow)) {
+      return;
+    }
+
+    logStartupEvent('warn', 'Failed to synchronize startup window state.', {
+      error: error && error.message ? error.message : String(error),
+    });
+  });
+}
+
+function mergeStartupViewState(patch = {}) {
+  startupViewState = {
+    ...startupViewState,
+    ...patch,
+  };
+
+  syncStartupWindowView();
+}
+
+function resetStartupViewState() {
+  startupViewState = { ...STARTUP_VIEW_DEFAULTS };
+  syncStartupWindowView();
+}
+
+function handleRuntimeStageUpdate(update = {}) {
+  if (!update || typeof update.stageName !== 'string') {
+    return;
+  }
+
+  const patch = buildStartupStagePatch(update.stageName, update.status);
+  if (!patch) {
+    return;
+  }
+
+  mergeStartupViewState(patch);
+}
+
 function createStartupWindow() {
   if (bootstrapOnly) {
     return null;
@@ -190,6 +300,13 @@ function createStartupWindow() {
   win.setMenu(null);
   win.once('ready-to-show', revealStartupWindow);
   win.webContents.once('did-finish-load', revealStartupWindow);
+  win.webContents.on('did-finish-load', () => {
+    if (startupWindow !== win) {
+      return;
+    }
+
+    syncStartupWindowView(win);
+  });
   win.on('closed', () => {
     const shouldQuitBecauseBootNotReady = startupWindow === win
       && (startupState === STARTUP_STATES.BOOTING || startupState === STARTUP_STATES.FAILED);
@@ -789,9 +906,12 @@ async function ensureBootSequence() {
   const attemptId = ++bootAttemptCounter;
   activeBootAttemptId = attemptId;
   setStartupState(STARTUP_STATES.BOOTING, { attemptId });
+  resetStartupViewState();
 
   if (!runtimeOrchestrator) {
-    runtimeOrchestrator = new RuntimeOrchestrator(app);
+    runtimeOrchestrator = new RuntimeOrchestrator(app, {
+      onStageUpdate: handleRuntimeStageUpdate,
+    });
   }
 
   if (!bootstrapOnly) {
@@ -822,6 +942,12 @@ async function ensureBootSequence() {
         setTimeout(() => app.quit(), holdMs);
         return runtime;
       }
+
+      mergeStartupViewState({
+        statusLabel: 'OPENING CONTROLLER',
+        statusText: 'Launching the controller interface.',
+        progress: 100,
+      });
 
       await createWindows(runtime.localBackendBaseUrl, attemptId);
 

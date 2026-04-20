@@ -326,7 +326,7 @@ class PersistentRuntimeLogger {
 }
 
 class RuntimeOrchestrator {
-  constructor(app) {
+  constructor(app, options = {}) {
     this.app = app;
     this.isPackaged = app.isPackaged;
     this.ports = this.isPackaged ? PACKAGED_PORTS : DEVELOPMENT_PORTS;
@@ -343,6 +343,7 @@ class RuntimeOrchestrator {
     this.localBackendBaseUrl = `http://127.0.0.1:${this.ports.server}`;
     this.startPromise = null;
     this.startedRuntime = null;
+    this.onStageUpdate = typeof options.onStageUpdate === 'function' ? options.onStageUpdate : null;
     this.debugState = {
       startedAt: new Date().toISOString(),
       mode: this.isPackaged ? 'packaged' : 'development',
@@ -357,6 +358,21 @@ class RuntimeOrchestrator {
       failure: null,
       readyAt: null,
     };
+  }
+
+  emitStageUpdate(payload) {
+    if (!this.onStageUpdate) {
+      return;
+    }
+
+    try {
+      this.onStageUpdate(payload);
+    } catch (error) {
+      this.logger.warn('Startup stage update callback failed.', {
+        error: error && error.message ? error.message : String(error),
+        payload,
+      });
+    }
   }
 
   async start() {
@@ -713,6 +729,11 @@ class RuntimeOrchestrator {
       startedAt: new Date().toISOString(),
     };
     this.debugState.stages.push(stageRecord);
+    this.emitStageUpdate({
+      stageName,
+      status: 'in_progress',
+      startedAt: stageRecord.startedAt,
+    });
     this.logger.info(`Stage start: ${stageName}`);
     this.persistDebugState();
 
@@ -720,6 +741,12 @@ class RuntimeOrchestrator {
       const result = await action();
       stageRecord.status = 'success';
       stageRecord.finishedAt = new Date().toISOString();
+      this.emitStageUpdate({
+        stageName,
+        status: 'success',
+        startedAt: stageRecord.startedAt,
+        finishedAt: stageRecord.finishedAt,
+      });
       this.logger.info(`Stage success: ${stageName}`);
       this.persistDebugState();
       return result;
@@ -732,6 +759,14 @@ class RuntimeOrchestrator {
       stageRecord.finishedAt = new Date().toISOString();
       stageRecord.reason = stageError.reason;
       stageRecord.details = stageError.details || null;
+      this.emitStageUpdate({
+        stageName,
+        status: 'failed',
+        startedAt: stageRecord.startedAt,
+        finishedAt: stageRecord.finishedAt,
+        reason: stageError.reason,
+        details: stageError.details || null,
+      });
       this.debugState.finalStatus = 'failed';
       this.debugState.failure = {
         stage: stageError.stage || stageName,

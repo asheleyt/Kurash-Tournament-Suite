@@ -28,6 +28,10 @@
             box-sizing: border-box;
         }
 
+        [hidden] {
+            display: none !important;
+        }
+
         html,
         body {
             min-height: 100%;
@@ -79,38 +83,20 @@
         .card {
             position: relative;
             width: min(760px, 100%);
-            padding: 34px 34px 28px;
-            border-radius: 30px;
-            border: 1px solid var(--card-border);
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 12%),
-                radial-gradient(circle at top, rgba(41, 170, 229, 0.15), transparent 42%),
-                linear-gradient(180deg, var(--card-top) 0%, var(--card-bottom) 100%);
-            box-shadow:
-                0 30px 80px rgba(1, 7, 18, 0.58),
-                inset 0 1px 0 var(--card-highlight),
-                inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+            padding: 34px 34px 20px;
         }
 
         .card::before,
         .card::after {
-            content: "";
-            position: absolute;
-            pointer-events: none;
-            border-radius: inherit;
+            content: none;
         }
 
         .card::before {
-            inset: 0;
-            border: 1px solid rgba(129, 165, 222, 0.08);
+            display: none;
         }
 
         .card::after {
-            inset: 1px;
-            background:
-                radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.06), transparent 22%),
-                radial-gradient(circle at 84% 22%, rgba(143, 111, 255, 0.1), transparent 20%);
-            opacity: 0.9;
+            display: none;
         }
 
         .brand {
@@ -149,7 +135,7 @@
             height: 66px;
             display: block;
             object-fit: contain;
-            filter: drop-shadow(0 12px 20px rgba(5, 12, 24, 0.3));
+            filter: drop-shadow(0 10px 16px rgba(5, 12, 24, 0.18));
         }
 
         .brand-logo-fallback {
@@ -272,6 +258,13 @@
             font-weight: 700;
         }
 
+        .progress-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+        }
+
         .progress-track {
             position: relative;
             overflow: hidden;
@@ -292,14 +285,25 @@
             top: 2px;
             bottom: 2px;
             left: 2px;
-            width: 36%;
+            width: calc(8% - 4px);
             border-radius: inherit;
             background:
                 linear-gradient(90deg, rgba(57, 222, 242, 0.96) 0%, rgba(102, 198, 255, 0.98) 50%, rgba(138, 130, 255, 0.96) 100%);
+            background-size: 180% 100%;
             box-shadow:
                 0 0 18px rgba(57, 222, 242, 0.42),
                 0 0 34px rgba(138, 130, 255, 0.24);
-            transform-origin: left center;
+            animation: progress-gradient-shift 2.2s linear infinite;
+        }
+
+        .progress-fill::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 46%, rgba(255, 255, 255, 0) 100%);
+            transform: translateX(-120%);
+            animation: progress-sheen 1.9s ease-in-out infinite;
         }
 
         .progress-fill::after {
@@ -316,14 +320,88 @@
                 0 0 10px rgba(255, 255, 255, 0.55),
                 0 0 22px rgba(57, 222, 242, 0.55),
                 0 0 34px rgba(138, 130, 255, 0.36);
+            animation: progress-head-pulse 1.35s ease-in-out infinite;
         }
 
-        .progress-track[data-mode="indeterminate"] .progress-fill {
-            animation: indeterminate 1.85s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+        .progress-tooltip {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
         }
 
-        .progress-track[data-mode="determinate"] .progress-fill {
-            animation: none;
+        .progress-tooltip-trigger {
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border-radius: 999px;
+            border: 1px solid rgba(137, 167, 221, 0.42);
+            background: rgba(17, 29, 52, 0.82);
+            color: #b9c8db;
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: default;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                0 10px 20px rgba(4, 10, 22, 0.18);
+        }
+
+        .progress-tooltip-trigger:focus-visible {
+            outline: 2px solid rgba(126, 193, 255, 0.75);
+            outline-offset: 2px;
+        }
+
+        .progress-callout {
+            position: relative;
+            position: absolute;
+            right: calc(100% + 12px);
+            top: 50%;
+            max-width: 230px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(19, 32, 59, 0.94);
+            border: 1px solid rgba(133, 162, 214, 0.24);
+            color: #b7c8dd;
+            font-size: 0.8rem;
+            line-height: 1.35;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            box-shadow:
+                0 14px 30px rgba(4, 10, 22, 0.26),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transform: translateY(-50%) translateX(6px);
+            transition:
+                opacity 120ms ease,
+                transform 140ms ease,
+                visibility 0s linear 140ms;
+        }
+
+        .progress-callout::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            right: -7px;
+            width: 12px;
+            height: 12px;
+            border-top: 1px solid rgba(133, 162, 214, 0.24);
+            border-right: 1px solid rgba(133, 162, 214, 0.24);
+            background: rgba(19, 32, 59, 0.94);
+            transform: translateY(-50%) rotate(45deg);
+        }
+
+        .progress-tooltip:hover .progress-callout,
+        .progress-tooltip:focus-within .progress-callout,
+        .progress-callout:hover {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(-50%) translateX(0);
+            transition-delay: 0s;
         }
 
         .status-text {
@@ -332,17 +410,10 @@
             font-size: 1rem;
         }
 
-        .helper-note,
         .footer-note {
             position: relative;
             z-index: 1;
             text-align: center;
-        }
-
-        .helper-note {
-            margin-top: 18px;
-            color: #a8bad3;
-            font-size: 0.93rem;
         }
 
         .footer-note {
@@ -366,6 +437,10 @@
                 0 0 32px rgba(239, 68, 68, 0.3);
         }
 
+        html[data-mode="failure"] .progress-fill::before {
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 237, 213, 0.2) 46%, rgba(255, 255, 255, 0) 100%);
+        }
+
         html[data-mode="failure"] .status-heading strong,
         html[data-mode="failure"] h1 {
             color: #fff4f1;
@@ -378,18 +453,39 @@
                 0 18px 40px rgba(28, 7, 7, 0.35);
         }
 
-        @keyframes indeterminate {
+        @keyframes progress-gradient-shift {
             0% {
-                width: 30%;
-                transform: translateX(-118%);
-            }
-            52% {
-                width: 42%;
-                transform: translateX(92%);
+                background-position: 0% 50%;
             }
             100% {
-                width: 30%;
-                transform: translateX(208%);
+                background-position: 180% 50%;
+            }
+        }
+
+        @keyframes progress-sheen {
+            0% {
+                transform: translateX(-120%);
+            }
+            100% {
+                transform: translateX(130%);
+            }
+        }
+
+        @keyframes progress-head-pulse {
+            0%,
+            100% {
+                transform: translateY(-50%) scale(0.96);
+                box-shadow:
+                    0 0 8px rgba(255, 255, 255, 0.45),
+                    0 0 18px rgba(57, 222, 242, 0.4),
+                    0 0 28px rgba(138, 130, 255, 0.26);
+            }
+            50% {
+                transform: translateY(-50%) scale(1.08);
+                box-shadow:
+                    0 0 12px rgba(255, 255, 255, 0.62),
+                    0 0 24px rgba(57, 222, 242, 0.58),
+                    0 0 36px rgba(138, 130, 255, 0.38);
             }
         }
 
@@ -399,8 +495,7 @@
             }
 
             .card {
-                padding: 28px 22px 24px;
-                border-radius: 24px;
+                padding: 28px 22px 18px;
             }
 
             .brand-logo {
@@ -419,9 +514,8 @@
             }
 
             .brand-mark-shell {
-                width: 72px;
-                height: 72px;
-                border-radius: 20px;
+                width: 58px;
+                height: 58px;
             }
 
             .brand-wordmark {
@@ -444,6 +538,26 @@
                 margin-top: 24px;
                 padding: 20px 18px 18px;
                 border-radius: 18px;
+            }
+
+            .progress-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .progress-tooltip {
+                justify-self: end;
+            }
+
+            .progress-callout::before {
+                top: 50%;
+                right: -7px;
+                transform: translateY(-50%) rotate(45deg);
+            }
+
+            .progress-callout {
+                right: calc(100% + 10px);
+                max-width: min(230px, calc(100vw - 90px));
             }
         }
     </style>
@@ -486,22 +600,34 @@
                 <span>STATUS:</span>
                 <strong id="startupStatusLabel">BOOT IN PROGRESS</strong>
             </div>
-            <div
-                id="startupProgress"
-                class="progress-track"
-                data-mode="indeterminate"
-                role="progressbar"
-                aria-label="Application startup progress"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuetext="Boot in progress"
-            >
-                <div id="startupProgressFill" class="progress-fill"></div>
+            <div class="progress-row">
+                <div
+                    id="startupProgress"
+                    class="progress-track"
+                    data-mode="determinate"
+                    role="progressbar"
+                    aria-label="Application startup progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="8"
+                    aria-valuetext="Boot in progress"
+                >
+                    <div id="startupProgressFill" class="progress-fill"></div>
+                </div>
+                <div class="progress-tooltip">
+                    <button
+                        id="startupHelperTrigger"
+                        class="progress-tooltip-trigger"
+                        type="button"
+                        aria-label="Startup note"
+                        aria-describedby="startupHelperNote"
+                    >i</button>
+                    <div id="startupHelperNote" class="progress-callout">Repeated launches will refocus this window.</div>
+                </div>
             </div>
             <p id="startupStatusText" class="status-text">Preparing runtime services for controller launch.</p>
         </section>
 
-        <p id="startupHelperNote" class="helper-note">Repeated launches will refocus this window.</p>
         <p id="startupFooterNote" class="footer-note">First launch after install may take a little longer.</p>
     </main>
 
@@ -538,20 +664,30 @@
                     return;
                 }
 
+                const hideFallback = function () {
+                    showElement(image, true);
+                    showElement(fallback, false);
+                };
+
                 const revealFallback = function () {
                     showElement(image, false);
                     showElement(fallback, true);
                 };
 
+                image.addEventListener('load', hideFallback);
                 image.addEventListener('error', revealFallback);
 
-                if (image.complete && typeof image.naturalWidth === 'number' && image.naturalWidth === 0) {
+                if (image.complete && typeof image.naturalWidth === 'number') {
+                    if (image.naturalWidth > 0) {
+                        hideFallback();
+                        return;
+                    }
+
                     revealFallback();
                     return;
                 }
 
-                showElement(image, true);
-                showElement(fallback, false);
+                hideFallback();
             }
 
             function setText(key, value) {
@@ -579,24 +715,47 @@
                 }
 
                 const clamped = Math.max(0, Math.min(100, numericValue));
-                elements.progressTrack.dataset.mode = 'determinate';
-                elements.progressFill.style.left = '2px';
-                elements.progressFill.style.transform = 'translateX(0)';
                 elements.progressFill.style.width = clamped <= 0 ? '0px' : ('calc(' + clamped + '% - 4px)');
                 elements.progressTrack.setAttribute('aria-valuenow', String(Math.round(clamped)));
                 elements.progressTrack.setAttribute('aria-valuetext', Math.round(clamped) + '% complete');
             }
 
             function resetProgress() {
-                elements.progressTrack.dataset.mode = 'indeterminate';
-                elements.progressFill.style.left = '2px';
-                elements.progressFill.style.width = '36%';
-                elements.progressFill.style.transform = '';
-                elements.progressTrack.removeAttribute('aria-valuenow');
+                setProgress(8);
                 elements.progressTrack.setAttribute('aria-valuetext', elements.statusLabel.textContent || 'Boot in progress');
             }
 
             window.KTSStartupScreen = {
+                applyState(nextState) {
+                    if (!nextState || typeof nextState !== 'object') {
+                        return;
+                    }
+
+                    if (typeof nextState.mode === 'string') {
+                        setMode(nextState.mode);
+                    }
+                    if (typeof nextState.heading === 'string') {
+                        setText('heading', nextState.heading);
+                    }
+                    if (typeof nextState.subtitle === 'string') {
+                        setText('subtitle', nextState.subtitle);
+                    }
+                    if (typeof nextState.statusLabel === 'string') {
+                        this.setStatusLabel(nextState.statusLabel);
+                    }
+                    if (typeof nextState.statusText === 'string') {
+                        setText('statusText', nextState.statusText);
+                    }
+                    if (typeof nextState.helperNote === 'string') {
+                        setText('helperNote', nextState.helperNote);
+                    }
+                    if (typeof nextState.footerNote === 'string') {
+                        setText('footerNote', nextState.footerNote);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(nextState, 'progress')) {
+                        setProgress(nextState.progress);
+                    }
+                },
                 setMode,
                 setHeading(value) {
                     setText('heading', value);
@@ -625,7 +784,7 @@
             setMode('booting');
             bindImageFallback('brandLogo', 'brandLogoFallback');
             bindImageFallback('brandWordmark', 'brandWordmarkFallback');
-            resetProgress();
+            setProgress(8);
         })();
     </script>
 </body>
