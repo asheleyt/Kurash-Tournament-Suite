@@ -98,6 +98,10 @@ const MYSQL_READY_TIMEOUT_MS = 90000;
 const LARAVEL_READY_TIMEOUT_MS = 90000;
 const REVERB_READY_TIMEOUT_MS = 30000;
 const STARTUP_RETRY_DELAY_MS = 250;
+const PACKAGED_PAYLOAD_READY_TIMEOUT_MS = 180000;
+const PACKAGED_PAYLOAD_STABLE_RETRY_DELAY_MS = 1000;
+const PACKAGED_PAYLOAD_STABLE_SAMPLE_COUNT = 2;
+const PACKAGED_PAYLOAD_RECENT_MTIME_MS = 120000;
 
 function ensureDir(targetPath) {
   if (!fs.existsSync(targetPath)) {
@@ -133,6 +137,65 @@ function normalizeExitCode(exitCode) {
   }
 
   return exitCode < 0 ? (0x100000000 + exitCode) : exitCode;
+}
+
+function summarizeDirectoryTree(rootPath) {
+  const summary = {
+    path: rootPath,
+    exists: fs.existsSync(rootPath),
+    fileCount: 0,
+    directoryCount: 0,
+    totalBytes: 0,
+    latestMtimeMs: 0,
+    errors: [],
+  };
+
+  if (!summary.exists) {
+    return summary;
+  }
+
+  const stack = [rootPath];
+  while (stack.length > 0) {
+    const currentPath = stack.pop();
+    let entries = [];
+
+    try {
+      entries = fs.readdirSync(currentPath, { withFileTypes: true });
+    } catch (error) {
+      summary.errors.push({
+        path: currentPath,
+        error: error && error.message ? error.message : String(error),
+      });
+      continue;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentPath, entry.name);
+      let stats = null;
+
+      try {
+        stats = fs.statSync(entryPath);
+      } catch (error) {
+        summary.errors.push({
+          path: entryPath,
+          error: error && error.message ? error.message : String(error),
+        });
+        continue;
+      }
+
+      summary.latestMtimeMs = Math.max(summary.latestMtimeMs, stats.mtimeMs);
+
+      if (entry.isDirectory()) {
+        summary.directoryCount += 1;
+        stack.push(entryPath);
+      } else {
+        summary.fileCount += 1;
+        summary.totalBytes += stats.size;
+      }
+    }
+  }
+
+  return summary;
 }
 
 function diagnoseWindowsDependencyFailure(result = {}) {
@@ -406,6 +469,10 @@ class RuntimeOrchestrator {
       this.resolvePaths();
     });
 
+    await this.runStage('wait for packaged payload extraction', async () => {
+      await this.waitForPackagedPayloadReady();
+    });
+
     await this.runStage('verify required binaries exist', async () => {
       this.verifyRequiredBinaries();
     });
@@ -649,6 +716,176 @@ class RuntimeOrchestrator {
       { label: 'MariaDB template', target: this.state.mariadbTemplatePath, exists: fs.existsSync(this.state.mariadbTemplatePath) },
       { label: 'Laravel storage seed', target: this.state.laravelStorageSeedAppPath, exists: fs.existsSync(this.state.laravelStorageSeedAppPath) },
     ];
+  }
+
+  collectPackagedPayloadChecks() {
+    if (!this.isPackaged || !this.state) return [];
+
+    const laravelChecks = [
+      { label: 'Laravel artisan', target: path.join(this.state.laravelRoot, 'artisan') },
+      { label: 'Laravel bootstrap app', target: path.join(this.state.laravelRoot, 'bootstrap', 'app.php') },
+      { label: 'Laravel web routes', target: path.join(this.state.laravelRoot, 'routes', 'web.php') },
+      { label: 'Laravel API routes', target: path.join(this.state.laravelRoot, 'routes', 'api.php') },
+      { label: 'Laravel vendor autoload', target: path.join(this.state.laravelRoot, 'vendor', 'autoload.php') },
+      {
+        label: 'Laravel framework application',
+        target: path.join(this.state.laravelRoot, 'vendor', 'laravel', 'framework', 'src', 'Illuminate', 'Foundation', 'Application.php'),
+      },
+      { label: 'Laravel public build manifest', target: path.join(this.state.laravelRoot, 'public', 'build', 'manifest.json') },
+    ];
+
+    return [
+      ...this.collectPackagedRuntimePathChecks(),
+      ...laravelChecks.map((check) => ({
+        ...check,
+        exists: fs.existsSync(check.target),
+      })),
+    ];
+  }
+
+  packagedPayloadRecentlyModified(checks) {
+    const now = Date.now();
+    let latestMtimeMs = 0;
+
+    for (const check of checks) {
+      if (!check.exists) continue;
+
+      try {
+        latestMtimeMs = Math.max(latestMtimeMs, fs.statSync(check.target).mtimeMs);
+      } catch (error) {
+      }
+    }
+
+    for (const targetPath of [this.state.portableRuntimeRoot, this.state.laravelRoot]) {
+      if (!fs.existsSync(targetPath)) continue;
+
+      try {
+        latestMtimeMs = Math.max(latestMtimeMs, fs.statSync(targetPath).mtimeMs);
+      } catch (error) {
+      }
+    }
+
+    return latestMtimeMs > 0 && now - latestMtimeMs <= PACKAGED_PAYLOAD_RECENT_MTIME_MS;
+  }
+
+  snapshotPackagedPayload() {
+    const summaries = [
+      summarizeDirectoryTree(this.state.portableRuntimeRoot),
+      summarizeDirectoryTree(this.state.laravelRoot),
+    ];
+
+    const signature = JSON.stringify(summaries.map((summary) => ({
+      path: summary.path,
+      exists: summary.exists,
+      fileCount: summary.fileCount,
+      directoryCount: summary.directoryCount,
+      totalBytes: summary.totalBytes,
+      latestMtimeMs: summary.latestMtimeMs,
+      errorCount: summary.errors.length,
+    })));
+
+    return {
+      summaries,
+      signature,
+    };
+  }
+
+  async waitForPackagedPayloadReady() {
+    if (!this.isPackaged) {
+      this.logger.info('Skipping packaged payload extraction wait in development mode.');
+      return;
+    }
+
+    const startTime = Date.now();
+    let attempt = 0;
+    let lastLogAt = 0;
+    let stableSamples = 0;
+    let previousSignature = null;
+
+    while (Date.now() - startTime <= PACKAGED_PAYLOAD_READY_TIMEOUT_MS) {
+      attempt += 1;
+
+      const checks = this.collectPackagedPayloadChecks();
+      const missing = checks.filter((check) => !check.exists);
+      this.debugState.packagedPayloadChecks = checks;
+
+      if (missing.length === 0) {
+        const shouldVerifySettled = this.packagedPayloadRecentlyModified(checks);
+
+        if (!shouldVerifySettled) {
+          this.logger.info('Packaged payload required files are present.', {
+            attempts: attempt,
+            elapsedMs: Date.now() - startTime,
+          });
+          this.persistDebugState();
+          return;
+        }
+
+        const snapshot = this.snapshotPackagedPayload();
+        if (snapshot.signature === previousSignature) {
+          stableSamples += 1;
+        } else {
+          stableSamples = 1;
+          previousSignature = snapshot.signature;
+        }
+
+        this.debugState.packagedPayloadSnapshot = snapshot.summaries;
+
+        if (stableSamples >= PACKAGED_PAYLOAD_STABLE_SAMPLE_COUNT) {
+          this.logger.info('Packaged payload extraction appears settled.', {
+            attempts: attempt,
+            elapsedMs: Date.now() - startTime,
+            stableSamples,
+            summaries: snapshot.summaries.map((summary) => ({
+              path: summary.path,
+              fileCount: summary.fileCount,
+              directoryCount: summary.directoryCount,
+              totalBytes: summary.totalBytes,
+              latestMtimeMs: summary.latestMtimeMs,
+              errorCount: summary.errors.length,
+            })),
+          });
+          this.persistDebugState();
+          return;
+        }
+
+        if (Date.now() - lastLogAt >= 5000 || attempt === 1) {
+          lastLogAt = Date.now();
+          this.logger.info('Waiting for packaged payload extraction to settle.', {
+            attempt,
+            elapsedMs: Date.now() - startTime,
+            stableSamples,
+            summaries: snapshot.summaries.map((summary) => ({
+              path: summary.path,
+              fileCount: summary.fileCount,
+              directoryCount: summary.directoryCount,
+              totalBytes: summary.totalBytes,
+              latestMtimeMs: summary.latestMtimeMs,
+              errorCount: summary.errors.length,
+            })),
+          });
+        }
+      } else if (Date.now() - lastLogAt >= 5000 || attempt === 1) {
+        lastLogAt = Date.now();
+        this.logger.info('Waiting for packaged payload extraction to finish.', {
+          attempt,
+          elapsedMs: Date.now() - startTime,
+          missingCount: missing.length,
+          missing: missing.slice(0, 10),
+        });
+      }
+
+      this.persistDebugState();
+      await delay(PACKAGED_PAYLOAD_STABLE_RETRY_DELAY_MS);
+    }
+
+    const checks = this.collectPackagedPayloadChecks();
+    const missing = checks.filter((check) => !check.exists);
+    throw new RuntimeStageError('wait for packaged payload extraction', 'Packaged payload extraction incomplete', {
+      timeoutMs: PACKAGED_PAYLOAD_READY_TIMEOUT_MS,
+      missingCount: missing.length,
+      missing: missing.slice(0, 20),
+    });
   }
 
   buildChildEnv() {

@@ -45,6 +45,7 @@ const STARTUP_STATES = Object.freeze({
 
 const STARTUP_STAGE_SEQUENCE = Object.freeze([
   'resolve packaged/runtime paths',
+  'wait for packaged payload extraction',
   'verify required binaries exist',
   'run PHP preflight',
   'ensure writable runtime directories exist',
@@ -59,6 +60,7 @@ const STARTUP_STAGE_SEQUENCE = Object.freeze([
 
 const STARTUP_STAGE_DESCRIPTIONS = Object.freeze({
   'resolve packaged/runtime paths': 'Resolving local runtime layout.',
+  'wait for packaged payload extraction': 'Waiting for installed package files to finish unpacking.',
   'verify required binaries exist': 'Verifying packaged service binaries.',
   'run PHP preflight': 'Checking PHP runtime readiness.',
   'ensure writable runtime directories exist': 'Preparing writable local service directories.',
