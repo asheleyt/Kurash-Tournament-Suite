@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: Match.vue
+    Description: Match control and scoring page for kurash bouts.
+    Manages timer state, overlays, penalties, scores, and finish actions.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <template>
 <div class="scoreboard">
 

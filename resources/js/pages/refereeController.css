@@ -1,3 +1,15 @@
+/**
+ * Kurash Tournament Suite
+ *
+ * File: refereeController.css
+ * Description: Scoped styles for the referee controller page.
+ * Defines layout, dialogs, and controller-specific visual treatments.
+ *
+ * Part of the Kurash Tournament Suite desktop application.
+ *
+ * Copyright (c) 2026 Kurash Tournament Suite.
+ * All rights reserved.
+ */
 .controller-shell {
     scroll-behavior: smooth;
 }

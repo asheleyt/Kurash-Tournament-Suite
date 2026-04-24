@@ -1,3 +1,15 @@
+/**
+ * Kurash Tournament Suite
+ *
+ * File: refereeController.setup.ts
+ * Description: Setup logic for the referee controller page, composing match control,
+ * queue sync, display management, and recovery state.
+ *
+ * Part of the Kurash Tournament Suite desktop application.
+ *
+ * Copyright (c) 2026 Kurash Tournament Suite.
+ * All rights reserved.
+ */
 /* --- IMPORTS --- */
 import {
     Clock,
@@ -57,10 +69,6 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import type {
-    ElectronDisplayManagementBridge,
-    ElectronDisplayState,
-} from '@/composables/refereeDisplayTypes';
 import type { PersistedResultOverride } from '@/composables/refereeQueueOverrides';
 import { useBroadcast } from '@/composables/useBroadcast';
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts';
@@ -70,14 +78,15 @@ import {
     writeLocalScoreboardState,
 } from '@/composables/useLocalScoreboardState';
 import { useRefereeControllerSession } from '@/composables/useRefereeControllerSession';
-import { useRefereeDisplayManagement } from '@/composables/useRefereeDisplayManagement';
 import { useRefereeQueueSync } from '@/composables/useRefereeQueueSync';
 import { useRefereeRingMatchOrderSync } from '@/composables/useRefereeRingMatchOrderSync';
+import { useRefereeBracketInference } from './refereeController/useRefereeBracketInference';
+import { useRefereeControllerDisplayManagement } from './refereeController/useRefereeControllerDisplayManagement';
+import { useRefereeControllerQueuePreview } from './refereeController/useRefereeControllerQueuePreview';
+import { useRefereeControllerQueueHelpers } from './refereeController/useRefereeControllerQueueHelpers';
+import { useRefereeControllerSyncPanels } from './refereeController/useRefereeControllerSyncPanels';
 import {
-    buildDisplaySlots,
     normalizeQueueRows,
-    type RingDisplaySlot,
-    type RingDisplayMatchSlot,
     type RingDisplayRole,
     type RingQueueDisplayClass,
     type RingQueueSource,
@@ -86,8 +95,6 @@ import {
     buildRingMatchOrderProjectionKey,
     createRingMatchOrderProjectionRecord,
     normalizeProjectionAdminBase,
-    RING_MATCH_ORDER_FRESH_MS,
-    RING_MATCH_ORDER_OFFLINE_MS,
     RING_MATCH_ORDER_PROJECTION_CHANNEL,
     type ElectronDisplayRole,
     type RingMatchOrderProjectionMeta,
@@ -700,11 +707,6 @@ function handleSettingsScroll() {
     }, 900);
 }
 
-function getDisplayBridge(): ElectronDisplayManagementBridge | null {
-    return ((window as any).kurashElectron?.displayManagement ??
-        null) as ElectronDisplayManagementBridge | null;
-}
-
 function getControllerAuthBridge(): ElectronControllerAuthBridge | null {
     return ((window as any).kurashElectron?.controllerAuth ??
         null) as ElectronControllerAuthBridge | null;
@@ -856,472 +858,25 @@ function createBrowserFallbackDeviceId(): string {
     return `controller-${randomPart}`;
 }
 
-let removeDisplayStateListener: (() => void) | null = null;
-
 const {
-    displayState,
-    displayActionPending,
-    isDisplayAdvancedOpen,
-    isDisplayScreenMenuOpen,
-    newBroadcastProfileName,
-    selectedBroadcastProfileId,
-    controllerOutputConfirmed,
-    displayErrorMessage,
-    selectedScoreboardDisplayId,
-    lastDisplayNoticeTimestamp,
-    isDisplayManagementAvailable,
-    detectedDisplays,
-    controllerDisplayInfo,
-    scoreboardDisplayInfo,
-    preferredScoreboardDisplayInfo,
-    selectedScoreboardDisplayIds,
-    liveScoreboardDisplayIds,
-    previewDisplayIds,
-    missingSelectedDisplayIds,
-    selectedRingMatchOrderDisplayIds,
-    liveRingMatchOrderDisplayIds,
-    previewRingMatchOrderDisplayIds,
-    missingRingMatchOrderDisplayIds,
-    knownDisplayLabels,
-    selectedScoreboardDisplays,
-    liveScoreboardDisplays,
-    selectedRingMatchOrderDisplays,
-    liveRingMatchOrderDisplays,
-    broadcastProfiles,
-    selectedBroadcastProfile,
-    externalDisplays,
-    isBroadcastMode,
-    isDisplayTestActive,
-    isScoreboardLive,
-    isRingMatchOrderPreviewActive,
+    displayManagementPanelModel,
+    displayManagementPanelActions,
     isRingMatchOrderLive,
-    requiresScoreboardDisplaySelection,
-    requiresRingMatchOrderDisplaySelection,
-    controllerDisplaySelected,
-    requiresControllerOutputConfirmation,
-    selectedOutputPerformanceWarning,
-    missingSelectedDisplayEntries,
-    missingRingMatchOrderDisplayEntries,
-    displayModeLabel,
-    scoreboardStatusLabel,
-    scoreboardStatusToneClass,
-    scoreboardStatusDescription,
-    ringMatchOrderSummary,
-    ringMatchOrderStatusLabel,
-    ringMatchOrderStatusToneClass,
-    ringMatchOrderStatusDescription,
-    selectedScoreboardDisplayLabel,
-    selectedScoreboardDisplayDescription,
-    selectedRingMatchOrderDisplayLabel,
-    selectedRingMatchOrderDisplayDescription,
     shouldAutoExpandRingMatchOrderPanel,
-    applyDisplayState,
-    getDisplayStatusEntry,
-    getDisplayStatusEntryForRole,
-    getKnownDisplayLabel,
-    getProfileDisplaySnapshots,
-    getDisplayRoleUsageBadges,
-    isControllerDisplay,
-    getDisplayRoleLabel,
-    getDisplayCardDescription,
-    getRingMatchOrderDisplayCardDescription,
-    loadDisplayState,
-    setScoreboardOutputMode,
-    toggleScoreboardTarget,
-    selectAllExternalDisplayTargets,
-    clearSelectedDisplayTargets,
-    removeDisplayTarget,
-    ensureControllerOutputConfirmation,
-    launchSelectedScoreboards,
-    testSelectedScreens,
-    stopBroadcastOutputs,
-    toggleRingMatchOrderTarget,
-    selectAllRingMatchOrderDisplayTargets,
-    clearRingMatchOrderDisplayTargets,
-    removeRingMatchOrderDisplayTarget,
-    previewSelectedRingMatchOrderDisplays,
-    launchSelectedRingMatchOrderDisplays,
-    stopRingMatchOrderOutputs,
-    reAddRingMatchOrderOutput,
-    reAddDisplayToBroadcast,
-    saveCurrentBroadcastProfile,
-    applyBroadcastProfile,
-    deleteBroadcastProfile,
-    applySelectedBroadcastProfile,
-    deleteSelectedBroadcastProfile,
-    moveScoreboardToSelectedDisplay,
-    moveControllerToSelectedDisplay,
-    launchScoreboardToSelectedDisplay,
-    testSelectedDisplay,
-    bringScoreboardToMainDisplay,
-    closeScoreboardWindow,
-    swapDisplayAssignments,
-    rescanDisplayAssignments,
-} = useRefereeDisplayManagement({
-    getDisplayBridge,
+} = useRefereeControllerDisplayManagement({
     showBanner,
-    prepareScoreboardOutputChange: syncBroadcastSnapshotBeforeOutputChange,
-    handleSuccessfulLaunch: closeMatchSettingsAfterSuccessfulLaunch,
+    isSettingsOpen,
+    publishLocalScoreboardState,
+    buildFullLocalScoreboardState,
+    broadcastAll,
+    toggleRingMatchOrderPanel,
     getRingMatchOrderProjectionKey: () => ringMatchOrderProjectionKey.value,
     getSyncConfigurationReady: () => syncConfigurationReady.value,
+    getIsRingMatchOrderPanelExpanded: () => isRingMatchOrderPanelExpanded.value,
+    getRingMatchOrderProjectionRecord: () => ringMatchOrderProjectionRecord.value,
+    getRingMatchOrderProjectionLastAttemptAt: () =>
+        ringMatchOrderProjectionLastAttemptAt.value,
 });
-const ringMatchOrderProjectionFreshnessState = computed<
-    'fresh' | 'stale' | 'offline'
->(() => {
-    const lastSuccessAt =
-        ringMatchOrderProjectionRecord.value?.lastSuccessAt ?? null;
-    if (!lastSuccessAt) return 'offline';
-    const age = Date.now() - lastSuccessAt;
-    if (age <= RING_MATCH_ORDER_FRESH_MS) return 'fresh';
-    if (age <= RING_MATCH_ORDER_OFFLINE_MS) return 'stale';
-    return 'offline';
-});
-const ringMatchOrderProjectionFreshnessLabel = computed(() => {
-    if (ringMatchOrderProjectionFreshnessState.value === 'fresh')
-        return 'Fresh';
-    if (ringMatchOrderProjectionFreshnessState.value === 'stale')
-        return 'Stale';
-    return 'Offline';
-});
-const ringMatchOrderProjectionFreshnessToneClass = computed(() => {
-    if (ringMatchOrderProjectionFreshnessState.value === 'fresh')
-        return 'border-emerald-500/35 bg-emerald-500/12 text-emerald-100';
-    if (ringMatchOrderProjectionFreshnessState.value === 'stale')
-        return 'border-amber-500/35 bg-amber-500/12 text-amber-100';
-    return 'border-rose-500/35 bg-rose-500/12 text-rose-100';
-});
-const ringMatchOrderProjectionLastUpdatedLabel = computed(() =>
-    formatProjectionDateTime(
-        ringMatchOrderProjectionRecord.value?.lastSuccessAt ?? null,
-    ),
-);
-const ringMatchOrderProjectionLastAttemptLabel = computed(() =>
-    formatProjectionDateTime(
-        ringMatchOrderProjectionRecord.value?.lastAttemptAt ??
-            ringMatchOrderProjectionLastAttemptAt.value ??
-            null,
-    ),
-);
-const ringMatchOrderProjectionStatusSummary = computed(() => {
-    if (!ringMatchOrderProjectionKey.value) {
-        return 'Pick Admin Host, fallback tournament, and fallback gilam first so the controller can track a projection cache key for this role.';
-    }
-
-    if (!ringMatchOrderProjectionRecord.value?.lastSuccessAt) {
-        return `No successful Admin-backed projection snapshot yet. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s and offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
-    }
-
-    if (ringMatchOrderProjectionFreshnessState.value === 'fresh') {
-        return `Admin-backed projection snapshot is current. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s.`;
-    }
-
-    if (ringMatchOrderProjectionFreshnessState.value === 'stale') {
-        return `Showing the last successful Admin-backed projection snapshot while polling retries. Offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
-    }
-
-    return 'Projection polling is offline. The last successful Admin-backed snapshot stays visible until updates resume.';
-});
-const displayManagementPanelModel = {
-    get isDisplayManagementAvailable() {
-        return isDisplayManagementAvailable.value;
-    },
-    get displayActionPending() {
-        return displayActionPending.value;
-    },
-    get isDisplayAdvancedOpen() {
-        return isDisplayAdvancedOpen.value;
-    },
-    get newBroadcastProfileName() {
-        return newBroadcastProfileName.value;
-    },
-    get selectedBroadcastProfileId() {
-        return selectedBroadcastProfileId.value;
-    },
-    get controllerOutputConfirmed() {
-        return controllerOutputConfirmed.value;
-    },
-    get displayErrorMessage() {
-        return displayErrorMessage.value;
-    },
-    get selectedScoreboardDisplayId() {
-        return selectedScoreboardDisplayId.value;
-    },
-    get displayState() {
-        return displayState.value;
-    },
-    get detectedDisplays() {
-        return detectedDisplays.value;
-    },
-    get controllerDisplayInfo() {
-        return controllerDisplayInfo.value;
-    },
-    get selectedScoreboardDisplayIds() {
-        return selectedScoreboardDisplayIds.value;
-    },
-    get liveScoreboardDisplayIds() {
-        return liveScoreboardDisplayIds.value;
-    },
-    get missingSelectedDisplayIds() {
-        return missingSelectedDisplayIds.value;
-    },
-    get selectedRingMatchOrderDisplayIds() {
-        return selectedRingMatchOrderDisplayIds.value;
-    },
-    get liveRingMatchOrderDisplayIds() {
-        return liveRingMatchOrderDisplayIds.value;
-    },
-    get missingRingMatchOrderDisplayIds() {
-        return missingRingMatchOrderDisplayIds.value;
-    },
-    get broadcastProfiles() {
-        return broadcastProfiles.value;
-    },
-    get selectedBroadcastProfile() {
-        return selectedBroadcastProfile.value;
-    },
-    get isBroadcastMode() {
-        return isBroadcastMode.value;
-    },
-    get isDisplayTestActive() {
-        return isDisplayTestActive.value;
-    },
-    get isScoreboardLive() {
-        return isScoreboardLive.value;
-    },
-    get isRingMatchOrderPreviewActive() {
-        return isRingMatchOrderPreviewActive.value;
-    },
-    get isRingMatchOrderLive() {
-        return isRingMatchOrderLive.value;
-    },
-    get requiresScoreboardDisplaySelection() {
-        return requiresScoreboardDisplaySelection.value;
-    },
-    get requiresRingMatchOrderDisplaySelection() {
-        return requiresRingMatchOrderDisplaySelection.value;
-    },
-    get controllerDisplaySelected() {
-        return controllerDisplaySelected.value;
-    },
-    get requiresControllerOutputConfirmation() {
-        return requiresControllerOutputConfirmation.value;
-    },
-    get selectedOutputPerformanceWarning() {
-        return selectedOutputPerformanceWarning.value;
-    },
-    get missingSelectedDisplayEntries() {
-        return missingSelectedDisplayEntries.value;
-    },
-    get missingRingMatchOrderDisplayEntries() {
-        return missingRingMatchOrderDisplayEntries.value;
-    },
-    get displayModeLabel() {
-        return displayModeLabel.value;
-    },
-    get scoreboardStatusLabel() {
-        return scoreboardStatusLabel.value;
-    },
-    get scoreboardStatusToneClass() {
-        return scoreboardStatusToneClass.value;
-    },
-    get scoreboardStatusDescription() {
-        return scoreboardStatusDescription.value;
-    },
-    get ringMatchOrderStatusLabel() {
-        return ringMatchOrderStatusLabel.value;
-    },
-    get ringMatchOrderStatusToneClass() {
-        return ringMatchOrderStatusToneClass.value;
-    },
-    get ringMatchOrderStatusDescription() {
-        return ringMatchOrderStatusDescription.value;
-    },
-    get selectedScoreboardDisplayLabel() {
-        return selectedScoreboardDisplayLabel.value;
-    },
-    get selectedScoreboardDisplayDescription() {
-        return selectedScoreboardDisplayDescription.value;
-    },
-    get selectedRingMatchOrderDisplayLabel() {
-        return selectedRingMatchOrderDisplayLabel.value;
-    },
-    get selectedRingMatchOrderDisplayDescription() {
-        return selectedRingMatchOrderDisplayDescription.value;
-    },
-    get liveRingMatchOrderDisplays() {
-        return liveRingMatchOrderDisplays.value;
-    },
-    get syncConfigurationReady() {
-        return syncConfigurationReady.value;
-    },
-    get isRingMatchOrderPanelExpanded() {
-        return isRingMatchOrderPanelExpanded.value;
-    },
-    get ringMatchOrderProjectionFreshnessLabel() {
-        return ringMatchOrderProjectionFreshnessLabel.value;
-    },
-    get ringMatchOrderProjectionFreshnessToneClass() {
-        return ringMatchOrderProjectionFreshnessToneClass.value;
-    },
-    get ringMatchOrderProjectionLastUpdatedLabel() {
-        return ringMatchOrderProjectionLastUpdatedLabel.value;
-    },
-    get ringMatchOrderProjectionLastAttemptLabel() {
-        return ringMatchOrderProjectionLastAttemptLabel.value;
-    },
-    get ringMatchOrderProjectionStatusSummary() {
-        return ringMatchOrderProjectionStatusSummary.value;
-    },
-    get ringMatchOrderProjectionRecord() {
-        return ringMatchOrderProjectionRecord.value;
-    },
-    get ringMatchOrderFreshSeconds() {
-        return Math.round(RING_MATCH_ORDER_FRESH_MS / 1000);
-    },
-    get ringMatchOrderOfflineSeconds() {
-        return Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000);
-    },
-    getDisplayStatusEntry,
-    getDisplayStatusEntryForRole,
-    getProfileDisplaySnapshots,
-    getDisplayRoleUsageBadges,
-    isControllerDisplay,
-    getDisplayRoleLabel,
-    getDisplayCardDescription,
-    getRingMatchOrderDisplayCardDescription,
-};
-const displayManagementPanelActions = {
-    setScoreboardOutputMode,
-    setSelectedBroadcastProfileId: (value: string) => {
-        selectedBroadcastProfileId.value = value;
-    },
-    applySelectedBroadcastProfile,
-    deleteSelectedBroadcastProfile,
-    setNewBroadcastProfileName: (value: string) => {
-        newBroadcastProfileName.value = value;
-    },
-    saveCurrentBroadcastProfile,
-    setControllerOutputConfirmed: (value: boolean) => {
-        controllerOutputConfirmed.value = value;
-    },
-    removeDisplayTarget,
-    selectAllExternalDisplayTargets,
-    clearSelectedDisplayTargets,
-    toggleScoreboardTarget,
-    reAddDisplayToBroadcast,
-    testSelectedScreens,
-    launchSelectedScoreboards,
-    stopBroadcastOutputs,
-    toggleRingMatchOrderPanel,
-    selectAllRingMatchOrderDisplayTargets,
-    clearRingMatchOrderDisplayTargets,
-    toggleRingMatchOrderTarget,
-    removeRingMatchOrderDisplayTarget,
-    reAddRingMatchOrderOutput,
-    previewSelectedRingMatchOrderDisplays,
-    launchSelectedRingMatchOrderDisplays,
-    stopRingMatchOrderOutputs,
-    toggleDisplayAdvancedOpen: () => {
-        isDisplayAdvancedOpen.value = !isDisplayAdvancedOpen.value;
-    },
-    moveControllerToSelectedDisplay,
-    bringScoreboardToMainDisplay,
-    rescanDisplayAssignments,
-};
-watch(
-    broadcastProfiles,
-    (profiles) => {
-        const profileIds = profiles.map((profile) => String(profile.id));
-        if (!profileIds.length) {
-            selectedBroadcastProfileId.value = '';
-            return;
-        }
-
-        if (!profileIds.includes(selectedBroadcastProfileId.value)) {
-            selectedBroadcastProfileId.value = profileIds[0];
-        }
-    },
-    { immediate: true },
-);
-function formatProjectionDateTime(value: number | null) {
-    if (!value) return 'Never';
-    try {
-        return new Date(value).toLocaleString();
-    } catch {
-        return 'Never';
-    }
-}
-
-function closeMatchSettingsAfterSuccessfulLaunch(
-    nextState: ElectronDisplayState | null,
-) {
-    if (!nextState) return;
-
-    const launched =
-        nextState.broadcastSessionState === 'live' ||
-        nextState.broadcastSessionState === 'partially_degraded' ||
-        nextState.scoreboardStatus === 'live' ||
-        nextState.scoreboardStatus === 'disconnected' ||
-        nextState.ringMatchOrderSessionState === 'live' ||
-        nextState.ringMatchOrderSessionState === 'partially_degraded' ||
-        nextState.ringMatchOrderStatus === 'live' ||
-        nextState.ringMatchOrderStatus === 'disconnected';
-
-    if (!launched) return;
-    isSettingsOpen.value = false;
-}
-
-async function syncBroadcastSnapshotBeforeOutputChange() {
-    try {
-        publishLocalScoreboardState(buildFullLocalScoreboardState(), {
-            replace: true,
-        });
-        void broadcastAll().catch((error) => {
-            console.warn(
-                'Background scoreboard sync failed while preparing output launch:',
-                error,
-            );
-        });
-        return true;
-    } catch (error: any) {
-        const message =
-            error?.message ||
-            'Failed to prepare the live scoreboard state before changing outputs.';
-        displayErrorMessage.value = message;
-        showBanner(message, 'error', 4500);
-        return false;
-    }
-}
-
-watch(
-    () => displayState.value.statusNotice?.timestamp ?? null,
-    (timestamp) => {
-        if (!timestamp || timestamp === lastDisplayNoticeTimestamp.value)
-            return;
-
-        lastDisplayNoticeTimestamp.value = timestamp;
-        const notice = displayState.value.statusNotice;
-        if (!notice?.message) return;
-
-        showBanner(
-            notice.message,
-            notice.level === 'success' ? 'success' : 'info',
-            4500,
-        );
-    },
-);
-
-watch(
-    () =>
-        [
-            selectedScoreboardDisplayIds.value.join('|'),
-            displayState.value.controllerDisplayId ?? '',
-            displayState.value.scoreboardOutputMode,
-        ].join('::'),
-    () => {
-        controllerOutputConfirmed.value = false;
-    },
-);
 
 watch(flagSearchQuery1, (val) => {
     const next = (val || '').toUpperCase();
@@ -2498,426 +2053,36 @@ const {
         attemptLiveSnapshotRecovery(options),
 });
 
-const loggedBracketRingConflicts = new Set<string>();
-
-function getBracketKeyForMatch(m: any): string {
-    if (!m || typeof m !== 'object') return '||';
-    const age = (m?.age_category ?? m?.ageCategory ?? m?.age ?? '')
-        .toString()
-        .trim();
-    const genderRaw = (
-        m?.gender ??
-        m?.gender_category ??
-        m?.genderCategory ??
-        ''
-    )
-        .toString()
-        .trim();
-    const g = genderRaw.toLowerCase();
-    const gender =
-        g === 'male' || g === 'm' || g === 'men' || g === 'mens'
-            ? 'MEN'
-            : g === 'female' || g === 'f' || g === 'women' || g === 'womens'
-              ? 'WOMEN'
-              : genderRaw.toUpperCase();
-    const cat = (
-        m?.category ??
-        m?.weight_category ??
-        m?.weightCategory ??
-        m?.bracket_name ??
-        ''
-    )
-        .toString()
-        .trim();
-    return `${age}|${gender}|${cat}`;
-}
-
-function getBracketIdText(m: any): string {
-    const raw =
-        m?.bracket_id ??
-        m?.bracketId ??
-        m?.category_id ??
-        m?.categoryId ??
-        m?.category?.id ??
-        m?.bracket?.id ??
-        null;
-
-    if (raw === null || raw === undefined) return '';
-    const text =
-        typeof raw === 'object' && raw && 'id' in raw ? (raw as any).id : raw;
-    return String(text).trim();
-}
-
-function getBracketGroupKey(m: any): string {
-    const bid = getBracketIdText(m);
-    if (bid) return `id:${bid}`;
-    return `key:${getBracketKeyForMatch(m)}`;
-}
-
-function warnBracketRingConflicts(matches: any[], tournamentId: number | null) {
-    try {
-        const bracketRings = new Map<
-            string,
-            { rings: Set<string>; bracketId: string; bracketLabel: string }
-        >();
-        for (const m of matches || []) {
-            if (!m || typeof m !== 'object') continue;
-            const key = getBracketGroupKey(m);
-            const ringText = getMatchRingText(m);
-            if (!ringText) continue;
-            const meta = bracketRings.get(key) || {
-                rings: new Set<string>(),
-                bracketId: getBracketIdText(m),
-                bracketLabel:
-                    [getAgeCategoryLabel(m), getWeightCategoryLabel(m)]
-                        .map((x) => (x || '').toString().trim())
-                        .filter(Boolean)
-                        .join(' ') || getBracketKeyForMatch(m),
-            };
-            meta.rings.add(ringText);
-            bracketRings.set(key, meta);
-        }
-
-        for (const [key, meta] of bracketRings) {
-            const rings = Array.from(meta.rings);
-            if (rings.length <= 1) continue;
-            const conflictKey = `${tournamentId || ''}|${meta.bracketId || key}`;
-            if (loggedBracketRingConflicts.has(conflictKey)) continue;
-            loggedBracketRingConflicts.add(conflictKey);
-            console.warn(
-                'Bracket appears in multiple rings (admin contract violation):',
-                {
-                    tournament_id: tournamentId,
-                    bracket_id: meta.bracketId || null,
-                    bracket_label: meta.bracketLabel || null,
-                    rings,
-                },
-            );
-        }
-    } catch {}
-}
-
-function getNextMatchIdText(m: any): string | null {
-    const raw =
-        m?.next_match_id ??
-        m?.nextMatchId ??
-        m?.next_match_remote_id ??
-        m?.winner_to_match_id ??
-        m?.winnerToMatchId ??
-        null;
-    if (raw === null || raw === undefined) return null;
-    const s = String(raw).trim();
-    return s ? s : null;
-}
-
-function getNumericRoundNumber(m: any): number | null {
-    const rn = m?.round_number ?? m?.roundNumber ?? null;
-    const asNum =
-        rn != null && rn !== '' && !Number.isNaN(Number(rn))
-            ? Number(rn)
-            : null;
-    if (asNum != null && Number.isFinite(asNum)) return Math.floor(asNum);
-
-    const rr = (
-        m?.round_display ??
-        m?.roundDisplay ??
-        m?.round_name ??
-        m?.roundName ??
-        m?.round ??
-        ''
-    )
-        .toString()
-        .trim();
-    const m2 = rr.match(/round\s*(\d+)/i);
-    if (m2) return Number(m2[1]);
-    return null;
-}
-
-function stageLabelFromDistanceToFinal(distance: number): string {
-    if (distance <= 0) return 'Finals';
-    if (distance === 1) return 'Semi Finals';
-    if (distance === 2) return 'Quarterfinals';
-    // distance=3 => R16, 4 => R32, 5 => R64...
-    const ro = 2 ** (distance + 1);
-    if (ro === 16) return 'Round of 16';
-    if (ro === 32) return 'Round of 32';
-    if (ro === 64) return 'Round of 64';
-    if (ro === 128) return 'Round of 128';
-    return `Round of ${ro}`;
-}
-
-const inferredRoundMeta = computed(() => {
-    const formatByBracketKey = new Map<
-        string,
-        'round_robin' | 'single_elimination'
-    >();
-    const stageByMatchId = new Map<string, string>();
-
-    const groups = new Map<string, any[]>();
-    for (const m of allMatchesList.value || []) {
-        const key = getBracketGroupKey(m);
-        const arr = groups.get(key);
-        if (arr) arr.push(m);
-        else groups.set(key, [m]);
-    }
-
-    for (const [key, group] of groups) {
-        const hasAdvancement = group.some((m: any) => !!getNextMatchIdText(m));
-
-        // Round-based shape inference (works even when next_match_id is not provided).
-        const roundCounts = new Map<number, number>();
-        let maxRound = 0;
-        for (const m of group) {
-            const rn = getNumericRoundNumber(m);
-            if (rn == null) continue;
-            roundCounts.set(rn, (roundCounts.get(rn) || 0) + 1);
-            if (rn > maxRound) maxRound = rn;
-        }
-        const rounds = Array.from(roundCounts.keys()).sort((a, b) => a - b);
-        let decreases = 0;
-        let increases = 0;
-        for (let i = 0; i < rounds.length - 1; i++) {
-            const a = roundCounts.get(rounds[i]) || 0;
-            const b = roundCounts.get(rounds[i + 1]) || 0;
-            if (b < a) decreases++;
-            else if (b > a) increases++;
-        }
-        const lastRoundCount =
-            maxRound > 0 ? roundCounts.get(maxRound) || 0 : 0;
-
-        const looksElimByRounds =
-            rounds.length >= 2 &&
-            maxRound > 0 &&
-            lastRoundCount > 0 &&
-            lastRoundCount <= 2 &&
-            increases === 0 &&
-            decreases >= 1;
-
-        // Small brackets can be (1,1) (bye) or (2,2) (final+bronze) and still be elimination.
-        const looksElimSmallBye =
-            !looksElimByRounds &&
-            rounds.length === 2 &&
-            maxRound > 0 &&
-            lastRoundCount === 1 &&
-            increases === 0 &&
-            group.length === 2;
-        const looksElimSmallBronze =
-            !looksElimByRounds &&
-            rounds.length === 2 &&
-            maxRound > 0 &&
-            lastRoundCount === 2 &&
-            increases === 0 &&
-            group.length === 4;
-        const looksElimSmallBracket = looksElimSmallBye || looksElimSmallBronze;
-
-        const looksElimSingleMatch =
-            !looksElimByRounds &&
-            !looksElimSmallBracket &&
-            rounds.length === 1 &&
-            group.length === 1 &&
-            lastRoundCount === 1;
-
-        const inferredFormat: 'round_robin' | 'single_elimination' =
-            hasAdvancement ||
-            looksElimByRounds ||
-            looksElimSmallBracket ||
-            looksElimSingleMatch
-                ? 'single_elimination'
-                : 'round_robin';
-
-        formatByBracketKey.set(key, inferredFormat);
-        if (inferredFormat !== 'single_elimination') continue;
-
-        // If we don't have a progression graph, derive stages solely from (round_number, maxRound).
-        if (!hasAdvancement) {
-            for (const m of group) {
-                const id = getRemoteMatchId(m);
-                if (id == null) continue;
-                const idText = String(id).trim();
-                if (!idText) continue;
-
-                const rawRound = (
-                    m?.round_name ??
-                    m?.roundName ??
-                    m?.round_display ??
-                    m?.roundDisplay ??
-                    m?.round ??
-                    ''
-                )
-                    .toString()
-                    .trim();
-                if (/\bbronze\b/i.test(rawRound)) {
-                    stageByMatchId.set(idText, 'Bronze');
-                    continue;
-                }
-
-                const rnum = getNumericRoundNumber(m);
-                if (maxRound > 0 && rnum != null) {
-                    stageByMatchId.set(
-                        idText,
-                        stageLabelFromDistanceToFinal(
-                            Math.max(0, maxRound - rnum),
-                        ),
-                    );
-                } else {
-                    stageByMatchId.set(
-                        idText,
-                        rawRound || (rnum != null ? `Round ${rnum}` : 'Round'),
-                    );
-                }
-            }
-            continue;
-        }
-
-        // Graph-based inference when next_match_id exists.
-        const idToMatch = new Map<string, any>();
-        const nextById = new Map<string, string>();
-        const indegree = new Map<string, number>();
-
-        for (const m of group) {
-            const id = getRemoteMatchId(m);
-            if (id == null) continue;
-            const idText = String(id).trim();
-            if (!idText) continue;
-            idToMatch.set(idText, m);
-            const nextText = getNextMatchIdText(m);
-            if (nextText) {
-                nextById.set(idText, nextText);
-                indegree.set(nextText, (indegree.get(nextText) || 0) + 1);
-            }
-        }
-
-        const terminalIds: string[] = [];
-        for (const idText of idToMatch.keys()) {
-            if (!nextById.has(idText)) terminalIds.push(idText);
-        }
-
-        const looksLikeFinal = (m: any) => {
-            const raw = (
-                m?.round_name ??
-                m?.roundName ??
-                m?.round_display ??
-                m?.roundDisplay ??
-                m?.round ??
-                ''
-            ).toString();
-            return (
-                /\bfinals?\b/i.test(raw) &&
-                !/\bsemi\b/i.test(raw) &&
-                !/\bquarter\b/i.test(raw) &&
-                !/\bbronze\b/i.test(raw)
-            );
-        };
-
-        let finalId: string | null = null;
-        for (const tid of terminalIds) {
-            const tm = idToMatch.get(tid);
-            if (tm && looksLikeFinal(tm)) {
-                finalId = tid;
-                break;
-            }
-        }
-        if (!finalId && terminalIds.length > 0) {
-            let best = terminalIds[0];
-            let bestIn = indegree.get(best) || 0;
-            let bestOrder = Number(
-                idToMatch.get(best)?.match_number ??
-                    idToMatch.get(best)?.global_match_order ??
-                    NaN,
-            );
-            if (!Number.isFinite(bestOrder)) bestOrder = -1;
-            for (const tid of terminalIds) {
-                const inD = indegree.get(tid) || 0;
-                let order = Number(
-                    idToMatch.get(tid)?.match_number ??
-                        idToMatch.get(tid)?.global_match_order ??
-                        NaN,
-                );
-                if (!Number.isFinite(order)) order = -1;
-                if (inD > bestIn || (inD === bestIn && order > bestOrder)) {
-                    best = tid;
-                    bestIn = inD;
-                    bestOrder = order;
-                }
-            }
-            finalId = best;
-        }
-
-        const distanceCache = new Map<string, number | null>();
-        const distanceToFinal = (startId: string): number | null => {
-            if (distanceCache.has(startId))
-                return distanceCache.get(startId) ?? null;
-            if (!finalId) return null;
-            let cur = startId;
-            const visited = new Set<string>();
-            let steps = 0;
-            while (cur && !visited.has(cur)) {
-                visited.add(cur);
-                if (cur === finalId) {
-                    distanceCache.set(startId, steps);
-                    return steps;
-                }
-                const nxt = nextById.get(cur);
-                if (!nxt) break;
-                cur = nxt;
-                steps++;
-            }
-            distanceCache.set(startId, null);
-            return null;
-        };
-
-        for (const [idText, m] of idToMatch) {
-            const rawRound = (
-                m?.round_name ??
-                m?.roundName ??
-                m?.round_display ??
-                m?.roundDisplay ??
-                m?.round ??
-                ''
-            )
-                .toString()
-                .trim();
-            if (/\bbronze\b/i.test(rawRound)) {
-                stageByMatchId.set(idText, 'Bronze');
-                continue;
-            }
-
-            const d = distanceToFinal(idText);
-            if (d != null) {
-                stageByMatchId.set(idText, stageLabelFromDistanceToFinal(d));
-                continue;
-            }
-
-            // Fallback: if we can't connect this match to the inferred final, keep a stable label.
-            const rnum = getNumericRoundNumber(m);
-            if (maxRound > 0 && rnum != null) {
-                stageByMatchId.set(
-                    idText,
-                    stageLabelFromDistanceToFinal(Math.max(0, maxRound - rnum)),
-                );
-            } else {
-                stageByMatchId.set(
-                    idText,
-                    rnum != null ? `Round ${rnum}` : rawRound || 'Round',
-                );
-            }
-        }
-    }
-
-    return { formatByBracketKey, stageByMatchId };
+const {
+    loggedBracketRingConflicts,
+    getBracketKeyForMatch,
+    getBracketIdText,
+    getBracketGroupKey,
+    warnBracketRingConflicts,
+    getNumericRoundNumber,
+    getInferredBracketFormat,
+    getInferredElimStageLabel,
+} = useRefereeBracketInference({
+    allMatchesList,
+    getRemoteMatchId,
 });
-
-function getInferredBracketFormat(
-    m: any,
-): 'round_robin' | 'single_elimination' | null {
-    const key = getBracketGroupKey(m);
-    return inferredRoundMeta.value.formatByBracketKey.get(key) ?? null;
-}
-function getInferredElimStageLabel(m: any): string | null {
-    const id = getRemoteMatchId(m);
-    if (id == null) return null;
-    return inferredRoundMeta.value.stageByMatchId.get(String(id)) ?? null;
-}
+const {
+    getRoundDisplayText,
+    getAgeCategoryLabel,
+    getWeightCategoryLabel,
+    parseDivisionAndGenderFromLabel,
+    getMatchRingText,
+    getFallbackRingText,
+    isMatchIdEqual,
+    getNextQueuedMatchId,
+} = useRefereeControllerQueueHelpers({
+    getInferredBracketFormat,
+    getInferredElimStageLabel,
+    getNumericRoundNumber,
+    getRemoteMatchId,
+    buildLocalAutoLoadCandidateRows,
+    getEffectiveStatus,
+});
 const isUpdatingMatches = ref(false);
 const updatingMatchId = ref<number | string | null>(null);
 const currentMatchId = ref<number | string | null>(null);
@@ -3044,14 +2209,6 @@ watch(
         }
     },
 );
-const lastSyncLabel = computed(() => {
-    if (!lastSyncAt.value) return 'Never';
-    try {
-        return new Date(lastSyncAt.value).toLocaleString();
-    } catch {
-        return 'Never';
-    }
-});
 const normalizedControllerAdminBase = computed(() => {
     const raw = (adminBase.value || '').toString().trim();
     if (!raw) return '';
@@ -3294,892 +2451,134 @@ const ringMatchOrderProjectionMeta =
             updatedAt: Date.now(),
         };
     });
-const syncServerAddressLabel = computed(() => {
-    const raw = (adminBase.value || '').toString().trim();
-    if (!raw) return 'Not configured';
-    try {
-        const normalized = normalizeApiBaseInput(raw);
-        const parsed = new URL(normalized);
-        return `${parsed.host}${parsed.pathname}`;
-    } catch {
-        return raw;
-    }
-});
-const syncServerAddressDetail = computed(() => {
-    const raw = (adminBase.value || '').toString().trim();
-    if (!raw)
-        return 'Add the Admin Host address to enable Admin-backed snapshots.';
-    try {
-        return normalizeApiBaseInput(raw);
-    } catch {
-        return 'Address needs to be corrected before live sync can connect.';
-    }
-});
-const syncApiKeyPreview = computed(() => {
-    const raw = (getAPIKey() || '').toString().trim();
-    if (!raw) return 'Not configured';
-    if (raw.length <= 4) return '*'.repeat(raw.length);
-    const maskLength = Math.max(4, Math.min(8, raw.length - 4));
-    return `${raw.slice(0, 2)}${'*'.repeat(maskLength)}${raw.slice(-2)}`;
-});
-const isAdminRecoveryLocked = computed(
-    () =>
-        isOnline.value &&
-        hasKnownDeviceCredentials.value &&
-        hasAssignedSetup.value &&
-        queueSourceMode.value === 'queue_api' &&
-        !queueIsDegraded.value,
-);
-const fallbackSetupStatusLabel = computed(() => {
-    if (isAdminRecoveryLocked.value) return 'Locked';
-    if (setupSource.value === 'assigned_setup') return 'Manual';
-    if (
-        syncHasServer.value &&
-        manualSelectedTournamentId.value &&
-        manualSelectedRing.value
-    )
-        return 'Configured';
-    return 'Setup Needed';
-});
-const fallbackSetupStatusToneClass = computed(() => {
-    if (fallbackSetupStatusLabel.value === 'Locked')
-        return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
-    if (fallbackSetupStatusLabel.value === 'Configured')
-        return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
-    if (fallbackSetupStatusLabel.value === 'Manual')
-        return 'border-sky-400/30 bg-sky-500/10 text-sky-100';
-    return 'border-amber-400/30 bg-amber-500/10 text-amber-200';
-});
-const fallbackSetupHostSummaryLabel = computed(() =>
-    syncHasServer.value ? syncServerAddressLabel.value : 'Host needed',
-);
-const fallbackTournamentSummaryLabel = computed(() =>
-    manualSelectedTournamentId.value
-        ? manualSelectedTournamentNameLabel.value
-        : 'Tournament needed',
-);
-const fallbackGilamSummaryLabel = computed(() =>
-    manualSelectedRing.value
-        ? `Gilam ${manualSelectedRing.value}`
-        : 'Gilam needed',
-);
-const fallbackRecoveryPanelModel = computed(() => ({
-    setupSource: setupSource.value,
-    isFallbackSetupPanelExpanded: isFallbackSetupPanelExpanded.value,
-    isAdminRecoveryLocked: isAdminRecoveryLocked.value,
-    fallbackSetupStatusToneClass: fallbackSetupStatusToneClass.value,
-    fallbackSetupStatusLabel: fallbackSetupStatusLabel.value,
-    fallbackSetupHostSummaryLabel: fallbackSetupHostSummaryLabel.value,
-    fallbackTournamentSummaryLabel: fallbackTournamentSummaryLabel.value,
-    fallbackGilamSummaryLabel: fallbackGilamSummaryLabel.value,
-    adminBase: adminBase.value,
-    manualSelectedTournamentNameLabel: manualSelectedTournamentNameLabel.value,
-    manualSelectedTournamentId: manualSelectedTournamentId.value,
-    tournaments: tournaments.value,
-    manualSelectedRing: manualSelectedRing.value,
-    ringOptions: ringOptions.value,
-    syncHasServer: syncHasServer.value,
-    isCheckingStatus: isCheckingStatus.value,
-    isFetchingAll: isFetchingAll.value,
-    isLoadingTournaments: isLoadingTournaments.value,
-    syncConfigurationReady: syncConfigurationReady.value,
-    isLoadingMatches: isLoadingMatches.value,
-    isLiveSnapshotRecoveryBusy: isLiveSnapshotRecoveryBusy.value,
-    syncRecoveryActionLabel: syncRecoveryActionLabel.value,
-}));
-const fallbackRecoveryPanelActions = {
-    toggleFallbackSetupPanel,
-    selectTournament: (tournamentId: number | null) => {
-        manualSelectedTournamentId.value = tournamentId;
-    },
-    selectRing: (ring: string) => {
-        manualSelectedRing.value = ring;
-        persistSelectedRing();
-    },
-    testSyncConnection,
-    fetchAllTournaments,
-    reconnectSyncNow,
-};
-const shouldAutoExpandFallbackSetup = computed(
-    () =>
-        setupSource.value === 'manual_fallback' &&
-        (!syncHasServer.value ||
-            !manualSelectedTournamentId.value ||
-            !manualSelectedRing.value ||
-            connectionState.value === 'setup_needed'),
-);
-const assignmentState = computed<AssignmentState>(() => {
-    if (assignedSetup.value && isAssignedSetupStale.value)
-        return 'assignment_stale';
-    if (assignedSetup.value) return 'assignment_received';
-    return 'no_assignment';
-});
-const assignedSetupUpdatedAtLabel = computed(() => {
-    if (!assignedSetupUpdatedAt.value) return 'Not yet received';
-    try {
-        return new Date(assignedSetupUpdatedAt.value).toLocaleString();
-    } catch {
-        return 'Unknown';
-    }
-});
-const pairingStateLabel = computed(() => {
-    if (pairingState.value === 'pairing') return 'Pairing';
-    if (pairingState.value === 'pair_failed') return 'Pair failed';
-    if (pairingState.value === 'paired_known_device') return 'Known device';
-    return 'Unpaired';
-});
-const pairingStateToneClass = computed(() => {
-    if (pairingState.value === 'pairing')
-        return 'border-blue-400/30 bg-blue-500/10 text-blue-200';
-    if (pairingState.value === 'pair_failed')
-        return 'border-red-400/30 bg-red-500/10 text-red-100';
-    if (pairingState.value === 'paired_known_device')
-        return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
-    return 'border-amber-400/30 bg-amber-500/10 text-amber-200';
-});
-const pairingResetReasonLabel = computed(() =>
-    pairingResetReasonMessage(pairingResetReason.value),
-);
-const assignedTargetBadges = computed(() => {
-    const targets = assignedSetup.value?.targets ?? {};
-    return Object.entries(targets).map(([slot, target]) => {
-        const contentType = target?.content_type ?? 'none';
-        const enabled = target?.enabled !== false;
-        const label =
-            contentType === 'match_order'
-                ? 'Match Order'
-                : contentType === 'ring_display'
-                  ? 'Ring Display'
-                  : contentType === 'scoreboard'
-                    ? 'Scoreboard'
-                    : 'None';
-
-        let toneClass = 'border-white/10 bg-white/5 text-slate-300';
-        if (!enabled || contentType === 'none')
-            toneClass = 'border-slate-500/30 bg-slate-500/10 text-slate-300';
-        else if (contentType === 'scoreboard')
-            toneClass =
-                'border-emerald-400/30 bg-emerald-500/10 text-emerald-200';
-        else if (contentType === 'match_order')
-            toneClass = 'border-blue-400/30 bg-blue-500/10 text-blue-200';
-        else if (contentType === 'ring_display')
-            toneClass = 'border-yellow-400/30 bg-yellow-500/10 text-yellow-100';
-
-        return {
-            key: slot,
-            slot,
-            label: `${slot}: ${label}${enabled ? '' : ' Disabled'}`,
-            toneClass,
-            contentType,
-            enabled,
-        };
-    });
-});
-const hasUnsupportedAssignedTarget = computed(() =>
-    assignedTargetBadges.value.some(
-        (target) => target.contentType === 'ring_display',
-    ),
-);
-const hasAssignedScoreboardTarget = computed(() =>
-    assignedTargetBadges.value.some(
-        (target) => target.enabled && target.contentType === 'scoreboard',
-    ),
-);
-const assignedSetupStatusLabel = computed(() => {
-    if (assignmentState.value === 'assignment_received')
-        return 'Assigned setup active';
-    if (assignmentState.value === 'assignment_stale')
-        return 'Assigned setup stale';
-    return 'No Admin assignment yet';
-});
-const connectionPanelModel = computed(() => ({
-    adminBase: adminBase.value,
-    pairingCode: pairingCode.value,
-    pairingStateToneClass: pairingStateToneClass.value,
-    pairingStateLabel: pairingStateLabel.value,
-    assignmentState: assignmentState.value,
-    assignedSetupStatusLabel: assignedSetupStatusLabel.value,
-    syncHasServer: syncHasServer.value,
-    isPairingBusy: isPairingBusy.value,
-    isControllerReconnectBusy: isControllerReconnectBusy.value,
-    controllerAuthState: controllerAuthState.value,
-    setupSource: setupSource.value,
-    pairingStatusDetail: pairingStatusDetail.value,
-    pairingResetReason: pairingResetReason.value,
-    pairingResetReasonLabel: pairingResetReasonLabel.value,
-    assignedSetupUpdatedAtLabel: assignedSetupUpdatedAtLabel.value,
-    assignedTargetBadges: assignedTargetBadges.value,
-}));
-const connectionPanelActions = {
-    updateAdminBase: (value: string) => {
-        adminBase.value = value;
-    },
-    updatePairingCode: (value: string) => {
-        pairingCode.value = value;
-    },
+const {
+    isAdminRecoveryLocked,
+    fallbackRecoveryPanelModel,
+    fallbackRecoveryPanelActions,
+    shouldAutoExpandFallbackSetup,
+    assignmentState,
+    assignedSetupUpdatedAtLabel,
+    pairingStateLabel,
+    hasUnsupportedAssignedTarget,
+    hasAssignedScoreboardTarget,
+    assignedSetupStatusLabel,
+    connectionPanelModel,
+    connectionPanelActions,
+    canExitFallbackAndResync,
+    snapshotMode,
+    showLiveRecoveryBanner,
+    liveRecoveryBannerTitle,
+    liveRecoveryBannerMessage,
+    syncRecoveryActionLabel,
+    connectionState,
+    currentConnectionWarningLabel,
+    syncFallbackReasonLabel,
+    upstreamGeneratedAtLabel,
+    controllerGeneratedAtLabel,
+    upstreamQueueVersionShort,
+    controllerSnapshotVersionShort,
+    queueFreshnessLabel,
+    queueFreshnessToneClass,
+    showSyncAttentionNotice,
+    syncPrimaryState,
+    syncTopSummaryItems,
+    lastSyncLabel,
+} = useRefereeControllerSyncPanels({
+    adminBase,
+    pairingCode,
+    manualSelectedTournamentId,
+    manualSelectedTournamentNameLabel,
+    tournaments,
+    manualSelectedRing,
+    ringOptions,
+    isOnline,
+    hasKnownDeviceCredentials,
+    hasAssignedSetup,
+    queueSourceMode,
+    queueIsDegraded,
+    queueDegradedReason,
+    setupSource,
+    syncHasServer,
+    syncHasTournament,
+    syncHasRing,
+    isFallbackSetupPanelExpanded,
+    isCheckingStatus,
+    isFetchingAll,
+    isLoadingTournaments,
+    syncConfigurationReady,
+    isLoadingMatches,
+    isLiveSnapshotRecoveryBusy,
+    assignedSetup,
+    isAssignedSetupStale,
+    assignedSetupUpdatedAt,
+    pairingState,
+    controllerAuthState,
+    pairingStatusDetail,
+    pairingResetReason,
+    isPairingBusy,
+    isControllerReconnectBusy,
+    isAssignedSetupLoading,
+    liveSnapshotContextKey,
+    selectedTournamentId,
+    selectedTournamentNameLabel,
+    selectedRing,
+    upstreamGeneratedAt,
+    controllerGeneratedAt,
+    upstreamQueueVersion,
+    controllerSnapshotVersion,
+    lastSyncAt,
+    pendingResultSyncCount,
+    blockedPendingResultSyncCount,
+    queueReadyCount,
+    queueProvisionalCount,
+    queueAutoAdvanceCount,
+    queueHiddenCount,
+    queueCompletedRemovedCount,
+    matchesList,
+    normalizeApiBaseInput,
+    getAPIKey,
+    pairingResetReasonMessage,
     onApiBaseBlur,
     submitControllerPairing,
     forgetControllerPairing,
-};
-const canExitFallbackAndResync = computed(
-    () =>
-        hasKnownDeviceCredentials.value &&
-        hasAssignedSetup.value &&
-        syncHasServer.value &&
-        isOnline.value &&
-        !!liveSnapshotContextKey.value &&
-        queueIsDegraded.value,
-);
-const snapshotMode = computed<'live' | 'fallback' | 'recovering'>(() => {
-    if (queueSourceMode.value === 'queue_api' && !queueIsDegraded.value)
-        return 'live';
-    if (
-        canExitFallbackAndResync.value &&
-        (isLiveSnapshotRecoveryBusy.value ||
-            isControllerReconnectBusy.value ||
-            isAssignedSetupLoading.value ||
-            isCheckingStatus.value ||
-            isLoadingMatches.value)
-    ) {
-        return 'recovering';
-    }
-    return 'fallback';
+    toggleFallbackSetupPanel,
+    persistSelectedRing,
+    testSyncConnection,
+    fetchAllTournaments,
+    reconnectSyncNow,
 });
-const snapshotModeLabel = computed(() => {
-    if (snapshotMode.value === 'recovering') return 'Recovering Live Snapshot';
-    if (snapshotMode.value === 'live') return 'Live Snapshot';
-    return 'Fallback Snapshot';
-});
-const showLiveRecoveryBanner = computed(
-    () =>
-        hasKnownDeviceCredentials.value &&
-        hasAssignedSetup.value &&
-        !!liveSnapshotContextKey.value &&
-        ((snapshotMode.value === 'fallback' &&
-            canExitFallbackAndResync.value) ||
-            snapshotMode.value === 'recovering'),
-);
-const liveRecoveryBannerTitle = computed(() =>
-    snapshotMode.value === 'recovering'
-        ? 'Rejoining the Event Host live snapshot.'
-        : 'Fallback snapshot active.',
-);
-const liveRecoveryBannerMessage = computed(() =>
-    snapshotMode.value === 'recovering'
-        ? 'The controller is exiting fallback and refreshing the current Admin-assigned live queue for this gilam.'
-        : 'The Event Host is reachable and this controller has Admin-assigned setup. Exit fallback to restore the live queue snapshot now.',
-);
-const syncRecoveryActionLabel = computed(() => {
-    if (snapshotMode.value === 'recovering') return 'Recovering...';
-    if (canExitFallbackAndResync.value) return 'Exit Fallback & Resync';
-    if (!isOnline.value && hasKnownDeviceCredentials.value)
-        return 'Reconnect to Event Host';
-    return 'Refresh Snapshot';
-});
-const connectionState = computed<ConnectionState>(() => {
-    if (
-        isPairingBusy.value ||
-        isControllerReconnectBusy.value ||
-        isAssignedSetupLoading.value ||
-        isLiveSnapshotRecoveryBusy.value
-    ) {
-        return 'reconnecting';
-    }
-
-    if (!syncHasServer.value) return 'setup_needed';
-
-    if (!isOnline.value) return 'offline';
-
-    if (hasKnownDeviceCredentials.value) {
-        if (
-            assignmentState.value === 'no_assignment' &&
-            !manualSelectedTournamentId.value
-        )
-            return 'setup_needed';
-        if (
-            assignmentState.value === 'assignment_stale' ||
-            assignmentState.value === 'no_assignment' ||
-            hasUnsupportedAssignedTarget.value ||
-            queueIsDegraded.value
-        ) {
-            return 'connected_warn';
-        }
-        if (syncConfigurationReady.value) return 'connected';
-        return 'setup_needed';
-    }
-
-    if (!syncConfigurationReady.value) return 'setup_needed';
-    if (queueIsDegraded.value) return 'connected_warn';
-    return 'connected';
-});
-const currentConnectionWarningLabel = computed(() => {
-    if (hasUnsupportedAssignedTarget.value) {
-        return 'Admin assigned an unsupported ring_display target. Local display roles remain manual on this controller in this release.';
-    }
-    if (assignmentState.value === 'assignment_stale') {
-        return 'The last matching Admin-assigned setup is cached on this controller, but the latest assignment refresh failed.';
-    }
-    if (
-        hasKnownDeviceCredentials.value &&
-        assignmentState.value === 'no_assignment'
-    ) {
-        return 'This controller is paired as a known device, but Admin has not assigned tournament and gilam details yet.';
-    }
-    return syncFallbackReasonLabel.value;
-});
-const syncSourceLabel = computed(() => {
-    if (snapshotMode.value === 'recovering')
-        return 'Rejoining Event Host live snapshot';
-    if (setupSource.value === 'assigned_setup') return 'Admin-assigned setup';
-    if (
-        hasKnownDeviceCredentials.value &&
-        assignmentState.value === 'no_assignment'
-    )
-        return 'Known device waiting for assignment';
-    if (queueSourceMode.value === 'queue_api')
-        return 'Admin-backed live snapshot';
-    if (queueSourceMode.value === 'cached_queue')
-        return 'Saved controller snapshot';
-    if (queueSourceMode.value === 'offline_cache')
-        return 'Offline snapshot cache';
-    if (queueSourceMode.value === 'legacy_adapter')
-        return 'Local tournament copy';
-    if (isOnline.value) return 'Admin Host ready';
-    return 'Waiting for Admin Host';
-});
-const syncModeLabel = computed(() => {
-    if (snapshotMode.value === 'recovering') return 'Recovering Live Snapshot';
-    if (
-        isLoadingMatches.value ||
-        isLoadingTournaments.value ||
-        isCheckingStatus.value
-    )
-        return 'Refreshing';
-    if (queueSourceMode.value === 'queue_api') return 'Live snapshot';
-    if (queueSourceMode.value === 'cached_queue') return 'Cached snapshot';
-    if (queueSourceMode.value === 'offline_cache')
-        return 'Offline snapshot fallback';
-    if (queueSourceMode.value === 'legacy_adapter')
-        return 'Compatibility fallback';
-    return 'Idle';
-});
-const syncFallbackReasonLabel = computed(() => {
-    switch ((queueDegradedReason.value || '').toString()) {
-        case 'local_cache':
-            return 'Using the last saved Admin-backed queue snapshot on this controller.';
-        case 'cached_queue':
-            return 'Showing the saved Admin-backed queue snapshot while live updates catch up.';
-        case 'offline_cache':
-            return 'The Admin Host is offline, so the controller is using its saved Admin-backed queue snapshot.';
-        case 'queue_api_unavailable':
-            return 'The live ring queue could not be loaded, so the controller fell back to its local tournament copy.';
-        case 'offline_legacy_adapter':
-            return 'The Admin Host is offline, so the controller is showing the local tournament copy.';
-        case 'ring_number_mismatch_filtered':
-            return 'Some queue items were assigned to another gilam and were filtered out for safety.';
-        case 'fallback':
-            return 'Live updates are temporarily unavailable, so the controller switched to a safer fallback snapshot source.';
-        default:
-            return queueIsDegraded.value
-                ? 'Admin-backed snapshots are available with warnings. Review diagnostics if something looks unexpected.'
-                : 'Admin-backed snapshot and fallback behavior are operating normally.';
-    }
-});
-const syncReconnectPolicyLabel = computed(() =>
-    hasKnownDeviceCredentials.value
-        ? 'Background health checks keep known devices alive with heartbeat every 10 seconds and refresh assignment periodically over the local event LAN.'
-        : 'Background health checks watch the Admin Host over the local event LAN every 10 seconds.',
-);
-const showSyncAttentionNotice = computed(
-    () =>
-        (syncConfigurationReady.value || hasKnownDeviceCredentials.value) &&
-        !isLoadingMatches.value &&
-        !isLoadingTournaments.value &&
-        !isCheckingStatus.value &&
-        (connectionState.value === 'connected_warn' ||
-            connectionState.value === 'offline'),
-);
-const syncPrimaryState = computed(() => {
-    if (connectionState.value === 'setup_needed' && !syncHasServer.value) {
-        return {
-            label: 'Setup needed',
-            title: 'Add the Admin Host address to begin pairing or manual recovery.',
-            message:
-                'This controller is ready for local live operation, but it needs the local Admin Host address before it can pair or receive Admin-backed queue snapshots.',
-            badgeClass: 'border-amber-400/30 bg-amber-500/10 text-amber-200',
-            dotClass: 'bg-amber-400',
-        };
-    }
-
-    if (
-        connectionState.value === 'setup_needed' &&
-        hasKnownDeviceCredentials.value
-    ) {
-        return {
-            label: 'Setup needed',
-            title: 'Known device connected, but it still needs assignment or recovery values.',
-            message:
-                'Admin has not assigned tournament and gilam details yet. Pairing is complete, and manual fallback remains available as a temporary recovery path.',
-            badgeClass: 'border-amber-400/30 bg-amber-500/10 text-amber-200',
-            dotClass: 'bg-amber-400',
-        };
-    }
-
-    if (connectionState.value === 'setup_needed') {
-        return {
-            label: 'Setup needed',
-            title: 'Choose the fallback tournament and gilam to continue.',
-            message:
-                'The controller can reach Admin Host, but it still needs temporary recovery values until Admin-assigned setup is available.',
-            badgeClass: 'border-amber-400/30 bg-amber-500/10 text-amber-200',
-            dotClass: 'bg-amber-400',
-        };
-    }
-
-    if (connectionState.value === 'reconnecting') {
-        return {
-            label: 'Reconnecting',
-            title:
-                snapshotMode.value === 'recovering'
-                    ? 'Exiting fallback and rejoining the live Event Host snapshot.'
-                    : hasKnownDeviceCredentials.value
-                      ? 'Reconnecting as a known device.'
-                      : 'Refreshing the Admin-backed snapshot link.',
-            message: hasKnownDeviceCredentials.value
-                ? snapshotMode.value === 'recovering'
-                    ? 'Verifying the saved device token, refreshing assignment, and replacing the fallback queue with the current live snapshot.'
-                    : 'Verifying the saved device token, refreshing assignment, and restoring the latest Admin-backed queue snapshot.'
-                : `Trying to restore or refresh live queue snapshots from Admin Host for Gilam ${selectedRing.value}.`,
-            badgeClass: 'border-blue-400/30 bg-blue-500/10 text-blue-200',
-            dotClass: 'bg-blue-400',
-        };
-    }
-
-    if (connectionState.value === 'connected') {
-        return {
-            label: 'Connected',
-            title:
-                setupSource.value === 'assigned_setup'
-                    ? 'Admin-assigned setup is active on this controller.'
-                    : 'Receiving live Admin-backed queue snapshots.',
-            message:
-                setupSource.value === 'assigned_setup'
-                    ? `This controller is using Admin-assigned tournament and gilam values for ${selectedTournamentNameLabel.value}.`
-                    : `Gilam ${selectedRing.value} is following the Admin-backed queue snapshot for ${selectedTournamentNameLabel.value}.`,
-            badgeClass:
-                'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
-            dotClass: 'bg-emerald-400',
-        };
-    }
-
-    if (connectionState.value === 'connected_warn') {
-        return {
-            label: 'Connected with warnings',
-            title: hasKnownDeviceCredentials.value
-                ? snapshotMode.value === 'fallback'
-                    ? 'The Admin Host connection is up, but this controller is still using fallback snapshot data.'
-                    : 'The Admin Host connection is up, but this controller still needs attention.'
-                : 'The Admin Host connection is up, but snapshots are using a fallback path.',
-            message: currentConnectionWarningLabel.value,
-            badgeClass: 'border-yellow-400/30 bg-yellow-500/10 text-yellow-100',
-            dotClass: 'bg-yellow-300',
-        };
-    }
-
-    if (
-        connectionState.value === 'offline' &&
-        (matchesList.value.length > 0 || !!lastSyncAt.value)
-    ) {
-        return {
-            label: hasKnownDeviceCredentials.value
-                ? 'Known device offline'
-                : 'Manual fallback active',
-            title: 'Admin-backed snapshots are unavailable, but this controller can keep operating.',
-            message: hasKnownDeviceCredentials.value
-                ? 'The saved device identity remains valid locally, and the controller will retry the Admin Host while recovery-only setup stays available.'
-                : 'The last saved Admin-backed queue snapshot remains available here, and the manual fallback tools stay available for recovery only.',
-            badgeClass: 'border-orange-400/30 bg-orange-500/10 text-orange-100',
-            dotClass: 'bg-orange-300',
-        };
-    }
-
-    return {
-        label: hasKnownDeviceCredentials.value
-            ? 'Known device offline'
-            : 'Disconnected',
-        title: 'Admin-backed snapshots are unavailable right now.',
-        message: hasKnownDeviceCredentials.value
-            ? 'The controller cannot reach the Admin Host right now. The saved device identity remains on this machine, and reconnect will retry automatically.'
-            : 'The controller cannot reach Admin Host at the moment. Manual recovery remains available while the local LAN connection is restored.',
-        badgeClass: 'border-red-400/30 bg-red-500/10 text-red-100',
-        dotClass: 'bg-red-300',
-    };
-});
-const syncTopSummaryItems = computed(() => {
-    const items: { key: string; label: string }[] = [];
-
-    if (syncHasServer.value) {
-        items.push({
-            key: 'server',
-            label: `Host ${syncServerAddressLabel.value}`,
-        });
-    }
-
-    if (hasKnownDeviceCredentials.value) {
-        items.push({ key: 'pairing', label: pairingStateLabel.value });
-    }
-
-    if (setupSource.value === 'assigned_setup') {
-        items.push({ key: 'setup-source', label: 'Admin-assigned setup' });
-    } else {
-        items.push({ key: 'setup-source', label: 'Manual fallback' });
-    }
-
-    if (syncHasTournament.value) {
-        items.push({
-            key: 'tournament',
-            label: selectedTournamentNameLabel.value,
-        });
-    }
-
-    if (syncHasRing.value) {
-        items.push({ key: 'ring', label: `Gilam ${selectedRing.value}` });
-    }
-
-    if (syncConfigurationReady.value || hasKnownDeviceCredentials.value) {
-        items.push({ key: 'snapshot-mode', label: snapshotModeLabel.value });
-    }
-
-    if (pendingResultSyncCount.value > 0) {
-        const count = pendingResultSyncCount.value;
-        items.push({
-            key: 'pending-results',
-            label: `${count} result${count === 1 ? '' : 's'} pending Admin sync`,
-        });
-    }
-
-    if (blockedPendingResultSyncCount.value > 0) {
-        const count = blockedPendingResultSyncCount.value;
-        items.push({
-            key: 'blocked-results',
-            label: `${count} result${count === 1 ? '' : 's'} need sync review`,
-        });
-    }
-
-    if (lastSyncAt.value) {
-        items.push({
-            key: 'last-sync',
-            label: `Last sync ${lastSyncLabel.value}`,
-        });
-    }
-
-    return items;
-});
-const syncSummaryItems = computed(() => [
-    {
-        key: 'source',
-        label: 'Source',
-        value: syncSourceLabel.value,
-        detail:
-            setupSource.value === 'assigned_setup'
-                ? 'Admin assignment is authoritative while it is available.'
-                : selectedTournamentNameLabel.value,
-    },
-    {
-        key: 'ring',
-        label: 'Gilam',
-        value: selectedRing.value ? `Gilam ${selectedRing.value}` : 'Not set',
-        detail:
-            setupSource.value === 'assigned_setup'
-                ? 'Queue filtered to the Admin-assigned gilam.'
-                : selectedTournamentId.value
-                  ? 'Queue filtered to the active gilam.'
-                  : 'Select a tournament to choose a gilam.',
-    },
-    {
-        key: 'last-sync',
-        label: 'Last Sync',
-        value: lastSyncLabel.value,
-        detail: lastSyncAt.value
-            ? 'Last successful Admin-backed queue snapshot stored on this controller.'
-            : 'No saved queue snapshot yet.',
-    },
-    {
-        key: 'assignment',
-        label: 'Assignment',
-        value: assignedSetupStatusLabel.value,
-        detail: `Updated ${assignedSetupUpdatedAtLabel.value}`,
-    },
-    {
-        key: 'mode',
-        label: 'Mode',
-        value: syncModeLabel.value,
-        detail:
-            connectionState.value === 'connected_warn'
-                ? currentConnectionWarningLabel.value
-                : queueIsDegraded.value
-                  ? syncFallbackReasonLabel.value
-                  : 'Admin-backed snapshots are using their normal source.',
-    },
-]);
-const syncQueueCountItems = computed(() => [
-    {
-        key: 'ready',
-        label: 'Ready',
-        value: queueReadyCount.value,
-        toneClass: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-200',
-    },
-    {
-        key: 'provisional',
-        label: 'Provisional',
-        value: queueProvisionalCount.value,
-        toneClass: 'bg-amber-500/10 border-amber-500/20 text-amber-200',
-    },
-    {
-        key: 'auto-advance',
-        label: 'Auto-Advance',
-        value: queueAutoAdvanceCount.value,
-        toneClass: 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-200',
-    },
-    {
-        key: 'hidden',
-        label: 'Hidden',
-        value: queueHiddenCount.value,
-        toneClass: 'bg-rose-500/10 border-rose-500/20 text-rose-200',
-    },
-    {
-        key: 'removed',
-        label: 'Removed',
-        value: queueCompletedRemovedCount.value,
-        toneClass: 'bg-slate-500/10 border-slate-500/20 text-slate-200',
-    },
-]);
-const upstreamGeneratedAtLabel = computed(() => {
-    if (!upstreamGeneratedAt.value) return 'Unknown';
-    try {
-        return new Date(upstreamGeneratedAt.value).toLocaleString();
-    } catch {
-        return 'Unknown';
-    }
-});
-const controllerGeneratedAtLabel = computed(() => {
-    if (!controllerGeneratedAt.value) return 'Unknown';
-    try {
-        return new Date(controllerGeneratedAt.value).toLocaleString();
-    } catch {
-        return 'Unknown';
-    }
-});
-const upstreamQueueVersionShort = computed(() => {
-    const raw = (upstreamQueueVersion.value || '').trim();
-    if (!raw) return '';
-    return raw.length > 18 ? raw.slice(-12) : raw;
-});
-const controllerSnapshotVersionShort = computed(() => {
-    const raw = (controllerSnapshotVersion.value || '').trim();
-    if (!raw) return '';
-    return raw.length > 18 ? raw.slice(-12) : raw;
-});
-const queueFreshnessLabel = computed(() => {
-    if (snapshotMode.value === 'recovering') return 'Recovering Live Snapshot';
-    if (isLoadingMatches.value) return 'Syncing';
-    if (!syncConfigurationReady.value) return 'Setup needed';
-    if (queueSourceMode.value === 'queue_api') return 'Live Snapshot';
-    if (queueSourceMode.value === 'cached_queue') return 'Cached Snapshot';
-    if (queueSourceMode.value === 'offline_cache') return 'Offline Snapshot';
-    if (queueSourceMode.value === 'legacy_adapter')
-        return 'Legacy Snapshot Fallback';
-    return 'Idle';
-});
-const queueFreshnessToneClass = computed(() => {
-    if (snapshotMode.value === 'recovering')
-        return 'bg-blue-500/20 border-blue-500/40 text-blue-300';
-    if (isLoadingMatches.value)
-        return 'bg-blue-500/20 border-blue-500/40 text-blue-300';
-    if (!syncConfigurationReady.value)
-        return 'bg-amber-500/20 border-amber-500/40 text-amber-200';
-    if (queueSourceMode.value === 'queue_api')
-        return 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
-    if (
-        queueSourceMode.value === 'cached_queue' ||
-        queueSourceMode.value === 'offline_cache'
-    )
-        return 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300';
-    if (queueSourceMode.value === 'legacy_adapter')
-        return 'bg-slate-500/20 border-slate-400/40 text-slate-200';
-    return 'bg-white/5 border-white/10 text-slate-300';
-});
-const matchesListForSlots = computed(() => {
-    const overrides = localStatusOverrides.value || {};
-    const keys = Object.keys(overrides);
-    if (!keys.length) return matchesList.value;
-    return (matchesList.value || []).map((m: any) => {
-        const id = getRemoteMatchId(m);
-        if (id == null) return m;
-        const st = overrides[String(id)];
-        if (!st) return m;
-        return { ...m, status: st };
-    });
-});
-const displaySlots = computed<RingDisplaySlot[]>(() =>
-    buildDisplaySlots(matchesListForSlots.value, {
-        limit: 5,
-        isLoading: isLoadingMatches.value,
-        source: queueSourceMode.value,
-        isOnline: isOnline.value,
-    }),
-);
-function isRingDisplayMatchSlot(
-    slot: RingDisplaySlot,
-): slot is RingDisplayMatchSlot {
-    return slot.type === 'match';
-}
-const previewMatchSlots = computed<RingDisplayMatchSlot[]>(() =>
-    displaySlots.value.filter(isRingDisplayMatchSlot),
-);
-function getRingMatchOrderProjectionSlotLabel(
-    role: RingDisplayRole,
-    index: number,
-) {
-    if (role === 'ON_MAT') return 'On Mat';
-    if (role === 'ON_DECK') return 'Next';
-    return `Queue ${Math.max(1, index - 1)}`;
-}
-function buildLocalRingMatchOrderProjectionPayload() {
-    const items = displaySlots.value.reduce<Record<string, unknown>[]>(
-        (list, slot, index) => {
-            if (
-                slot.type !== 'match' ||
-                !slot.row ||
-                typeof slot.row !== 'object'
-            )
-                return list;
-            const label = getRingMatchOrderProjectionSlotLabel(
-                slot.role,
-                index,
-            );
-            const row = slot.row as Record<string, unknown>;
-            const playerOne = buildLocalRingMatchOrderProjectionParticipant(
-                row,
-                'player1',
-            );
-            const playerTwo = buildLocalRingMatchOrderProjectionParticipant(
-                row,
-                'player2',
-            );
-            list.push({
-                ...row,
-                player_one: playerOne,
-                player_two: playerTwo,
-                player_one_club_logo_url: playerOne.club_logo_url ?? null,
-                player_two_club_logo_url: playerTwo.club_logo_url ?? null,
-                player_one_club_code: playerOne.club_code ?? null,
-                player_two_club_code: playerTwo.club_code ?? null,
-                player_one_country_code: playerOne.country_code ?? null,
-                player_two_country_code: playerTwo.country_code ?? null,
-                player_one_club: playerOne.club ?? null,
-                player_two_club: playerTwo.club ?? null,
-                role: label,
-                slot_role: slot.role,
-                slotRole: slot.role,
-                slot_label: label,
-                slotLabel: label,
-                position_label: label,
-                positionLabel: label,
-                slot_index: index,
-                source: 'controller_local_queue_snapshot',
-                source_mode: queueSourceMode.value ?? null,
-                queue_version:
-                    controllerSnapshotVersion.value ??
-                    upstreamQueueVersion.value ??
-                    null,
-                generated_at:
-                    controllerGeneratedAt.value ??
-                    upstreamGeneratedAt.value ??
-                    null,
-            });
-            return list;
-        },
-        [],
-    );
-
-    if (!items.length) return null;
-
-    return {
-        success: true,
-        items,
-        source: 'controller_local_queue_snapshot',
-        source_mode: queueSourceMode.value ?? null,
-        queue_version:
-            controllerSnapshotVersion.value ??
-            upstreamQueueVersion.value ??
-            null,
-        generated_at:
-            controllerGeneratedAt.value ?? upstreamGeneratedAt.value ?? null,
-        tournament_id: selectedTournamentId.value ?? null,
-        ring: (selectedRing.value || '').toString().trim() || null,
-        snapshot_id: activeAssignmentSnapshotId.value ?? null,
-    } satisfies Record<string, unknown>;
-}
-const selectedRingBracketLabels = computed(() => {
-    const seen = new Set<string>();
-    const list: { key: string; label: string }[] = [];
-    for (const m of matchesList.value || []) {
-        const key = getBracketGroupKey(m);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const label =
-            [getAgeCategoryLabel(m), getWeightCategoryLabel(m)]
-                .map((x) => (x || '').toString().trim())
-                .filter(Boolean)
-                .join(' ') || 'Bracket';
-        list.push({ key, label });
-    }
-    list.sort((a, b) =>
-        a.label.localeCompare(b.label, undefined, { numeric: true }),
-    );
-    return list;
-});
-const syncQueueEmptyState = computed(() => {
-    if (isLoadingMatches.value) {
-        return {
-            title: 'Checking this gilam queue snapshot.',
-            message:
-                'Matches will appear here as soon as the latest queue is ready.',
-        };
-    }
-
-    if (!syncHasServer.value) {
-        return {
-            title: 'Add the Admin Host address to begin.',
-            message:
-                'The queue snapshot will appear after the Admin Host source is set.',
-        };
-    }
-
-    if (!syncHasTournament.value || !syncHasRing.value) {
-        return {
-            title: 'Choose the fallback tournament and gilam to continue.',
-            message:
-                'This preview stays empty until the controller has temporary recovery values for tournament and gilam.',
-        };
-    }
-
-    if (queueIsDegraded.value) {
-        return {
-            title: 'No queue items are ready right now.',
-            message:
-                currentMatchId.value == null
-                    ? 'The last bout is complete. Waiting for the next usable match from the saved queue snapshot.'
-                    : 'The controller is waiting for the next usable match from the selected source.',
-        };
-    }
-
-    return {
-        title: 'No matches are waiting for this gilam.',
-        message:
-            'The preview will update automatically when the next match is available.',
-    };
+const {
+    matchesListForSlots,
+    displaySlots,
+    previewMatchSlots,
+    buildLocalRingMatchOrderProjectionPayload,
+    selectedRingBracketLabels,
+    syncQueueEmptyState,
+} = useRefereeControllerQueuePreview({
+    matchesList,
+    localStatusOverrides,
+    getRemoteMatchId,
+    isLoadingMatches,
+    queueSourceMode,
+    isOnline,
+    controllerSnapshotVersion,
+    upstreamQueueVersion,
+    controllerGeneratedAt,
+    upstreamGeneratedAt,
+    selectedTournamentId,
+    selectedRing,
+    activeAssignmentSnapshotId,
+    getBracketGroupKey,
+    getAgeCategoryLabel,
+    getWeightCategoryLabel,
+    syncHasServer,
+    syncHasTournament,
+    syncHasRing,
+    queueIsDegraded,
+    currentMatchId,
+    teamLogoMap,
+    teamCodeMap,
+    extractMatchSideBranding,
 });
 function toggleFallbackSetupPanel() {
     isFallbackSetupPanelExpanded.value = !isFallbackSetupPanelExpanded.value;
@@ -5590,222 +3989,6 @@ async function loadNextMatchAfterResult(
     return hasAdvancedPastMatch(finishedMatchId);
 }
 
-function getRoundDisplayText(m: any) {
-    const empty = '\u2014';
-
-    const normalizeStage = (s: string): string | null => {
-        const t = (s || '').toString().trim();
-        if (!t) return null;
-        if (/\bbronze\b/i.test(t)) return 'Bronze';
-        if (
-            /\bfinals?\b/i.test(t) &&
-            !/\bsemi\b/i.test(t) &&
-            !/\bquarter\b/i.test(t)
-        )
-            return 'Finals';
-        if (/\bsemi[- ]?finals?\b/i.test(t)) return 'Semi Finals';
-        if (/\bquarter[- ]?finals?\b/i.test(t)) return 'Quarterfinals';
-        if (/\bround of 16\b/i.test(t)) return 'Round of 16';
-        if (/\bround of 32\b/i.test(t)) return 'Round of 32';
-        if (/\bround of 64\b/i.test(t)) return 'Round of 64';
-        if (/\bround of 128\b/i.test(t)) return 'Round of 128';
-        return t;
-    };
-
-    const explicitFormat = (m?.bracket_format ?? m?.bracketFormat ?? '')
-        .toString()
-        .trim();
-    const inferredFormat = getInferredBracketFormat(m);
-    const format =
-        explicitFormat === 'single_elimination' ||
-        explicitFormat === 'round_robin'
-            ? (explicitFormat as 'single_elimination' | 'round_robin')
-            : inferredFormat;
-
-    if (format === 'single_elimination') {
-        const directStage = normalizeStage(
-            (m?.stage_label ??
-                m?.stageLabel ??
-                m?._stageLabel ??
-                m?.round_name ??
-                m?.roundName ??
-                '') as string,
-        );
-        if (directStage) return directStage;
-
-        const inferredStage = getInferredElimStageLabel(m);
-        if (inferredStage) return inferredStage;
-
-        const fromRoundText = normalizeStage(
-            (m?.round_display ?? m?.roundDisplay ?? m?.round ?? '') as string,
-        );
-        if (fromRoundText) return fromRoundText;
-
-        return empty;
-    }
-
-    if (format === 'round_robin') {
-        const roundNum = getNumericRoundNumber(m);
-        if (roundNum != null) return `Round ${roundNum}`;
-
-        const rd = m?.round_display;
-        if (typeof rd === 'string' && rd.trim()) return rd.trim();
-
-        const rr = m?.round;
-        if (typeof rr === 'string' && rr.trim()) return rr.trim();
-
-        return empty;
-    }
-
-    // Unknown format: prefer inferred elimination stage when available, otherwise keep existing text.
-    const inferredStage = getInferredElimStageLabel(m);
-    if (inferredStage) return inferredStage;
-
-    const rd = m?.round_display;
-    if (typeof rd === 'string' && rd.trim()) return rd.trim();
-
-    const rr = m?.round;
-    if (typeof rr === 'string' && rr.trim()) return rr.trim();
-
-    return empty;
-}
-
-function getAgeCategoryLabel(m: any) {
-    const v =
-        m?.age_category ??
-        m?.ageCategory ??
-        m?.age ??
-        m?.division ??
-        m?.classification ??
-        m?.bracket?.age_category ??
-        '';
-    return (v || '').toString().trim();
-}
-
-function getWeightCategoryLabel(m: any) {
-    const wc = m?.weight_category;
-    if (typeof wc === 'string' && wc.trim()) return wc.trim();
-
-    const cat = m?.category;
-    if (typeof cat === 'string' && cat.trim()) return cat.trim();
-
-    const nested = m?.bracket?.weight_category;
-    return typeof nested === 'string' ? nested : '';
-}
-
-/* function getBracketLabel(m: any) {
-  const bn = (m.bracket_name || '').toString().trim()
-  if (bn) return sanitizeBracketLabel(bn)
-  const parts: string[] = []
-  const age = (m.age_category || '').toString().trim()
-  const genderRaw = (m.gender || '').toString().trim()
-  const weight = (m.category || '').toString().trim()
-  if (age && age !== 'N/A') parts.push(age)
-  if (genderRaw && genderRaw !== 'N/A') {
-    const g = genderRaw.toLowerCase()
-    parts.push(g === 'male' || g === 'm' ? 'Male' : (g === 'female' || g === 'f' ? 'Female' : genderRaw))
-  }
-  if (weight && weight !== 'N/A') parts.push(weight)
-  return sanitizeBracketLabel(parts.join(' '))
-}
-
-function getStageLabel(m: any) {
-  if (m._stageLabel) return m._stageLabel
-  const rn = (m.round_name || '').toString().trim()
-  if (/\bfinals?\b/i.test(rn)) return 'Finals'
-  if (/\bbronze\b/i.test(rn)) return 'Bronze'
-  if (/\bsemi[- ]?finals?\b/i.test(rn)) return 'Semi-finals'
-  if (/\bquarter[- ]?finals?\b/i.test(rn)) return 'Quarterfinals'
-  const rstr = (m.round || '').toString().trim()
-  if (/\bfinals?\b/i.test(rstr)) return 'Finals'
-  if (/\bbronze\b/i.test(rstr)) return 'Bronze'
-  if (/\bsemi[- ]?finals?\b/i.test(rstr)) return 'Semi-finals'
-  if (/\bquarter[- ]?finals?\b/i.test(rstr)) return 'Quarterfinals'
-  const ro = Number(m.round_order ?? NaN)
-  if (!Number.isNaN(ro)) {
-    if (ro >= 90) return 'Finals'
-    if (ro >= 80) return 'Bronze'
-    if (ro >= 70) return 'Semi-finals'
-    if (ro >= 60) return 'Quarterfinals'
-    if (ro >= 50) return 'Round of 16'
-    if (ro >= 40) return 'Round of 32'
-    if (ro >= 30) return 'Round of 64'
-    if (ro >= 20) return 'Round of 128'
-    if (ro >= 10) return 'Qualification'
-  }
-  const rnum = m.round_number
-  if (typeof rnum === 'number') return `Round ${rnum}`
-  const m2 = rstr.match(/round\s*(\d+)/i)
-  if (m2) return `Round ${Number(m2[1])}`
-  return 'Round'
-} */
-
-function parseDivisionAndGenderFromLabel(label: string) {
-    const s = (label || '').trim();
-    if (!s) return { division: '', gender: 'N/A' };
-    const parts = s.split(/\s+/);
-    const last = parts[parts.length - 1];
-    if (/^M$/i.test(last) || /^Male$/i.test(last)) {
-        parts.pop();
-        return { division: parts.join(' ').trim(), gender: 'Mens' };
-    }
-    if (/^F$/i.test(last) || /^Female$/i.test(last)) {
-        parts.pop();
-        return { division: parts.join(' ').trim(), gender: 'Women' };
-    }
-    return { division: s, gender: 'N/A' };
-}
-
-function getMatchRingText(m: any): string {
-    const raw =
-        m?.ring_number ??
-        m?.ring ??
-        m?.mat ??
-        m?.mat_number ??
-        m?.matNumber ??
-        m?.ringNumber ??
-        m?.ring_no ??
-        m?.ringNo ??
-        null;
-
-    if (raw === null || raw === undefined) return '';
-    const text = String(raw).trim();
-    if (!text) return '';
-
-    const asNumber = Number(text);
-    if (Number.isFinite(asNumber) && Math.floor(asNumber) === asNumber)
-        return String(asNumber);
-    return text;
-}
-
-function getFallbackRingText(m: any, idx: number, ringCount: number): string {
-    if (!ringCount || ringCount <= 0) return '';
-    const n = Number(
-        m?.global_match_order ?? m?.match_number ?? m?.match_order ?? NaN,
-    );
-    const base = Number.isFinite(n) && n > 0 ? Math.floor(n) - 1 : idx;
-    return String((base % ringCount) + 1);
-}
-
-function isMatchIdEqual(m: any, id: number | string | null) {
-    if (id == null) return false;
-    const mid = getRemoteMatchId(m);
-    if (mid == null) return false;
-    return String(mid) === String(id);
-}
-
-function getNextQueuedMatchId(
-    rows: any[] = buildLocalAutoLoadCandidateRows(),
-    excludeMatchId: number | string | null = null,
-) {
-    const next = (Array.isArray(rows) ? rows : []).find((m: any) => {
-        if (excludeMatchId != null && isMatchIdEqual(m, excludeMatchId))
-            return false;
-        return getEffectiveStatus(m).toLowerCase() !== 'completed';
-    });
-    return next ? getRemoteMatchId(next) : null;
-}
-
 async function refreshMatchesAfterResult(
     matchId: number | string | null,
     expectedStatus = 'completed',
@@ -6594,82 +4777,6 @@ function extractMatchSideBranding(match: any, side: 'player1' | 'player2') {
         .slice(0, 4);
 
     return { teamName, clubLogo, clubCode };
-}
-
-function buildLocalRingMatchOrderProjectionParticipant(
-    match: any,
-    side: 'player1' | 'player2',
-) {
-    const isPlayerOne = side === 'player1';
-    const participant = isPlayerOne
-        ? (match?.player_one ?? match?.player_green ?? match?.player_left ?? {})
-        : (match?.player_two ??
-          match?.player_blue ??
-          match?.player_right ??
-          {});
-    const candidate =
-        participant && typeof participant === 'object'
-            ? { ...(participant as Record<string, unknown>) }
-            : ({} as Record<string, unknown>);
-
-    const branding = extractMatchSideBranding(match, side);
-    const teamName = firstNonEmptyString(
-        branding.teamName,
-        candidate.club,
-        candidate.team_name,
-        candidate.teamName,
-        candidate.club_name,
-        candidate.clubName,
-    );
-    const clubLogo = firstNonEmptyString(
-        branding.clubLogo,
-        teamName ? teamLogoMap.value[teamName] : '',
-        candidate.club_logo_url,
-        candidate.clubLogoUrl,
-        candidate.logo_url,
-        candidate.logoUrl,
-        candidate.club_logo_path,
-        candidate.clubLogoPath,
-    );
-    const clubCode = firstNonEmptyString(
-        branding.clubCode,
-        teamName ? teamCodeMap.value[teamName] : '',
-        candidate.club_code,
-        candidate.clubCode,
-        candidate.code,
-    )
-        .replace(/[^a-zA-Z]/g, '')
-        .toUpperCase()
-        .slice(0, 4);
-    const countryCode = firstNonEmptyString(
-        candidate.country_code,
-        candidate.countryCode,
-        isPlayerOne
-            ? (match?.player_one_country_code ??
-                  match?.player1_country_code ??
-                  match?.player_green_country_code ??
-                  match?.player_left_country_code ??
-                  match?.player_red_country_code)
-            : (match?.player_two_country_code ??
-                  match?.player2_country_code ??
-                  match?.player_blue_country_code ??
-                  match?.player_right_country_code),
-    );
-
-    return {
-        ...candidate,
-        club: teamName || firstNonEmptyString(candidate.club) || null,
-        club_code:
-            clubCode ||
-            firstNonEmptyString(
-                candidate.club_code,
-                candidate.clubCode,
-                candidate.code,
-            ) ||
-            null,
-        club_logo_url: clubLogo || null,
-        country_code: countryCode || null,
-    };
 }
 
 function hydrateFetchedTeamBranding(...sources: any[]) {
@@ -7482,16 +5589,6 @@ onMounted(() => {
             el.addEventListener('scroll', handleSettingsScroll, {
                 passive: true,
             });
-    });
-});
-
-onMounted(() => {
-    const bridge = getDisplayBridge();
-    if (!bridge) return;
-
-    void loadDisplayState(false);
-    removeDisplayStateListener = bridge.onStateChanged((nextState) => {
-        applyDisplayState(nextState);
     });
 });
 
@@ -8457,9 +6554,5 @@ onBeforeUnmount(() => {
     if (settingsScrollTimeoutId != null) {
         window.clearTimeout(settingsScrollTimeoutId);
         settingsScrollTimeoutId = null;
-    }
-    if (removeDisplayStateListener) {
-        removeDisplayStateListener();
-        removeDisplayStateListener = null;
     }
 });

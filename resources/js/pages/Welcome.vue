@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: Welcome.vue
+    Description: Public welcome and landing page for the desktop application.
+    Introduces the product and provides the initial entry experience.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { dashboard, login, register } from '@/routes';

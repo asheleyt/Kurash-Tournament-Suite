@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: Dashboard.vue
+    Description: Dashboard page for the desktop application.
+    Presents the main authenticated landing view and navigation entry points.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';

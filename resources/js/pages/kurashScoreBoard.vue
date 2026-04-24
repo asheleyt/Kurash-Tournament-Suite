@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: kurashScoreBoard.vue
+    Description: Public scoreboard display page for a live kurash match.
+    Renders athlete details, score state, overlays, and match presentation.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <template>
   <div
     ref="scoreboardViewport"

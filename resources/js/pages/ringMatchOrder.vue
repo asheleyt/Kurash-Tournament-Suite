@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: ringMatchOrder.vue
+    Description: Ring match order display page for public queue presentation.
+    Shows on-mat, on-deck, and queued bouts for a selected ring.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <template>
   <div class="ring-order-page h-screen overflow-hidden bg-[#060a13] text-white">
     <div class="ring-order-shell mx-auto flex h-full w-full max-w-[1920px] flex-col px-4 py-4 sm:px-5 sm:py-5 xl:px-8 xl:py-6">

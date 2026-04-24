@@ -1,3 +1,15 @@
+<!--
+    Kurash Tournament Suite
+
+    File: loginPageTest.vue
+    Description: Test page for the login screen experience and related UI flow.
+    Used to preview and validate the login page presentation.
+
+    Part of the Kurash Tournament Suite desktop application.
+
+    Copyright (c) 2026 Kurash Tournament Suite.
+    All rights reserved.
+-->
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
