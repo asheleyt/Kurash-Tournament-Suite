@@ -36,6 +36,21 @@ class ControllerDeviceProxyService
         return $this->sendJsonRequest('get', 'controller/assigned-setup', null, $headers, $query);
     }
 
+    public function queue(array $headers = [], array $query = []): array
+    {
+        return $this->sendJsonRequest('get', 'controller/queue', null, $headers, $query);
+    }
+
+    public function displayBatch(array $headers = [], array $query = []): array
+    {
+        return $this->sendJsonRequest('get', 'controller/display-batch', null, $headers, $query);
+    }
+
+    public function queueDiagnostics(array $headers = [], array $query = []): array
+    {
+        return $this->sendJsonRequest('get', 'controller/queue-diagnostics', null, $headers, $query);
+    }
+
     protected function normalizeBaseUrl(?string $base): string
     {
         $base = trim((string) $base);

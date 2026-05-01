@@ -80,11 +80,6 @@ import {
 import { useRefereeControllerSession } from '@/composables/useRefereeControllerSession';
 import { useRefereeQueueSync } from '@/composables/useRefereeQueueSync';
 import { useRefereeRingMatchOrderSync } from '@/composables/useRefereeRingMatchOrderSync';
-import { useRefereeBracketInference } from './refereeController/useRefereeBracketInference';
-import { useRefereeControllerDisplayManagement } from './refereeController/useRefereeControllerDisplayManagement';
-import { useRefereeControllerQueuePreview } from './refereeController/useRefereeControllerQueuePreview';
-import { useRefereeControllerQueueHelpers } from './refereeController/useRefereeControllerQueueHelpers';
-import { useRefereeControllerSyncPanels } from './refereeController/useRefereeControllerSyncPanels';
 import {
     normalizeQueueRows,
     type RingDisplayRole,
@@ -105,6 +100,11 @@ import {
 import { availableFlags, availableCountries } from '@/Constants/countries';
 import { iso2ToThreeLetterCode } from '@/Constants/iocLookup';
 import { resolveFlagAsset } from '@/utils/flagAssets';
+import { useRefereeBracketInference } from './refereeController/useRefereeBracketInference';
+import { useRefereeControllerDisplayManagement } from './refereeController/useRefereeControllerDisplayManagement';
+import { useRefereeControllerQueueHelpers } from './refereeController/useRefereeControllerQueueHelpers';
+import { useRefereeControllerQueuePreview } from './refereeController/useRefereeControllerQueuePreview';
+import { useRefereeControllerSyncPanels } from './refereeController/useRefereeControllerSyncPanels';
 
 /* --- CONSTANTS --- */
 const BUZZER_SOUND = '/Sound/basketball-buzzer-game-over-bosnow-1-00-09.mp3';
@@ -1417,6 +1417,8 @@ async function confirmResetAll() {
     saveHistory();
     resetLiveBoutState();
     clearResultSubmitGateState();
+    showFinishModal.value = false;
+    showLegacyFinishBanner.value = false;
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
     manualMatchId.value = '';
@@ -1536,6 +1538,12 @@ async function handleWinnerToggle(player: 'player1' | 'player2') {
         );
         return;
     }
+    if (
+        await clearCurrentLoadedMatchForRingMismatch(
+            'winner declaration guard',
+        )
+    )
+        return;
 
     saveHistory();
     if (gameState.winner === player) {
@@ -1989,12 +1997,15 @@ const {
     localApiUrl,
     attachAdminBase,
     headers: (withJson = false) => headers(withJson),
+    controllerHeaders: (withJson = false) => buildControllerAuthHeaders(withJson),
     reportFetchFailure,
     safeApiErrorMessage,
     getRingMatchOrderProjectionMeta: () => ringMatchOrderProjectionMeta.value,
     getRingMatchOrderProjectionKey: () => ringMatchOrderProjectionKey.value,
     getSelectedTournamentId: () => selectedTournamentId.value,
     getSelectedRing: () => selectedRing.value,
+    hasKnownDeviceCredentials: () => hasKnownDeviceCredentials.value,
+    hasAssignedSetup: () => hasAssignedSetup.value,
     isRingMatchOrderLive: () => isRingMatchOrderLive.value,
     canLoadMatch,
 });
@@ -2209,6 +2220,119 @@ watch(
         }
     },
 );
+
+function getCurrentLoadedMatchRingText(): string {
+    const trackedRing = firstNonEmptyString(currentMatchRingNumber.value);
+    if (trackedRing) return trackedRing;
+
+    const loadedMatchId = currentMatchId.value;
+    if (loadedMatchId == null) return '';
+
+    const loadedMatch =
+        matchesList.value.find((item: any) =>
+            isMatchIdEqual(item, loadedMatchId),
+        ) ||
+        allMatchesList.value.find((item: any) =>
+            isMatchIdEqual(item, loadedMatchId),
+        ) ||
+        null;
+
+    return loadedMatch ? getMatchRingText(loadedMatch) : '';
+}
+
+function getCurrentLoadedQueueMatch(): any | null {
+    const loadedMatchId = currentMatchId.value;
+    if (loadedMatchId == null) return null;
+
+    return (
+        matchesList.value.find((item: any) =>
+            isMatchIdEqual(item, loadedMatchId),
+        ) || null
+    );
+}
+
+function hasAuthoritativeAssignedQueueSnapshot() {
+    return (
+        hasAssignedSetup.value &&
+        queueSourceMode.value === 'queue_api' &&
+        !queueIsDegraded.value &&
+        Array.isArray(matchesList.value)
+    );
+}
+
+function isCurrentLoadedMatchAssignedToDifferentRing(
+    ringText: string = selectedRing.value,
+) {
+    const targetRing = (ringText || '').toString().trim();
+    if (!targetRing) return false;
+    if (currentMatchId.value == null && !currentMatchRingNumber.value)
+        return false;
+
+    const loadedRing = getCurrentLoadedMatchRingText();
+    return !!loadedRing && loadedRing !== targetRing;
+}
+
+async function clearCurrentLoadedMatchForRingMismatch(
+    contextLabel: string,
+    options: {
+        announce?: boolean;
+        broadcast?: boolean;
+        requireAssignedQueueMembership?: boolean;
+    } = {},
+) {
+    const targetRing = (selectedRing.value || '').toString().trim();
+    const queueMatch = getCurrentLoadedQueueMatch();
+    const isWrongRing = isCurrentLoadedMatchAssignedToDifferentRing(targetRing);
+    const isMissingFromAssignedQueue =
+        options.requireAssignedQueueMembership !== false &&
+        hasAuthoritativeAssignedQueueSnapshot() &&
+        currentMatchId.value != null &&
+        !queueMatch;
+
+    if (!isWrongRing && !isMissingFromAssignedQueue) return false;
+
+    const loadedMatchId = currentMatchId.value;
+    const loadedRing = getCurrentLoadedMatchRingText();
+    resetLiveBoutState();
+    clearResultSubmitGateState();
+    showFinishModal.value = false;
+    showLegacyFinishBanner.value = false;
+    currentMatchId.value = null;
+    currentMatchRingNumber.value = null;
+    manualMatchId.value = '';
+    persistManualMatchId();
+    syncTempSettings();
+
+    if (options.broadcast !== false) {
+        await broadcastAll();
+    }
+
+    if (options.announce !== false) {
+        const matchLabel =
+            loadedMatchId == null
+                ? 'the loaded match'
+                : `match ${String(loadedMatchId)}`;
+        showBanner(
+            isWrongRing
+                ? `Cleared ${matchLabel} from Gilam ${loadedRing}; this controller is assigned to Gilam ${targetRing}.`
+                : `Cleared ${matchLabel}; it is not in the assigned Gilam ${targetRing} queue snapshot.`,
+            'info',
+            6500,
+        );
+    }
+
+    console.info(
+        `[controller] cleared stale loaded match after ${contextLabel}`,
+        {
+            match_id: loadedMatchId,
+            loaded_ring: loadedRing,
+            assigned_ring: targetRing,
+            missing_from_assigned_queue: isMissingFromAssignedQueue,
+        },
+    );
+
+    return true;
+}
 const normalizedControllerAdminBase = computed(() => {
     const raw = (adminBase.value || '').toString().trim();
     if (!raw) return '';
@@ -2383,6 +2507,7 @@ const {
     localApiUrl,
     attachAdminBase,
     headers: (withJson = false) => headers(withJson),
+    controllerHeaders: (withJson = false) => buildControllerAuthHeaders(withJson),
     reportFetchFailure,
     safeApiErrorMessage,
     normalizeApiBaseInput,
@@ -3186,7 +3311,10 @@ function normalizeResultSubmitResponse(submitResult: any) {
         const resultTraceId = normalizeOptionalText(
             responseJson?.result_trace_id,
         );
-        const accepted = syncStatus === 'synced';
+        const accepted =
+            syncStatus === 'synced' ||
+            syncStatus === 'local_only' ||
+            syncStatus === 'disabled';
 
         return {
             accepted,
@@ -3692,12 +3820,6 @@ function buildLocalAutoLoadCandidateRows() {
         }
     };
 
-    addRows(
-        Array.isArray(matchesListForSlots.value)
-            ? matchesListForSlots.value
-            : [],
-    );
-
     const selectedRingText = (
         selectedRing.value ||
         effectiveRing.value ||
@@ -3706,6 +3828,32 @@ function buildLocalAutoLoadCandidateRows() {
     )
         .toString()
         .trim();
+
+    const slotRows = Array.isArray(matchesListForSlots.value)
+        ? matchesListForSlots.value
+        : [];
+    const ringSlotRows = selectedRingText
+        ? slotRows.filter((row: any) => {
+              const ringText = getMatchRingText(row);
+              return !ringText || ringText === selectedRingText;
+          })
+        : slotRows;
+
+    addRows(ringSlotRows);
+    if (hasAuthoritativeAssignedQueueSnapshot()) {
+        return Array.from(entries.values())
+            .sort((left, right) => {
+                const leftOrder = getLocalQueueOrderValue(left.row, left.index);
+                const rightOrder = getLocalQueueOrderValue(
+                    right.row,
+                    right.index,
+                );
+                if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+                return left.index - right.index;
+            })
+            .map((entry) => entry.row);
+    }
+
     const allRows = Array.isArray(allMatchesList.value)
         ? allMatchesList.value
         : [];
@@ -3912,6 +4060,11 @@ async function maybeAutoLoadAssignedMatch(
     const ringText = (ring || '').toString().trim();
     if (!tournamentId || !ringText) return;
 
+    const clearedStaleLoadedMatch =
+        await clearCurrentLoadedMatchForRingMismatch('auto-load ring check', {
+            announce: false,
+            broadcast: false,
+        });
     const excludedMatchId = options.excludeMatchId ?? null;
     let candidate = pickLocalAutoLoadQueueItem(excludedMatchId);
     if (!candidate) {
@@ -3929,6 +4082,14 @@ async function maybeAutoLoadAssignedMatch(
                 showBanner(reason, 'info', 5200);
             }
         }
+        if (clearedStaleLoadedMatch) {
+            await broadcastAll();
+        }
+        return;
+    }
+
+    if (clearedStaleLoadedMatch) {
+        await loadMatch(candidate);
         return;
     }
 
@@ -4312,6 +4473,7 @@ watch(manualSelectedRing, () => {
 });
 
 watch(selectedRing, async () => {
+    await clearCurrentLoadedMatchForRingMismatch('selected ring change');
     restoreResultOverridesForSelection(
         selectedTournamentId.value,
         selectedRing.value,
@@ -4502,6 +4664,30 @@ function shouldRequireExplicitQueueSignalsForProgression() {
         queueSourceMode.value === 'queue_api' ||
         queueSourceMode.value === 'cached_queue' ||
         queueSourceMode.value === 'offline_cache' ||
+        queueIsDegraded.value ||
+        !!pendingLiveSnapshotRecoveryContextKey.value
+    );
+}
+
+function shouldUseLocalFirstResultFlow() {
+    const sourceMode = (queueSourceMode.value || '').toString();
+    return (
+        setupSource.value === 'manual_fallback' ||
+        resultSubmitQueueMode.value === 'offline_degraded' ||
+        queueIsDegraded.value ||
+        !!pendingLiveSnapshotRecoveryContextKey.value ||
+        sourceMode === 'cached_queue' ||
+        sourceMode === 'offline_cache' ||
+        sourceMode === 'legacy_adapter'
+    );
+}
+
+function shouldRequireLocalFirstQueueSignals() {
+    const sourceMode = (queueSourceMode.value || '').toString();
+    return (
+        sourceMode === 'queue_api' ||
+        sourceMode === 'cached_queue' ||
+        sourceMode === 'offline_cache' ||
         queueIsDegraded.value ||
         !!pendingLiveSnapshotRecoveryContextKey.value
     );
@@ -5104,6 +5290,24 @@ async function refreshCurrentMatchSubmitGate(
             error instanceof Error
                 ? error.message
                 : 'Failed to refresh the live queue.';
+        if ((error as any)?.controllerAssignmentBlocked) {
+            const detail = `Event Host assignment is not ready for this controller. ${message}`;
+            markResultSubmitReconcileRequired(
+                detail,
+                'controller_assignment_unavailable',
+            );
+            resultSubmitBlockReason.value = detail;
+
+            if (options.announceFailures) {
+                showBanner(detail, options.bannerType ?? 'error', 6500);
+            }
+
+            return {
+                ready: false,
+                match: null as any,
+                error,
+            };
+        }
         const fallbackAssessment = assessMatchQueueEligibility(
             localMatch,
             selectedMatchId,
@@ -5315,6 +5519,19 @@ async function loadMatch(m: any): Promise<boolean> {
         );
         return false;
     }
+
+    const selectedRingText = (selectedRing.value || '').toString().trim();
+    if (selectedRingText) {
+        const matchRingText = getMatchRingText(m);
+        if (matchRingText && matchRingText !== selectedRingText) {
+            showBanner(
+                `Cannot load match: it is assigned to Gilam ${matchRingText}, but this controller is on Gilam ${selectedRingText}.`,
+                'error',
+                6500,
+            );
+            return false;
+        }
+    }
     isSettingsOpen.value = false;
     resetLiveBoutState();
     clearResultSubmitGateState();
@@ -5408,7 +5625,8 @@ async function loadMatch(m: any): Promise<boolean> {
     );
     currentMatchId.value = getRemoteMatchId(m);
     currentMatchRingNumber.value =
-        (m.ring_number ?? selectedRing.value ?? '').toString().trim() || null;
+        firstNonEmptyString(m?.ring_number, getMatchRingText(m), selectedRing.value) ||
+        null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -5731,8 +5949,10 @@ async function handleSubmitResult() {
             matchesList.value.find((m: any) =>
                 isMatchIdEqual(m, currentMatchId.value),
             ) || null;
+        const localFirstResultFlow = shouldUseLocalFirstResultFlow();
         if (
             currentMatchId.value &&
+            !localFirstResultFlow &&
             syncHasServer.value &&
             selectedTournamentId.value != null &&
             (selectedRing.value || '').toString().trim()
@@ -5742,6 +5962,27 @@ async function handleSubmitResult() {
             });
             if (!gate.ready || !gate.match) return;
             currentMatch = gate.match;
+        } else if (currentMatchId.value && localFirstResultFlow) {
+            const assessment = assessMatchQueueEligibility(
+                currentMatch,
+                currentMatchId.value,
+                {
+                    requireExplicitSignals: shouldRequireLocalFirstQueueSignals(),
+                },
+            );
+            if (!assessment.ready) {
+                const message =
+                    assessment.message ||
+                    'This bout is not confirmed in the saved queue snapshot yet.';
+                resultSubmitBlockReason.value = message;
+                resultSubmitStatusReasonCode.value = assessment.reasonCode;
+                showBanner(message, 'error', 5200);
+                return;
+            }
+            markResultSubmitOfflineContinuation(
+                'Saving locally first from the saved queue snapshot.',
+                'offline_cached_confirmed',
+            );
         }
 
         const matchIdForSync =
@@ -5764,14 +6005,12 @@ async function handleSubmitResult() {
                     : Number(winnerIdRaw);
             return Number.isFinite(n) ? n : null;
         })();
-        const ringNumber = (
-            currentMatch?.ring_number ??
-            currentMatchRingNumber.value ??
-            selectedRing.value ??
-            ''
-        )
-            .toString()
-            .trim();
+        const ringNumber = firstNonEmptyString(
+            currentMatch?.ring_number,
+            getMatchRingText(currentMatch),
+            currentMatchRingNumber.value,
+            selectedRing.value,
+        );
         const ringNum = (() => {
             const n = Number(ringNumber);
             return Number.isFinite(n) ? n : null;
@@ -5839,6 +6078,7 @@ async function handleSubmitResult() {
                 resultSubmitQueueMode.value === 'offline_degraded',
             submit_queue_reconcile_required:
                 resultSubmitQueueMode.value === 'reconcile_required',
+            local_first_result_flow: localFirstResultFlow,
             ...getRendererRuntimeIdentity(),
         };
 
@@ -5875,13 +6115,19 @@ async function handleSubmitResult() {
             if (resolvedAdminBase) {
                 relayUrl.searchParams.set('admin_base', resolvedAdminBase);
             }
-            const shouldSubmitDirectToAdmin = !!resolvedAdminBase;
+            if (localFirstResultFlow) {
+                relayUrl.searchParams.set('local_only', '1');
+            }
+            const shouldSubmitDirectToAdmin =
+                !!resolvedAdminBase && !localFirstResultFlow;
             logResultSyncTrace('controller.result.submit.prepare', {
                 ...syncTraceContext,
                 local_relay_url: relayUrl.toString(),
                 submit_mode: shouldSubmitDirectToAdmin
                     ? 'admin_direct'
-                    : 'local_relay',
+                    : localFirstResultFlow
+                      ? 'local_relay_local_only'
+                      : 'local_relay',
                 normalized_match_id: matchIdForSync,
                 normalized_winner_id: winnerIdNum ?? null,
             });
@@ -5988,6 +6234,7 @@ async function handleSubmitResult() {
                     })
                     .catch(async (error) => {
                         if (
+                            localFirstResultFlow ||
                             !resolvedAdminBase ||
                             !shouldUseDirectAdminResultFallback(error)
                         ) {
@@ -6087,7 +6334,26 @@ async function handleSubmitResult() {
             updatingMatchId.value = matchIdForSync;
             let resultQueuedForAdminReplay = false;
 
-            if (adminSyncOk && resolvedAdminBase) {
+            if (
+                localFirstResultFlow &&
+                resolvedAdminBase &&
+                resultPayloadForPendingSync
+            ) {
+                queuePendingResultSync(
+                    resolvedAdminBase,
+                    matchIdForSync,
+                    resultPayloadForPendingSync,
+                    syncTraceId,
+                    syncTraceContext,
+                    'local_first_pending_admin_sync',
+                );
+                showBanner(
+                    'Result saved locally. Admin sync will run in the background when the Event Host is reachable.',
+                    'info',
+                    5200,
+                );
+                resultQueuedForAdminReplay = true;
+            } else if (adminSyncOk && resolvedAdminBase) {
                 removePendingResultSyncItem(
                     pendingResultSyncId(resolvedAdminBase, matchIdForSync),
                 );
@@ -6222,9 +6488,11 @@ async function handleSubmitResult() {
                 },
             );
 
-            resultPopupMessage.value = adminSyncOk
-                ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
-                : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Admin sync.`;
+            resultPopupMessage.value = resultQueuedForAdminReplay
+                ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Admin sync.`
+                : adminSyncOk
+                  ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
+                  : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`;
             showResultPopup.value = true;
             setTimeout(() => {
                 showResultPopup.value = false;
@@ -6236,6 +6504,24 @@ async function handleSubmitResult() {
 
             void (async () => {
                 try {
+                    if (localFirstResultFlow) {
+                        let advanced = hasAdvancedPastMatch(matchIdForSync);
+                        const localNextCandidate =
+                            pickLocalAutoLoadQueueItem(matchIdForSync);
+                        if (localNextCandidate) {
+                            advanced = await reconcileAuthoritativeNextMatch(
+                                localNextCandidate,
+                                matchIdForSync,
+                            );
+                        }
+                        if (!advanced) {
+                            await clearCompletedBoutToWaitingState(
+                                getWaitingForNextBoutMessage(matchIdForSync),
+                            );
+                        }
+                        return;
+                    }
+
                     await refreshMatchesAfterResult(
                         matchIdForSync,
                         'completed',

@@ -29,6 +29,15 @@
             html.dark {
                 background-color: oklch(0.145 0 0);
             }
+
+            @if(in_array($page['component'] ?? '', ['kurashScoreBoard', 'ringMatchOrder']))
+            html,
+            body,
+            #app {
+                background-color: #020617;
+                color-scheme: dark;
+            }
+            @endif
         </style>
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>

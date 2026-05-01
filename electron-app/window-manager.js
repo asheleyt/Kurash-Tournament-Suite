@@ -42,9 +42,8 @@ function createIssueSetBucket() {
   };
 }
 
-function toRoleMode(role, scoreboardOutputMode) {
-  if (role === 'scoreboard') return scoreboardOutputMode === 'broadcast' ? 'broadcast' : 'single';
-  return 'broadcast';
+function toRoleMode(_role, scoreboardOutputMode) {
+  return scoreboardOutputMode === 'broadcast' ? 'broadcast' : 'single';
 }
 
 function appendQueryParams(rawUrl, params = {}) {
@@ -83,6 +82,55 @@ function appendQueryParams(rawUrl, params = {}) {
   }
 }
 
+function getNestedPublicTargetUrl(rawUrl) {
+  if (!rawUrl) return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.searchParams.get('url') || rawUrl;
+  } catch (_error) {
+    return rawUrl;
+  }
+}
+
+function normalizeComparableUrl(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.hash = '';
+    const pathname = parsed.pathname.length > 1
+      ? parsed.pathname.replace(/\/+$/, '')
+      : parsed.pathname;
+    return `${parsed.origin}${pathname}${parsed.search}`;
+  } catch (_error) {
+    return String(rawUrl || '');
+  }
+}
+
+function isSamePublicTargetUrl(currentUrl, targetUrl) {
+  const current = normalizeComparableUrl(currentUrl);
+  const target = normalizeComparableUrl(targetUrl);
+  return !!current && !!target && current === target;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function buildPublicDisplayErrorUrl({ title, message, detail }) {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>:root{color-scheme:dark}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#020617;color:#e2e8f0;font-family:"Segoe UI",Arial,sans-serif}body{display:flex;align-items:center;justify-content:center;padding:5vw}.panel{width:min(88vw,900px);border:1px solid rgba(148,163,184,.22);border-radius:24px;background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(2,6,23,.98));box-shadow:0 24px 80px rgba(0,0,0,.45);padding:42px}.eyebrow{font-size:13px;font-weight:900;letter-spacing:.28em;text-transform:uppercase;color:#38bdf8}.title{margin:14px 0 0;font-size:clamp(32px,5vw,76px);line-height:1;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#fff}.message{margin-top:22px;font-size:clamp(18px,2vw,30px);line-height:1.45;color:#cbd5e1;font-weight:700}.detail{margin-top:18px;border-radius:16px;border:1px solid rgba(250,204,21,.28);background:rgba(250,204,21,.08);padding:16px;color:#fde68a;font-size:14px;line-height:1.6;font-family:Consolas,"SFMono-Regular",monospace;white-space:pre-wrap}</style></head><body><main class="panel"><div class="eyebrow">Kurash Public Display</div><h1 class="title">${escapeHtml(title)}</h1><div class="message">${escapeHtml(message)}</div>${detail ? `<div class="detail">${escapeHtml(detail)}</div>` : ''}</main></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function buildPublicLoadingUrl({ roleLabel }) {
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Initializing ${escapeHtml(roleLabel)}</title><style>:root{color-scheme:dark}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#020617;color:#fff;font-family:"Segoe UI",Arial,sans-serif}body{display:flex;align-items:center;justify-content:center;padding:5vw;background:radial-gradient(circle at 50% 20%,rgba(14,165,233,.2),transparent 34%),linear-gradient(135deg,#020617,#0f172a 58%,#111827)}.frame{display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px}.loader{width:64px;height:64px;border-radius:50%;border:6px solid rgba(148,163,184,.25);border-top-color:#38bdf8;animation:spin .9s linear infinite}.eyebrow{font-size:13px;font-weight:900;letter-spacing:.34em;text-transform:uppercase;color:#7dd3fc}.title{font-size:clamp(32px,4.8vw,78px);font-weight:900;letter-spacing:.18em;text-transform:uppercase;line-height:1;text-shadow:0 0 28px rgba(56,189,248,.24)}.message{max-width:760px;font-size:clamp(16px,1.6vw,25px);line-height:1.5;font-weight:700;color:#cbd5e1}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><main class="frame"><div class="loader"></div><div class="eyebrow">${escapeHtml(roleLabel)}</div><h1 class="title">Initializing System</h1><div class="message">Preparing the public display. It will switch over as soon as the live page is ready.</div></main></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
 class WindowManager extends EventEmitter {
   constructor({ app, displayManager, settingsStore, preloadPath, logger = console }) {
     super();
@@ -107,8 +155,10 @@ class WindowManager extends EventEmitter {
       this.selectedScoreboardDisplayIds = this.selectedScoreboardDisplayIds.slice(0, 1);
     }
 
-    this.selectedRingMatchOrderDisplayIds = normalizeDisplayIds(
-      savedSettings.selectedRingMatchOrderDisplayIds
+    this.selectedRingMatchOrderDisplayIds = this.sanitizeSelectedDisplayIdsForRole(
+      'ring_match_order',
+      normalizeDisplayIds(savedSettings.selectedRingMatchOrderDisplayIds),
+      this.scoreboardOutputMode
     );
     this.scoreboardFullscreenPreference = savedSettings.scoreboardFullscreen !== false;
     this.controllerWindow = null;
@@ -352,6 +402,8 @@ class WindowManager extends EventEmitter {
 
     const url = this.getPublicWindowUrl(role, { preview });
     if (!url) return null;
+    const targetUrl = getNestedPublicTargetUrl(url);
+    const roleLabel = role === 'ring_match_order' ? 'Gilam Match Order' : 'Scoreboard';
 
     const win = new BrowserWindow({
       title: this.getWindowTitleForRole(role, normalizedId, preview),
@@ -366,23 +418,129 @@ class WindowManager extends EventEmitter {
       paintWhenInitiallyHidden: true,
       webPreferences: { nodeIntegration: false, contextIsolation: true, preload: this.preloadPath },
     });
+    const loadingWindow = new BrowserWindow({
+      title: `${roleLabel} Loading ${normalizedId}`,
+      show: false,
+      frame: false,
+      autoHideMenuBar: true,
+      fullscreen: false,
+      fullscreenable: false,
+      kiosk: false,
+      resizable: false,
+      backgroundColor: '#020617',
+      paintWhenInitiallyHidden: true,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    });
+
+    loadingWindow.setMenu(null);
+    loadingWindow.loadURL(buildPublicLoadingUrl({ roleLabel })).catch((error) => {
+      this.logger.warn?.(`Failed to show ${roleLabel} loading page`, error);
+    });
 
     win.__kurashCanShow = false;
     win.__kurashPendingShow = false;
-    const markWindowReadyToShow = () => {
-      if (win.isDestroyed()) return;
-      win.__kurashCanShow = true;
-      if (win.__kurashPendingShow && !win.isVisible()) {
-        win.show();
+    win.__kurashPublicTargetLoaded = false;
+    win.__kurashPublicRetryDone = false;
+    win.__kurashLoadingWindow = loadingWindow;
+    let loadTimeout = null;
+
+    const clearLoadTimeout = () => {
+      if (loadTimeout) {
+        clearTimeout(loadTimeout);
+        loadTimeout = null;
       }
     };
 
-    win.once('ready-to-show', markWindowReadyToShow);
-    win.webContents.once('did-finish-load', markWindowReadyToShow);
+    const allowWindowToShow = () => {
+      if (win.isDestroyed()) return;
+      win.__kurashCanShow = true;
+      let didShowTarget = false;
+      if (win.__kurashPendingShow && !win.isVisible()) {
+        win.show();
+        didShowTarget = true;
+      }
+      if (didShowTarget) {
+        setTimeout(() => this.closePublicLoadingWindow(win), 180);
+      } else {
+        this.closePublicLoadingWindow(win);
+      }
+    };
+
+    const markPublicTargetLoaded = () => {
+      if (win.isDestroyed()) return;
+      clearLoadTimeout();
+      win.__kurashPublicTargetLoaded = true;
+      allowWindowToShow();
+    };
+
+    const markWindowLoadFailed = (message, detail = '') => {
+      if (win.isDestroyed() || win.__kurashPublicTargetLoaded) return;
+
+      if (!win.__kurashPublicRetryDone) {
+        win.__kurashPublicRetryDone = true;
+        clearLoadTimeout();
+        setTimeout(() => {
+          if (!win.isDestroyed() && !win.__kurashPublicTargetLoaded) {
+            loadPublicUrl();
+          }
+        }, 350);
+        return;
+      }
+
+      clearLoadTimeout();
+      const errorMessage = `${roleLabel} failed to load.`;
+      this.getFailedDisplayErrorsForRole(role).set(normalizedId, `${errorMessage} ${message || detail || ''}`.trim());
+      this.getDisconnectedDisplayIdsForRole(role).add(normalizedId);
+      this.updateSessionStateFromOutputs();
+      this.statusNotice = this.createNotice('warning', `${roleLabel} failed to load on ${this.describeDisplay(normalizedId)}.`);
+      this.emitStateChange(`${role}-load-failed:${normalizedId}`);
+
+      win.__kurashPublicTargetLoaded = true;
+      win.loadURL(buildPublicDisplayErrorUrl({
+        title: 'Display Load Failed',
+        message: `${roleLabel} could not reach the public page. Reopen it from the controller after the local services are ready.`,
+        detail: detail || message || targetUrl || url,
+      })).catch((error) => {
+        this.logger.warn?.(`Failed to show ${roleLabel} load error page`, error);
+      }).finally(allowWindowToShow);
+    };
+
+    const startLoadTimeout = () => {
+      clearLoadTimeout();
+      loadTimeout = setTimeout(() => {
+        markWindowLoadFailed('The public page did not finish loading in time.', targetUrl || url);
+      }, 55000);
+    };
+
+    const loadPublicUrl = () => {
+      if (win.isDestroyed()) return;
+      startLoadTimeout();
+    win.loadURL(url).catch((error) => {
+        markWindowLoadFailed(error?.message || 'Failed to start public display load.', targetUrl || url);
+      });
+    };
+
+    win.webContents.on('did-finish-load', () => {
+      if (win.isDestroyed() || win.__kurashPublicTargetLoaded) return;
+      const loadedUrl = win.webContents.getURL();
+      if (isSamePublicTargetUrl(loadedUrl, targetUrl)) {
+        markPublicTargetLoaded();
+      }
+    });
+
+    win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === -3) return;
+      markWindowLoadFailed(
+        errorDescription || `Load failed with code ${errorCode}.`,
+        validatedURL || targetUrl || url
+      );
+    });
 
     win.setMenu(null);
-    win.loadURL(url);
+    loadPublicUrl();
     win.on('closed', () => {
+      clearLoadTimeout();
+      this.closePublicLoadingWindow(win);
       const trackedWindow = targetMap.get(normalizedId);
       if (trackedWindow && trackedWindow !== win) return;
       targetMap.delete(normalizedId);
@@ -622,6 +780,15 @@ class WindowManager extends EventEmitter {
     };
   }
 
+  closePublicLoadingWindow(win) {
+    const loadingWindow = win && win.__kurashLoadingWindow;
+    if (!loadingWindow) return;
+    win.__kurashLoadingWindow = null;
+    if (!loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+  }
+
   applyWindowBounds(win, bounds, { alwaysOnTop, show = true }) {
     if (!win || win.isDestroyed()) return false;
     if (win.isMinimized()) win.restore();
@@ -630,7 +797,16 @@ class WindowManager extends EventEmitter {
     if (show && !win.isVisible()) {
       if (win.__kurashCanShow === false) {
         win.__kurashPendingShow = true;
+        const loadingWindow = win.__kurashLoadingWindow;
+        if (loadingWindow && !loadingWindow.isDestroyed()) {
+          loadingWindow.setAlwaysOnTop(alwaysOnTop, alwaysOnTop ? 'screen-saver' : 'normal');
+          loadingWindow.setBounds(bounds, false);
+          if (!loadingWindow.isVisible()) {
+            loadingWindow.show();
+          }
+        }
       } else {
+        this.closePublicLoadingWindow(win);
         win.show();
       }
     }
@@ -865,6 +1041,11 @@ class WindowManager extends EventEmitter {
     const nextMode = mode === 'broadcast' ? 'broadcast' : 'single';
     this.scoreboardOutputMode = nextMode;
     this.selectedScoreboardDisplayIds = this.sanitizeSelectedDisplayIds(this.selectedScoreboardDisplayIds, nextMode);
+    this.selectedRingMatchOrderDisplayIds = this.sanitizeSelectedDisplayIdsForRole(
+      'ring_match_order',
+      this.selectedRingMatchOrderDisplayIds,
+      nextMode
+    );
     if (!this.preferredPrimaryScoreboardDisplayId && this.selectedScoreboardDisplayIds.length > 0) {
       this.preferredPrimaryScoreboardDisplayId = this.selectedScoreboardDisplayIds[0];
     }
@@ -874,8 +1055,8 @@ class WindowManager extends EventEmitter {
     this.statusNotice = this.createNotice(
       'info',
       nextMode === 'broadcast'
-        ? 'Broadcast to Multiple Screens is ready.'
-        : 'Single Screen mode is ready.'
+        ? 'Multiple Screens mode is ready for public displays.'
+        : 'Single Screen mode is ready for public displays.'
     );
     return this.emitStateChange(`set-output-mode:${nextMode}`);
   }
@@ -940,6 +1121,7 @@ class WindowManager extends EventEmitter {
     if (role === 'scoreboard') return this.selectAllExternalDisplays();
 
     const externalIds = this.displayManager.getSecondaryDisplays().map((display) => normalizeDisplayId(display.id));
+    this.scoreboardOutputMode = 'broadcast';
     this.selectedRingMatchOrderDisplayIds = this.sanitizeSelectedDisplayIdsForRole(role, externalIds);
     this.pruneRuntimeTracking();
     this.updateSessionStateFromOutputs();

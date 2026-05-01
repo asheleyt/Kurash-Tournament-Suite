@@ -178,8 +178,6 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { availableFlags } from '@/Constants/countries'
-import { iso2ToThreeLetterCode } from '@/Constants/iocLookup'
 import {
   getRingMatchOrderProjectionStorageKey,
   RING_MATCH_ORDER_CURRENT_META_STORAGE_KEY,
@@ -189,6 +187,8 @@ import {
   readRingMatchOrderProjectionMeta,
   readRingMatchOrderProjectionRecord,
 } from '@/composables/useRingMatchOrderProjection'
+import { availableFlags } from '@/Constants/countries'
+import { iso2ToThreeLetterCode } from '@/Constants/iocLookup'
 import { resolveFlagAsset } from '@/utils/flagAssets'
 
 type ProjectionCard = Record<string, unknown>

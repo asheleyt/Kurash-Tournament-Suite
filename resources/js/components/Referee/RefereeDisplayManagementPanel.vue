@@ -34,28 +34,28 @@
             <div>
               <div class="flex flex-wrap items-center gap-2">
                 <span class="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">Step 1</span>
-                <div class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Output Mode</div>
+                <div class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Public Output Mode</div>
               </div>
-              <div class="mt-2 text-sm text-slate-400">Choose how the scoreboard should be shown before selecting screens.</div>
+              <div class="mt-2 text-sm text-slate-400">Choose how Scoreboard and Gilam Match Order should use public screens.</div>
             </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:min-w-lg">
               <button
                 @click="actions.setScoreboardOutputMode('single')"
-                :disabled="model.displayActionPending || model.isScoreboardLive || model.isDisplayTestActive"
+                :disabled="model.displayActionPending || model.isScoreboardLive || model.isDisplayTestActive || model.isRingMatchOrderLive || model.isRingMatchOrderPreviewActive"
                 class="rounded-3xl border px-5 py-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                 :class="!model.isBroadcastMode ? 'border-blue-500/40 bg-blue-500/10 text-white shadow-[0_18px_45px_-30px_rgba(37,99,235,0.95)]' : 'border-white/8 bg-white/3 text-slate-300 hover:bg-white/5'"
               >
                 <div class="text-sm font-black uppercase tracking-[0.18em]">Single Screen</div>
-                <div class="mt-1 text-xs text-slate-400">Show the scoreboard on one selected screen.</div>
+                <div class="mt-1 text-xs text-slate-400">Limit each public role to one selected screen.</div>
               </button>
               <button
                 @click="actions.setScoreboardOutputMode('broadcast')"
-                :disabled="model.displayActionPending || model.isScoreboardLive || model.isDisplayTestActive"
+                :disabled="model.displayActionPending || model.isScoreboardLive || model.isDisplayTestActive || model.isRingMatchOrderLive || model.isRingMatchOrderPreviewActive"
                 class="rounded-3xl border px-5 py-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                 :class="model.isBroadcastMode ? 'border-blue-500/40 bg-blue-500/10 text-white shadow-[0_18px_45px_-30px_rgba(37,99,235,0.95)]' : 'border-white/8 bg-white/3 text-slate-300 hover:bg-white/5'"
               >
                 <div class="text-sm font-black uppercase tracking-[0.18em]">Multiple Screens</div>
-                <div class="mt-1 text-xs text-slate-400">Show the same live scoreboard on several selected screens.</div>
+                <div class="mt-1 text-xs text-slate-400">Allow each public role on several selected screens.</div>
               </button>
             </div>
           </div>
@@ -497,7 +497,7 @@
                   v-if="model.requiresRingMatchOrderDisplaySelection"
                   class="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100"
                 >
-                  Choose Screen(s)
+                  {{ model.isBroadcastMode ? 'Choose Screens' : 'Choose a Screen' }}
                 </span>
               </div>
               <h4 class="mt-2 text-lg font-black uppercase tracking-[0.16em] text-white">Gilam Match Order</h4>
@@ -564,7 +564,7 @@
                     </div>
                   </div>
                   <div v-if="model.requiresRingMatchOrderDisplaySelection" class="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-100">
-                    Choose Screen(s)
+                    {{ model.isBroadcastMode ? 'Choose Screens' : 'Choose a Screen' }}
                   </div>
                 </div>
                 <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -641,11 +641,12 @@
                     <span class="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">Gilam Screens</span>
                     <div class="text-sm font-black uppercase tracking-[0.18em] text-white">Available Screens</div>
                   </div>
-                  <div class="mt-1 text-xs text-slate-400">Choose the screens that should show this controller's Gilam Match Order feed.</div>
-                  <div class="mt-2 text-xs text-slate-500">One projection payload fans out to every selected screen.</div>
+                  <div class="mt-1 text-xs text-slate-400">{{ model.isBroadcastMode ? "Choose the screens that should show this controller's Gilam Match Order feed." : "Choose the screen that should show this controller's Gilam Match Order feed." }}</div>
+                  <div class="mt-2 text-xs text-slate-500">{{ model.isBroadcastMode ? 'One projection payload fans out to every selected screen.' : 'Single Screen mode keeps this role to one selected display.' }}</div>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button
+                    v-if="model.isBroadcastMode"
                     @click="actions.selectAllRingMatchOrderDisplayTargets()"
                     :disabled="model.displayActionPending || model.isRingMatchOrderLive || model.isRingMatchOrderPreviewActive"
                     class="rounded-2xl border border-white/10 bg-black/20 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"

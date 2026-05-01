@@ -49,6 +49,36 @@ class ControllerDeviceProxyController extends Controller
         );
     }
 
+    public function queue(Request $request)
+    {
+        return $this->forwardProxyResponse(
+            $this->proxyService->queue(
+                $this->forwardedHeaders($request),
+                $this->forwardedQuery($request)
+            )
+        );
+    }
+
+    public function displayBatch(Request $request)
+    {
+        return $this->forwardProxyResponse(
+            $this->proxyService->displayBatch(
+                $this->forwardedHeaders($request),
+                $this->forwardedQueryWithLimit($request)
+            )
+        );
+    }
+
+    public function queueDiagnostics(Request $request)
+    {
+        return $this->forwardProxyResponse(
+            $this->proxyService->queueDiagnostics(
+                $this->forwardedHeaders($request),
+                $this->forwardedQueryWithLimit($request)
+            )
+        );
+    }
+
     protected function forwardedHeaders(Request $request): array
     {
         $adminBase = trim((string) $request->query('admin_base', $request->input('admin_base', '')));
@@ -67,6 +97,17 @@ class ControllerDeviceProxyController extends Controller
         return array_filter([
             'device_id' => $deviceId,
         ], static fn ($value) => $value !== null && trim((string) $value) !== '');
+    }
+
+    protected function forwardedQueryWithLimit(Request $request): array
+    {
+        $query = $this->forwardedQuery($request);
+        $limit = $request->query('limit');
+        if ($limit !== null && trim((string) $limit) !== '') {
+            $query['limit'] = (int) $limit;
+        }
+
+        return $query;
     }
 
     protected function extractForwardedDeviceId(Request $request): ?string

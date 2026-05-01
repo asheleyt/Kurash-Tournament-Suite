@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 function inlineVueScriptSetupSrc() {
     return {
@@ -76,4 +76,8 @@ export default defineConfig({
             },
         }),
     ],
+    test: {
+        environment: 'node',
+        include: ['resources/js/**/*.test.ts'],
+    },
 });

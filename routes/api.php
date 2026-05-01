@@ -10,6 +10,9 @@ Route::get('/status', [TournamentController::class, 'status']);
 Route::post('/controller/pair', [ControllerDeviceProxyController::class, 'pair']);
 Route::post('/controller/heartbeat', [ControllerDeviceProxyController::class, 'heartbeat']);
 Route::get('/controller/assigned-setup', [ControllerDeviceProxyController::class, 'assignedSetup']);
+Route::get('/controller/queue', [ControllerDeviceProxyController::class, 'queue']);
+Route::get('/controller/display-batch', [ControllerDeviceProxyController::class, 'displayBatch']);
+Route::get('/controller/queue-diagnostics', [ControllerDeviceProxyController::class, 'queueDiagnostics']);
 
 /*
  * Scoreboard / referee JSON API (api middleware: no CSRF, JSON-friendly errors).

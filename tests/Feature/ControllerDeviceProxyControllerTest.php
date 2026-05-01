@@ -209,7 +209,7 @@ class ControllerDeviceProxyControllerTest extends TestCase
     public function test_assigned_setup_passthroughs_the_current_assignment(): void
     {
         Http::fake([
-            'http://admin.test/api/controller/assigned-setup' => Http::response([
+            'http://admin.test/api/controller/assigned-setup?device_id=device-1' => Http::response([
                 'success' => true,
                 'data' => [
                     'controller_id' => 123,
@@ -244,7 +244,7 @@ class ControllerDeviceProxyControllerTest extends TestCase
     public function test_assigned_setup_allows_null_assignments(): void
     {
         Http::fake([
-            'http://admin.test/api/controller/assigned-setup' => Http::response([
+            'http://admin.test/api/controller/assigned-setup?device_id=device-1' => Http::response([
                 'success' => true,
                 'data' => [
                     'controller_id' => 123,
@@ -269,7 +269,7 @@ class ControllerDeviceProxyControllerTest extends TestCase
     public function test_assigned_setup_snapshot_required_passthroughs_the_admin_error(): void
     {
         Http::fake([
-            'http://admin.test/api/controller/assigned-setup' => Http::response([
+            'http://admin.test/api/controller/assigned-setup?device_id=device-1' => Http::response([
                 'success' => false,
                 'error' => 'snapshot_required',
                 'message' => 'An active event snapshot is required.',
@@ -286,6 +286,94 @@ class ControllerDeviceProxyControllerTest extends TestCase
 
         $response->assertStatus(412)
             ->assertJsonPath('error', 'snapshot_required');
+    }
+
+    public function test_controller_queue_passthroughs_authenticated_assigned_queue(): void
+    {
+        Http::fake([
+            'http://admin.test/api/controller/queue?device_id=device-1' => Http::response([
+                'success' => true,
+                'assignment' => [
+                    'snapshot_id' => 10,
+                    'tournament_id' => 77,
+                    'ring_number' => 2,
+                    'assigned_setup_updated_at' => '2026-04-04T12:36:10+00:00',
+                    'source' => 'controller_assignment',
+                ],
+                'items' => [
+                    ['match_id' => 201, 'ring_number' => 2],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this
+            ->withHeaders([
+                'Authorization' => 'Bearer known-token',
+                'X-Controller-Device-Id' => 'device-1',
+            ])
+            ->getJson('/api/controller/queue?admin_base=http://admin.test/api');
+
+        $response->assertOk()
+            ->assertJsonPath('assignment.ring_number', 2)
+            ->assertJsonPath('items.0.match_id', 201);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'http://admin.test/api/controller/queue?device_id=device-1'
+                && $request->hasHeader('Authorization', 'Bearer known-token')
+                && $request->hasHeader('X-Controller-Device-Id', 'device-1');
+        });
+    }
+
+    public function test_controller_display_batch_forwards_limit_and_assignment_auth(): void
+    {
+        Http::fake([
+            'http://admin.test/api/controller/display-batch?device_id=device-1&limit=5' => Http::response([
+                'success' => true,
+                'assignment' => [
+                    'snapshot_id' => 10,
+                    'tournament_id' => 77,
+                    'ring_number' => 1,
+                    'assigned_setup_updated_at' => '2026-04-04T12:36:10+00:00',
+                    'source' => 'controller_assignment',
+                ],
+                'items' => [
+                    ['match_id' => 156, 'ring_number' => 1],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this
+            ->withHeaders([
+                'Authorization' => 'Bearer known-token',
+                'X-Controller-Device-Id' => 'device-1',
+            ])
+            ->getJson('/api/controller/display-batch?admin_base=http://admin.test/api&limit=5');
+
+        $response->assertOk()
+            ->assertJsonPath('assignment.ring_number', 1)
+            ->assertJsonPath('items.0.match_id', 156);
+    }
+
+    public function test_controller_queue_assignment_required_passthroughs_admin_conflict(): void
+    {
+        Http::fake([
+            'http://admin.test/api/controller/queue?device_id=device-1' => Http::response([
+                'success' => false,
+                'error' => 'controller_assignment_required',
+                'message' => 'Waiting for Event Host assignment.',
+                'details' => null,
+            ], 409),
+        ]);
+
+        $response = $this
+            ->withHeaders([
+                'Authorization' => 'Bearer known-token',
+                'X-Controller-Device-Id' => 'device-1',
+            ])
+            ->getJson('/api/controller/queue?admin_base=http://admin.test/api');
+
+        $response->assertStatus(409)
+            ->assertJsonPath('error', 'controller_assignment_required');
     }
 
     public function test_controller_proxy_returns_a_local_transport_error_when_admin_host_is_unreachable(): void

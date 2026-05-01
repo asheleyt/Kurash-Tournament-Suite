@@ -766,6 +766,8 @@ class TournamentController extends Controller
                 'player_one_name',
                 'player_two_name',
                 'weight_category',
+                'local_only',
+                'sync_mode',
             ]),
         ]);
 
@@ -808,6 +810,8 @@ class TournamentController extends Controller
                     'player_one_name',
                     'player_two_name',
                     'weight_category',
+                    'local_only',
+                    'sync_mode',
                 ]),
             ]);
             throw $e;
@@ -846,6 +850,27 @@ class TournamentController extends Controller
             DB::rollBack();
             Log::error("Failed to record result for match {$id}: " . $e->getMessage());
             return response()->json(['message' => 'Failed to record result locally.'], 500);
+        }
+
+        $localOnly = $request->boolean('local_only') || strtolower(trim((string) $request->input('sync_mode', ''))) === 'local_only';
+        if ($localOnly) {
+            Log::info('[result-sync] controller.relay.local_only', [
+                'trace_id' => $traceId !== '' ? $traceId : null,
+                'route_match_id' => $id,
+                'local_match_id' => $match->id,
+                'remote_match_id' => $match->remote_id,
+                'admin_base' => $adminBase !== '' ? $adminBase : null,
+                'runtime' => $this->syncService->resultSyncRuntimeIdentity(),
+            ]);
+
+            return response()->json([
+                'match' => $match,
+                'sync_status' => 'local_only',
+                'message' => 'Result saved locally. Admin sync queued on controller.',
+                'sync_failure_class' => null,
+                'reject_reason' => null,
+                'result_trace_id' => null,
+            ]);
         }
 
         $shouldAttemptSync = env('KURASH_SYNC_ENABLED', false) || $adminBase !== '';

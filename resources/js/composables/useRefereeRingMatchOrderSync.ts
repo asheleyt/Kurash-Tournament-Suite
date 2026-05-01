@@ -19,6 +19,7 @@ interface UseRefereeRingMatchOrderSyncOptions {
   localApiUrl: (path: string) => URL
   attachAdminBase: (url: URL) => void
   headers: (withJson?: boolean) => Record<string, string>
+  controllerHeaders: (withJson?: boolean) => Record<string, string>
   reportFetchFailure: (
     contextLabel: string,
     requestUrl: string,
@@ -31,6 +32,8 @@ interface UseRefereeRingMatchOrderSyncOptions {
   getRingMatchOrderProjectionKey: () => string
   getSelectedTournamentId: () => number | null
   getSelectedRing: () => string
+  hasKnownDeviceCredentials: () => boolean
+  hasAssignedSetup: () => boolean
   isRingMatchOrderLive: () => boolean
   canLoadMatch: (item: any) => boolean
 }
@@ -238,11 +241,17 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
     const ringText = (ring || '').toString().trim()
     if (!ringText) throw new Error('Gilam is required')
 
-    const url = options.localApiUrl(`/tournaments/${id}/rings/${ringText}/display-batch`)
+    const useControllerAssignment =
+      options.hasKnownDeviceCredentials() && options.hasAssignedSetup()
+    const url = useControllerAssignment
+      ? options.localApiUrl('/controller/display-batch')
+      : options.localApiUrl(`/tournaments/${id}/rings/${ringText}/display-batch`)
     options.attachAdminBase(url)
     url.searchParams.set('limit', '5')
 
-    const res = await fetch(url.toString(), { headers: options.headers() })
+    const res = await fetch(url.toString(), {
+      headers: useControllerAssignment ? options.controllerHeaders() : options.headers(),
+    })
     const body = await res.text()
     if (!res.ok) {
       options.reportFetchFailure('Gilam Match Order', url.toString(), res.status, body, { notify: true })

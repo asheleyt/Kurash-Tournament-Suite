@@ -378,12 +378,9 @@
                                         />
 
                                         <div
+                                            v-if="!isAdminRecoveryLocked"
                                             ref="syncSetupCard"
-                                            :class="
-                                                isAdminRecoveryLocked
-                                                    ? 'rounded-3xl border border-white/10 bg-black/20 p-5 opacity-75 shadow-xl shadow-black/10'
-                                                    : 'rounded-3xl border border-white/10 bg-black/30 p-5 shadow-xl shadow-black/10'
-                                            "
+                                            class="rounded-3xl border border-white/10 bg-black/30 p-5 shadow-xl shadow-black/10"
                                         >
                                             <RefereeFallbackRecoveryPanel
                                                 :model="

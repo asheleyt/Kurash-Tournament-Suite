@@ -91,6 +91,7 @@ interface UseRefereeQueueSyncOptions {
   localApiUrl: (path: string) => URL
   attachAdminBase: (url: URL) => void
   headers: (withJson?: boolean) => Record<string, string>
+  controllerHeaders: (withJson?: boolean) => Record<string, string>
   reportFetchFailure: (
     contextLabel: string,
     requestUrl: string,
@@ -192,6 +193,62 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
 
   function normalizeQueueFingerprintText(value: unknown) {
     return value == null ? '' : String(value).trim()
+  }
+
+  function shouldUseControllerAssignedQueue() {
+    return options.hasKnownDeviceCredentials.value && options.syncHasServer.value
+  }
+
+  function getPayloadAssignment(payload: Record<string, unknown> | null | undefined) {
+    const candidate = payload?.assignment
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null
+    const source = candidate as Record<string, unknown>
+    const tournamentIdRaw = source.tournament_id ?? source.tournamentId ?? null
+    const ringRaw = source.ring_number ?? source.ringNumber ?? null
+    const snapshotIdRaw = source.snapshot_id ?? source.snapshotId ?? null
+    const tournamentNumber = Number(tournamentIdRaw)
+
+    return {
+      snapshotId: snapshotIdRaw == null || snapshotIdRaw === '' ? null : snapshotIdRaw,
+      tournamentId: Number.isFinite(tournamentNumber) ? Math.trunc(tournamentNumber) : null,
+      ring: ringRaw == null ? '' : String(ringRaw).trim(),
+      assignedSetupUpdatedAt:
+        typeof source.assigned_setup_updated_at === 'string'
+          ? source.assigned_setup_updated_at
+          : (typeof source.assignedSetupUpdatedAt === 'string' ? source.assignedSetupUpdatedAt : null),
+      source: typeof source.source === 'string' ? source.source : null,
+    }
+  }
+
+  function applyPayloadAssignment(payload: Record<string, unknown>) {
+    const assignment = getPayloadAssignment(payload)
+    if (!assignment) return null
+
+    if (assignment.tournamentId != null && options.selectedTournamentId.value !== assignment.tournamentId) {
+      options.selectedTournamentId.value = assignment.tournamentId
+    }
+    if (assignment.ring && options.selectedRing.value !== assignment.ring) {
+      options.selectedRing.value = assignment.ring
+    }
+
+    return assignment
+  }
+
+  function getControllerAssignmentError(body: string): string {
+    try {
+      const json = JSON.parse(body)
+      const error = typeof json?.error === 'string' ? json.error : ''
+      return error.trim()
+    } catch {
+      return ''
+    }
+  }
+
+  function isControllerAssignmentBlockingError(status: number, body: string) {
+    if (status !== 409) return false
+    return ['controller_assignment_required', 'controller_assignment_stale'].includes(
+      getControllerAssignmentError(body),
+    )
   }
 
   function buildQueueSampleHash(items: any[]) {
@@ -520,6 +577,17 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
 
     const selectedRingText = (optionsForSnapshot.selectedRingText ?? options.selectedRing.value ?? '').toString().trim()
     const sourceMode = optionsForSnapshot.sourceMode ?? options.queueSourceMode.value ?? 'legacy_adapter'
+    if (sourceMode === 'queue_api') {
+      return Array.from(entries.values())
+        .sort((left, right) => {
+          const leftOrder = getCacheQueueOrderValue(left.row, left.index)
+          const rightOrder = getCacheQueueOrderValue(right.row, right.index)
+          if (leftOrder !== rightOrder) return leftOrder - rightOrder
+          return left.index - right.index
+        })
+        .map((entry) => entry.row)
+    }
+
     const allRows = Array.isArray(options.allMatchesList.value) ? options.allMatchesList.value : []
     if (allRows.length > 0) {
       const ringRows = selectedRingText
@@ -755,14 +823,24 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     const ringText = (ring || '').toString().trim()
     if (!ringText) throw new Error('Gilam is required')
 
-    const url = options.localApiUrl(`/tournaments/${id}/rings/${ringText}/queue`)
+    const useControllerAssignment = shouldUseControllerAssignedQueue()
+    const url = useControllerAssignment
+      ? options.localApiUrl('/controller/queue')
+      : options.localApiUrl(`/tournaments/${id}/rings/${ringText}/queue`)
     options.attachAdminBase(url)
 
-    const res = await fetch(url.toString(), { headers: options.headers() })
+    const res = await fetch(url.toString(), {
+      headers: useControllerAssignment ? options.controllerHeaders() : options.headers(),
+    })
     const body = await res.text()
     if (!res.ok) {
-      options.reportFetchFailure('Ring queue', url.toString(), res.status, body, { notify: true })
-      throw new Error(`Queue failed: ${res.status}. ${options.safeApiErrorMessage(res.status, body)}`)
+      const contextLabel = useControllerAssignment ? 'Controller assigned queue' : 'Ring queue'
+      options.reportFetchFailure(contextLabel, url.toString(), res.status, body, { notify: true })
+      const error = new Error(`Queue failed: ${res.status}. ${options.safeApiErrorMessage(res.status, body)}`) as Error & {
+        controllerAssignmentBlocked?: boolean
+      }
+      error.controllerAssignmentBlocked = useControllerAssignment && isControllerAssignmentBlockingError(res.status, body)
+      throw error
     }
 
     let json: Record<string, unknown>
@@ -790,6 +868,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     const upstreamGeneratedAt = typeof payload?.generated_at === 'string' ? payload.generated_at : null
     const rawItems = Array.isArray(payload?.items) ? payload.items : null
     if (!rawItems) throw new Error('Queue payload missing items[]')
+    const assignment = applyPayloadAssignment(payload)
     restoreResultOverridesForSelection()
 
     try {
@@ -856,16 +935,12 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     } catch {}
 
     const items = rawItems.filter((item) => item && typeof item === 'object')
-    const selectedRingText = (options.selectedRing.value || '').toString().trim()
+    const selectedRingText = (assignment?.ring || options.selectedRing.value || '').toString().trim()
     let filtered = items
     let hasRingMismatch = false
 
     if (selectedRingText) {
-      const ringTextOf = (match: any) => {
-        const ringValue = match?.ring_number ?? match?.ringNumber ?? match?.ring_no ?? match?.ringNo ?? null
-        if (ringValue == null) return ''
-        return String(ringValue).trim()
-      }
+      const ringTextOf = (match: any) => (options.getMatchRingText(match) || '').toString().trim()
 
       const mismatched = items.filter((match: any) => {
         const ringValue = ringTextOf(match)
@@ -873,7 +948,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
       })
       hasRingMismatch = mismatched.length > 0
       if (mismatched.length) {
-        console.warn('Admin queue payload contains items assigned to another ring (controller will filter by ring_number):', {
+        console.warn('Admin queue payload contains items assigned to another ring (controller will filter by ring assignment fields):', {
           selected_ring: selectedRingText,
           mismatched_count: mismatched.length,
           sample: mismatched.slice(0, 3),
@@ -1341,6 +1416,20 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
           return
         } catch (queueError) {
           queuePerfSummary.fetchDurationMs = nowPerfMs() - queueFetchStartedAt
+          if (shouldUseControllerAssignedQueue()) {
+            queuePerfSummary.skip = 'error'
+            options.matchesList.value = []
+            options.queueSourceMode.value = null
+            options.queueIsDegraded.value = true
+            options.queueDegradedReason.value =
+              (queueError as any)?.controllerAssignmentBlocked
+                ? 'controller_assignment_unavailable'
+                : 'controller_assigned_queue_failed'
+            options.nextUpcomingMatchId.value = null
+            markLiveSnapshotRecoveryPending()
+            console.warn('GET controller assigned queue failed; not falling back to a locally selected ring', queueError)
+            return
+          }
           queuePerfSummary.skip = 'legacy_fallback'
           console.warn('GET ring queue failed; falling back to legacy adapter', queueError)
         }

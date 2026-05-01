@@ -851,12 +851,13 @@ async function createWindows(baseUrl, attemptId) {
   registerControllerAuthIpc();
 
   const controllerUrl = `${String(baseUrl).replace(/\/+$/, '')}/refereeController`;
-  const scoreboardSplashUrl = buildFileUrl('splash.html', { url: `${String(baseUrl).replace(/\/+$/, '')}/kurashScoreBoard` });
-  const ringMatchOrderSplashUrl = buildFileUrl('splash.html', { url: `${String(baseUrl).replace(/\/+$/, '')}/ringMatchOrder` });
+  const publicBaseUrl = String(baseUrl).replace(/\/+$/, '');
+  const scoreboardUrl = `${publicBaseUrl}/kurashScoreBoard`;
+  const ringMatchOrderUrl = `${publicBaseUrl}/ringMatchOrder`;
 
   controllerWindow = windowManager.createControllerWindow(controllerUrl);
-  windowManager.createScoreboardWindow(scoreboardSplashUrl);
-  windowManager.createRingMatchOrderWindow(ringMatchOrderSplashUrl);
+  windowManager.createScoreboardWindow(scoreboardUrl);
+  windowManager.createRingMatchOrderWindow(ringMatchOrderUrl);
   windowManager.registerDisplayListeners();
 
   const activeControllerWindow = controllerWindow;

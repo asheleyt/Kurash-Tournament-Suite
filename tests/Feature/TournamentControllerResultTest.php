@@ -105,6 +105,31 @@ class TournamentControllerResultTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_post_result_local_only_saves_without_calling_admin(): void
+    {
+        Http::fake();
+
+        $match = $this->makeSyncableMatch();
+
+        $response = $this->postJson('/api/matches/1001/result?admin_base=http://admin.test/api&local_only=1', [
+            'winner_id' => 501,
+            'winner_side' => 'player1',
+            'red_score' => 10,
+            'blue_score' => 0,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('sync_status', 'local_only')
+            ->assertJsonPath('message', 'Result saved locally. Admin sync queued on controller.');
+
+        $match->refresh();
+        $this->assertSame('completed', $match->status);
+        $this->assertSame('player1', $match->winner);
+        $this->assertFalse((bool) $match->is_synced);
+
+        Http::assertNothingSent();
+    }
+
     public function test_post_result_with_admin_base_rejects_html_success_responses_as_unexpected(): void
     {
         Http::fake([

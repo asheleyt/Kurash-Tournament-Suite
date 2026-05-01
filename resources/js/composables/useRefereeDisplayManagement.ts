@@ -211,7 +211,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     controllerDisplaySelected.value && !controllerOutputConfirmed.value
   )
   const selectedOutputPerformanceWarning = computed(() =>
-    isBroadcastMode.value && selectedScoreboardDisplayIds.value.length > 4
+    isBroadcastMode.value && (selectedScoreboardDisplayIds.value.length + selectedRingMatchOrderDisplayIds.value.length) > 4
   )
   const missingSelectedDisplayEntries = computed(() =>
     missingSelectedDisplayIds.value.map((displayId) => ({
@@ -392,13 +392,19 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     return 'The selected screens will receive the same live scoreboard.'
   })
   const selectedRingMatchOrderDisplayLabel = computed(() => {
-    if (!selectedRingMatchOrderDisplayIds.value.length) return 'Choose Screen(s)'
+    if (!selectedRingMatchOrderDisplayIds.value.length) return isBroadcastMode.value ? 'Choose Screens' : 'Choose a Screen'
+    if (!isBroadcastMode.value) {
+      return selectedRingMatchOrderDisplays.value[0]?.label
+        || `Display ${selectedRingMatchOrderDisplayIds.value[0]}`
+    }
     if (selectedRingMatchOrderDisplays.value.length === 1) return selectedRingMatchOrderDisplays.value[0].label
     return 'Multiple screens selected'
   })
   const selectedRingMatchOrderDisplayDescription = computed(() => {
     if (!selectedRingMatchOrderDisplayIds.value.length) {
-      return 'Choose the screen or screens that should show the Gilam Match Order feed.'
+      return isBroadcastMode.value
+        ? 'Choose the screens that should show the Gilam Match Order feed.'
+        : 'Choose the screen that should show the Gilam Match Order feed.'
     }
     if (missingRingMatchOrderDisplayIds.value.length > 0) {
       return 'Some saved Gilam Match Order selections are unavailable right now.'
@@ -596,7 +602,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
 
     await runDisplayAction(
       () => bridge.setOutputMode(mode),
-      'Failed to change the scoreboard output mode.',
+      'Failed to change the public output mode.',
     )
   }
 
@@ -737,9 +743,11 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function toggleRingMatchOrderTarget(displayId: string) {
-    const nextSelection = selectedRingMatchOrderDisplayIds.value.includes(displayId)
-      ? selectedRingMatchOrderDisplayIds.value.filter((id) => id !== displayId)
-      : [...selectedRingMatchOrderDisplayIds.value, displayId]
+    const nextSelection = isBroadcastMode.value
+      ? (selectedRingMatchOrderDisplayIds.value.includes(displayId)
+        ? selectedRingMatchOrderDisplayIds.value.filter((id) => id !== displayId)
+        : [...selectedRingMatchOrderDisplayIds.value, displayId])
+      : [displayId]
 
     await syncSelectedDisplayTargetsForRole('ring_match_order', nextSelection)
   }
@@ -767,7 +775,9 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
 
   async function previewSelectedRingMatchOrderDisplays() {
     if (!selectedRingMatchOrderDisplayIds.value.length) {
-      const message = 'Choose one or more Gilam Match Order screens first.'
+      const message = isBroadcastMode.value
+        ? 'Choose one or more Gilam Match Order screens first.'
+        : 'Choose a Gilam Match Order screen first.'
       displayErrorMessage.value = message
       options.showBanner(message, 'error', 3500)
       return
@@ -781,7 +791,9 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
 
   async function launchSelectedRingMatchOrderDisplays() {
     if (!selectedRingMatchOrderDisplayIds.value.length) {
-      const message = 'Choose one or more Gilam Match Order screens first.'
+      const message = isBroadcastMode.value
+        ? 'Choose one or more Gilam Match Order screens first.'
+        : 'Choose a Gilam Match Order screen first.'
       displayErrorMessage.value = message
       options.showBanner(message, 'error', 3500)
       return
