@@ -27,6 +27,12 @@ yarn-error.log
 /.vscode
 /.zed
 
+# Local deployment metadata
+/.vercel/
+
+# Local npm cache/logs
+/.npm-cache/
+
 node_modules/
 electron-app/dist/
 electron-app/build-output/
