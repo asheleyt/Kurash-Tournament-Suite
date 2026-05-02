@@ -78,15 +78,16 @@
                       <div class="ring-order-flag-stack">
                         <div class="ring-order-flag-box" :class="getFlagBoxClass('left')">
                           <img
-                            v-if="card.leftFlagSrc"
-                            :src="card.leftFlagSrc"
-                            :srcset="card.leftFlagSrcset || undefined"
+                            v-if="getBrandImageSrc(card, 'left')"
+                            :src="getBrandImageSrc(card, 'left')"
+                            :srcset="getBrandImageSrcset(card, 'left') || undefined"
                             :alt="`${card.leftCode} flag`"
                             class="ring-order-flag-image"
                             loading="lazy"
                             decoding="async"
+                            @error="handleBrandImageError(card, 'left')"
                           />
-                          <span v-else>Flag</span>
+                          <span v-else>{{ getBrandImageFallbackLabel(card.leftCode) }}</span>
                         </div>
                         <span class="ring-order-code-chip" :class="getCodeChipClass('left')">
                           {{ card.leftCode }}
@@ -141,15 +142,16 @@
                       <div class="ring-order-flag-stack">
                         <div class="ring-order-flag-box" :class="getFlagBoxClass('right')">
                           <img
-                            v-if="card.rightFlagSrc"
-                            :src="card.rightFlagSrc"
-                            :srcset="card.rightFlagSrcset || undefined"
+                            v-if="getBrandImageSrc(card, 'right')"
+                            :src="getBrandImageSrc(card, 'right')"
+                            :srcset="getBrandImageSrcset(card, 'right') || undefined"
                             :alt="`${card.rightCode} flag`"
                             class="ring-order-flag-image"
                             loading="lazy"
                             decoding="async"
+                            @error="handleBrandImageError(card, 'right')"
                           />
-                          <span v-else>Flag</span>
+                          <span v-else>{{ getBrandImageFallbackLabel(card.rightCode) }}</span>
                         </div>
                         <span class="ring-order-code-chip" :class="getCodeChipClass('right')">
                           {{ card.rightCode }}
@@ -192,6 +194,7 @@ import { iso2ToThreeLetterCode } from '@/Constants/iocLookup'
 import { resolveFlagAsset } from '@/utils/flagAssets'
 
 type ProjectionCard = Record<string, unknown>
+type BrandImageSide = 'left' | 'right'
 
 type BoardCard = {
   boardKey: string
@@ -225,6 +228,7 @@ const currentMeta = ref<RingMatchOrderProjectionMeta | null>(readInitialMeta())
 const projectionRecord = ref<RingMatchOrderProjectionRecord | null>(readInitialRecord())
 const renderedBoardCards = ref<BoardCard[]>([])
 const pendingTargetBoard = ref<BoardCard[] | null>(null)
+const failedBrandImageKeys = ref<Record<string, true>>({})
 const transitionPhase = ref<'idle' | 'holding' | 'advancing'>('idle')
 const completedCardSourceKey = ref<string | null>(null)
 const prefersReducedMotion = ref(false)
@@ -233,6 +237,21 @@ let completionHoldTimerId: number | null = null
 let advanceSettleTimerId: number | null = null
 let reducedMotionQuery: MediaQueryList | null = null
 let reducedMotionListener: ((event: MediaQueryListEvent) => void) | null = null
+
+const threeLetterFlagCodeMap = Object.keys(availableFlags).reduce<Record<string, string>>((map, code) => {
+  const normalized = code.toUpperCase()
+  if (normalized !== code) return map
+
+  const threeLetterCode = iso2ToThreeLetterCode(normalized)
+  if (threeLetterCode && !map[threeLetterCode]) {
+    map[threeLetterCode] = normalized
+  }
+
+  return map
+}, {})
+
+const IMAGE_ASSET_EXTENSION_PATTERN = /\.(?:avif|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i
+const IMAGE_ASSET_PATH_PATTERN = /^\/?(?:images|player-logos|storage|team-logos)\//i
 
 function readInitialMeta() {
   if (cacheKeyFromUrl) {
@@ -379,7 +398,8 @@ function resolveParticipantFlag(countryCode: unknown) {
   const code = toUpperAlphaNumeric(countryCode)
   if (!code) return { src: '', srcset: '' }
 
-  const file = availableFlags[code]
+  const flagCode = availableFlags[code] ? code : threeLetterFlagCodeMap[code]
+  const file = flagCode ? availableFlags[flagCode] : ''
   if (!file) return { src: '', srcset: '' }
 
   const asset = resolveFlagAsset(file)
@@ -410,19 +430,53 @@ function resolveEmbeddedImageData(value: unknown) {
   return `data:${mime};base64,${base64}`
 }
 
+function readImageAssetText(value: unknown) {
+  if (typeof value === 'string') return value.trim()
+  if (!value || typeof value !== 'object') return readText(value)
+
+  const candidate = value as Record<string, unknown>
+  return readText(
+    candidate.club_logo_url,
+    candidate.clubLogoUrl,
+    candidate.logo_url,
+    candidate.logoUrl,
+    candidate.club_logo_path,
+    candidate.clubLogoPath,
+    candidate.club_logo,
+    candidate.clubLogo,
+    candidate.logo,
+    candidate.url,
+    candidate.src,
+    candidate.path,
+    candidate.filename,
+  )
+}
+
+function isImageLikeAssetValue(value: string) {
+  const raw = (value || '').trim()
+  if (!raw) return false
+  if (raw.startsWith('data:')) return true
+  if (/^https?:\/\//i.test(raw)) return true
+
+  const normalized = raw.split('\\').join('/')
+  return IMAGE_ASSET_PATH_PATTERN.test(normalized) || IMAGE_ASSET_EXTENSION_PATTERN.test(normalized)
+}
+
 function resolveClubLogoAsset(value: unknown) {
   const embedded = resolveEmbeddedImageData(value)
   if (embedded) return embedded
 
-  const raw = typeof value === 'string' ? value.trim() : readText(value)
+  const raw = readImageAssetText(value)
   if (!raw) return ''
+  if (!isImageLikeAssetValue(raw)) return ''
   if (raw.startsWith('data:')) return raw
 
+  const cleaned = raw.split('\\').join('/')
   const adminAssetBase = buildRingProjectionAdminAssetBase()
 
-  if (/^https?:\/\//i.test(raw)) {
+  if (/^https?:\/\//i.test(cleaned)) {
     try {
-      const parsed = new URL(raw)
+      const parsed = new URL(cleaned)
       if (adminAssetBase) {
         const adminParsed = new URL(adminAssetBase)
         const isLoopbackHost = /^(localhost|127(?:\.\d{1,3}){3})$/i.test(parsed.hostname)
@@ -432,17 +486,17 @@ function resolveClubLogoAsset(value: unknown) {
         }
       }
     } catch {}
-    return raw
+    return cleaned
   }
 
   if (!adminAssetBase) {
-    return raw.startsWith('/') ? raw : `/${raw.replace(/^\/+/, '')}`
+    return cleaned.startsWith('/') ? cleaned : `/${cleaned.replace(/^\/+/, '')}`
   }
 
   try {
-    return new URL(raw.startsWith('/') ? raw : raw.replace(/^\/+/, ''), `${adminAssetBase}/`).toString()
+    return new URL(cleaned.startsWith('/') ? cleaned : cleaned.replace(/^\/+/, ''), `${adminAssetBase}/`).toString()
   } catch {
-    return raw
+    return cleaned
   }
 }
 
@@ -900,6 +954,42 @@ function getFlagBoxClass(side: 'left' | 'right') {
     : 'ring-order-flag-box--blue'
 }
 
+function getBrandImageFailureKey(card: BoardCard, side: BrandImageSide, src: string) {
+  return `${card.sourceKey}:${side}:${src}`
+}
+
+function getRawBrandImageSrc(card: BoardCard, side: BrandImageSide) {
+  return side === 'left' ? card.leftFlagSrc : card.rightFlagSrc
+}
+
+function getBrandImageSrc(card: BoardCard, side: BrandImageSide) {
+  const src = getRawBrandImageSrc(card, side)
+  if (!src) return ''
+
+  const failureKey = getBrandImageFailureKey(card, side, src)
+  return failedBrandImageKeys.value[failureKey] ? '' : src
+}
+
+function getBrandImageSrcset(card: BoardCard, side: BrandImageSide) {
+  if (!getBrandImageSrc(card, side)) return ''
+  return side === 'left' ? card.leftFlagSrcset : card.rightFlagSrcset
+}
+
+function handleBrandImageError(card: BoardCard, side: BrandImageSide) {
+  const src = getRawBrandImageSrc(card, side)
+  if (!src) return
+
+  failedBrandImageKeys.value = {
+    ...failedBrandImageKeys.value,
+    [getBrandImageFailureKey(card, side, src)]: true,
+  }
+}
+
+function getBrandImageFallbackLabel(code: string) {
+  const text = (code || '').trim()
+  return text && text !== '--' ? text : 'Flag'
+}
+
 function getCodeChipClass(side: 'left' | 'right') {
   return side === 'left'
     ? 'ring-order-code-chip--green'
@@ -939,6 +1029,7 @@ watch(
   (nextKey, previousKey) => {
     if (nextKey === previousKey) return
     clearCompletionTimers()
+    failedBrandImageKeys.value = {}
     transitionPhase.value = 'idle'
     completedCardSourceKey.value = null
     pendingTargetBoard.value = null

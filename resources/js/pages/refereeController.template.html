@@ -4021,6 +4021,57 @@
                 </div>
             </div>
 
+            <Dialog v-if="isElectronAppControlAvailable" v-model:open="isExitApplicationDialogOpen">
+                <DialogTrigger as-child>
+                    <button
+                        type="button"
+                        @click="openApplicationExitDialog"
+                        title="Exit application"
+                        class="fixed right-4 bottom-3 z-40 inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-400/25 bg-[#0f172a]/80 px-3 text-[11px] font-black tracking-[0.16em] text-emerald-300/90 uppercase opacity-70 shadow-[0_14px_34px_-24px_rgba(16,185,129,0.9)] backdrop-blur transition-all hover:border-emerald-300/55 hover:bg-[#111827]/95 hover:text-emerald-100 hover:opacity-100 focus:border-emerald-300/70 focus:opacity-100 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none active:scale-95 sm:right-5 sm:bottom-4"
+                    >
+                        <Power class="h-4 w-4" />
+                        <span>Exit</span>
+                    </button>
+                </DialogTrigger>
+                <DialogContent class="border-slate-700 bg-[#111827] text-white">
+                    <DialogHeader>
+                        <DialogTitle class="flex items-center gap-3 text-white">
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-400/25 bg-red-500/10 text-red-200">
+                                <Power class="h-5 w-5" />
+                            </span>
+                            Exit Application?
+                        </DialogTitle>
+                        <DialogDescription class="text-slate-400">
+                            This will close the controller and stop the local tournament services.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div
+                        v-if="applicationExitError"
+                        class="rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-100"
+                    >
+                        {{ applicationExitError }}
+                    </div>
+                    <DialogFooter>
+                        <DialogClose as-child>
+                            <Button
+                                variant="outline"
+                                :disabled="isRequestingApplicationExit"
+                                class="border-slate-600 bg-transparent text-white hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                            >
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button
+                            :disabled="isRequestingApplicationExit"
+                            @click="requestApplicationExit"
+                            class="border border-red-400/30 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+                        >
+                            {{ isRequestingApplicationExit ? 'Exiting...' : 'Exit Application' }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <!-- Confirmation Modal -->
             <div
                 v-if="showConfirmationModal"

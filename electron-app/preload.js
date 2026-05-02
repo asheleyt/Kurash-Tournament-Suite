@@ -56,4 +56,7 @@ contextBridge.exposeInMainWorld('kurashElectron', {
     updateState: (partial) => ipcRenderer.invoke('controller-auth:update-state', partial),
     clearAuth: (reason) => ipcRenderer.invoke('controller-auth:clear-auth', reason),
   },
+  appControl: {
+    requestExit: () => ipcRenderer.invoke('app-control:request-exit'),
+  },
 });

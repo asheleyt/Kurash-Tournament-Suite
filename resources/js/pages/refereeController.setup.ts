@@ -22,6 +22,7 @@ import {
     Hash,
     Flag,
     Search,
+    Power,
 } from 'lucide-vue-next';
 import {
     reactive,
@@ -487,6 +488,10 @@ interface ElectronControllerAuthBridge {
     ) => Promise<ControllerAuthState>;
 }
 
+interface ElectronAppControlBridge {
+    requestExit: () => Promise<{ success?: boolean } | void>;
+}
+
 type ControllerApiError = Error & {
     code?: string | null;
     status?: number;
@@ -635,6 +640,10 @@ function syncTempSettings() {
 
 const history = ref<GameState[]>([]);
 const isSettingsOpen = ref(false);
+const isElectronAppControlAvailable = ref(false);
+const isExitApplicationDialogOpen = ref(false);
+const isRequestingApplicationExit = ref(false);
+const applicationExitError = ref('');
 const settingsTab = ref<'match' | 'keyboard' | 'matchlist' | 'display'>(
     'display',
 );
@@ -710,6 +719,43 @@ function handleSettingsScroll() {
 function getControllerAuthBridge(): ElectronControllerAuthBridge | null {
     return ((window as any).kurashElectron?.controllerAuth ??
         null) as ElectronControllerAuthBridge | null;
+}
+
+function getAppControlBridge(): ElectronAppControlBridge | null {
+    return ((window as any).kurashElectron?.appControl ??
+        null) as ElectronAppControlBridge | null;
+}
+
+function refreshElectronAppControlAvailability() {
+    isElectronAppControlAvailable.value =
+        typeof getAppControlBridge()?.requestExit === 'function';
+}
+
+function openApplicationExitDialog() {
+    applicationExitError.value = '';
+    isExitApplicationDialogOpen.value = true;
+}
+
+async function requestApplicationExit() {
+    const bridge = getAppControlBridge();
+    if (typeof bridge?.requestExit !== 'function') {
+        applicationExitError.value =
+            'Application exit is only available in the desktop controller.';
+        showBanner(applicationExitError.value, 'error', 4200);
+        return;
+    }
+
+    isRequestingApplicationExit.value = true;
+    applicationExitError.value = '';
+
+    try {
+        await bridge.requestExit();
+    } catch (error: any) {
+        isRequestingApplicationExit.value = false;
+        applicationExitError.value =
+            error?.message || 'The desktop app could not be closed.';
+        showBanner(applicationExitError.value, 'error', 5000);
+    }
 }
 
 function normalizeOptionalText(value: unknown): string | null {
@@ -5715,6 +5761,8 @@ function startStatusMonitor() {
 }
 
 onMounted(() => {
+    refreshElectronAppControlAvailability();
+
     try {
         const ua = (navigator.userAgent || '').toLowerCase();
         const isElectron = ua.includes('electron');

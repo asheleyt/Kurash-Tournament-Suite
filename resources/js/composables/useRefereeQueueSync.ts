@@ -139,6 +139,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
   let lastAppliedQueueOverrideSignature = ''
   let lastKnownDeviceReconnectAttemptAt = 0
   let lastAdminDirectScoreboardSnapshotAt = 0
+  const unsupportedControllerAssignedQueueHosts = new Set<string>()
 
   function createQueuePerfSummary(): QueuePerfSummary {
     return {
@@ -196,7 +197,15 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
   }
 
   function shouldUseControllerAssignedQueue() {
-    return options.hasKnownDeviceCredentials.value && options.syncHasServer.value
+    if (!options.hasKnownDeviceCredentials.value || !options.syncHasServer.value) return false
+    const host = (options.normalizedControllerAdminBase.value || '').toString().trim()
+    if (host && unsupportedControllerAssignedQueueHosts.has(host)) return false
+    return true
+  }
+
+  function markControllerAssignedQueueUnsupported() {
+    const host = (options.normalizedControllerAdminBase.value || '').toString().trim()
+    if (host) unsupportedControllerAssignedQueueHosts.add(host)
   }
 
   function getPayloadAssignment(payload: Record<string, unknown> | null | undefined) {
@@ -824,9 +833,11 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     if (!ringText) throw new Error('Gilam is required')
 
     const useControllerAssignment = shouldUseControllerAssignedQueue()
-    const url = useControllerAssignment
-      ? options.localApiUrl('/controller/queue')
-      : options.localApiUrl(`/tournaments/${id}/rings/${ringText}/queue`)
+    const url = options.localApiUrl(
+      useControllerAssignment
+        ? '/controller/queue'
+        : `/tournaments/${id}/rings/${ringText}/queue`,
+    )
     options.attachAdminBase(url)
 
     const res = await fetch(url.toString(), {
@@ -834,6 +845,42 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     })
     const body = await res.text()
     if (!res.ok) {
+      if (useControllerAssignment && res.status === 404) {
+        markControllerAssignedQueueUnsupported()
+        console.warn('Controller assigned queue endpoint missing; falling back to ring queue.', {
+          url: url.toString(),
+          status: res.status,
+        })
+
+        const fallbackUrl = options.localApiUrl(`/tournaments/${id}/rings/${ringText}/queue`)
+        options.attachAdminBase(fallbackUrl)
+        const fallbackRes = await fetch(fallbackUrl.toString(), { headers: options.headers() })
+        const fallbackBody = await fallbackRes.text()
+        if (!fallbackRes.ok) {
+          options.reportFetchFailure('Ring queue', fallbackUrl.toString(), fallbackRes.status, fallbackBody, { notify: true })
+          throw new Error(
+            `Queue failed: ${fallbackRes.status}. ${options.safeApiErrorMessage(fallbackRes.status, fallbackBody)}`,
+          )
+        }
+
+        let fallbackJson: Record<string, unknown>
+        try {
+          fallbackJson = JSON.parse(fallbackBody) as Record<string, unknown>
+        } catch {
+          throw new Error(
+            `Queue: response was not JSON (${fallbackRes.status}). ${options.safeApiErrorMessage(fallbackRes.status, fallbackBody)}`,
+          )
+        }
+        if (fallbackJson?.success === false) {
+          const message = typeof fallbackJson?.message === 'string'
+            ? fallbackJson.message
+            : 'Queue endpoint rejected the request'
+          throw new Error(message)
+        }
+
+        return fallbackJson
+      }
+
       const contextLabel = useControllerAssignment ? 'Controller assigned queue' : 'Ring queue'
       options.reportFetchFailure(contextLabel, url.toString(), res.status, body, { notify: true })
       const error = new Error(`Queue failed: ${res.status}. ${options.safeApiErrorMessage(res.status, body)}`) as Error & {

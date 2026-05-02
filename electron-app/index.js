@@ -824,6 +824,21 @@ function registerControllerAuthIpc() {
   );
 }
 
+function registerAppControlIpc() {
+  ipcMain.removeHandler('app-control:request-exit');
+
+  ipcMain.handle('app-control:request-exit', () => {
+    logStartupEvent('info', 'Application exit requested from controller UI.');
+    setImmediate(() => {
+      if (!isQuitting) {
+        app.quit();
+      }
+    });
+
+    return { success: true };
+  });
+}
+
 async function createWindows(baseUrl, attemptId) {
   if (!isActiveBootAttempt(attemptId)) {
     logStartupEvent('warn', 'Skipped window creation because the boot attempt is no longer active.', {
@@ -849,6 +864,7 @@ async function createWindows(baseUrl, attemptId) {
 
   registerDisplayIpc();
   registerControllerAuthIpc();
+  registerAppControlIpc();
 
   const controllerUrl = `${String(baseUrl).replace(/\/+$/, '')}/refereeController`;
   const publicBaseUrl = String(baseUrl).replace(/\/+$/, '');
