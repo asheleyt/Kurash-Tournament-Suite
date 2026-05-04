@@ -919,7 +919,8 @@ const {
     getRingMatchOrderProjectionKey: () => ringMatchOrderProjectionKey.value,
     getSyncConfigurationReady: () => syncConfigurationReady.value,
     getIsRingMatchOrderPanelExpanded: () => isRingMatchOrderPanelExpanded.value,
-    getRingMatchOrderProjectionRecord: () => ringMatchOrderProjectionRecord.value,
+    getRingMatchOrderProjectionRecord: () =>
+        ringMatchOrderProjectionRecord.value,
     getRingMatchOrderProjectionLastAttemptAt: () =>
         ringMatchOrderProjectionLastAttemptAt.value,
 });
@@ -1585,9 +1586,7 @@ async function handleWinnerToggle(player: 'player1' | 'player2') {
         return;
     }
     if (
-        await clearCurrentLoadedMatchForRingMismatch(
-            'winner declaration guard',
-        )
+        await clearCurrentLoadedMatchForRingMismatch('winner declaration guard')
     )
         return;
 
@@ -2023,6 +2022,14 @@ const isPendingResultSyncBusy = ref(false);
 const localStatusOverrides = ref<Record<string, string>>({});
 const syncDiagnosticsOpen = ref(false);
 const syncQueueDetailsOpen = ref(false);
+const pendingDeviceIdentityLabel = 'Pending local device identity';
+const notPairedYetLabel = 'Not paired yet';
+const clubUnassignedLabel = 'Club unassigned';
+const queueItemReadyLabel = 'Queue item ready for controller consumption.';
+const selectTeamLabel = 'Select Team';
+const newUploadPreviewLabel = 'Has new upload preview';
+const savedLogoLabel = 'Saved logo';
+const exitApplicationLabel = 'Exit Application';
 const queueVersionGuardContextKey = ref('');
 const pendingLiveSnapshotRecoveryContextKey = ref<string | null>(null);
 const isLiveSnapshotRecoveryBusy = ref(false);
@@ -2043,7 +2050,8 @@ const {
     localApiUrl,
     attachAdminBase,
     headers: (withJson = false) => headers(withJson),
-    controllerHeaders: (withJson = false) => buildControllerAuthHeaders(withJson),
+    controllerHeaders: (withJson = false) =>
+        buildControllerAuthHeaders(withJson),
     reportFetchFailure,
     safeApiErrorMessage,
     getRingMatchOrderProjectionMeta: () => ringMatchOrderProjectionMeta.value,
@@ -2222,7 +2230,9 @@ const resultSubmitStatusToneClass = computed(() => {
         return 'text-rose-200';
     if (resultSubmitQueueMode.value === 'offline_degraded')
         return 'text-amber-200';
-    return resultSubmitBlockReason.value ? 'text-amber-200' : 'text-cyan-200/80';
+    return resultSubmitBlockReason.value
+        ? 'text-amber-200'
+        : 'text-cyan-200/80';
 });
 watch(
     [
@@ -2247,7 +2257,9 @@ watch(
             currentMatch,
             currentMatchId.value,
         );
-        resultSubmitBlockReason.value = assessment.ready ? null : assessment.message;
+        resultSubmitBlockReason.value = assessment.ready
+            ? null
+            : assessment.message;
         if (assessment.ready) {
             resultSubmitRequiresReconcile.value = false;
             if (
@@ -2553,7 +2565,8 @@ const {
     localApiUrl,
     attachAdminBase,
     headers: (withJson = false) => headers(withJson),
-    controllerHeaders: (withJson = false) => buildControllerAuthHeaders(withJson),
+    controllerHeaders: (withJson = false) =>
+        buildControllerAuthHeaders(withJson),
     reportFetchFailure,
     safeApiErrorMessage,
     normalizeApiBaseInput,
@@ -2627,9 +2640,11 @@ const {
     fallbackRecoveryPanelModel,
     fallbackRecoveryPanelActions,
     shouldAutoExpandFallbackSetup,
+    showRecoverySetupPanel,
     assignmentState,
     assignedSetupUpdatedAtLabel,
     pairingStateLabel,
+    assignedTargetBadges,
     hasUnsupportedAssignedTarget,
     hasAssignedScoreboardTarget,
     assignedSetupStatusLabel,
@@ -2774,21 +2789,24 @@ function openManualFallbackTab() {
     settingsTab.value = 'match';
     nextTick(() => scrollControllerToTop('smooth'));
 }
+function updateAdminBaseFromInput(event: Event) {
+    adminBase.value = (event.target as HTMLInputElement).value;
+}
 async function testSyncConnection() {
     try {
         if (!adminBase.value)
-            throw new Error('Enter the Admin Host address first.');
+            throw new Error('Enter the Event Host address first.');
         adminBase.value = normalizeApiBaseInput(adminBase.value);
         persistAdminBase();
         const data = await heartbeat();
         isOnline.value = data?.status === 'ok';
         if (!isOnline.value)
             throw new Error(
-                'Admin Host responded, but the sync service is not ready yet.',
+                'Event Host responded, but the sync service is not ready yet.',
             );
         await syncPendingResultSyncQueue({ silent: false });
         showBanner(
-            'Connection successful. Admin Host is reachable on the local LAN.',
+            'Connection successful. Event Host is reachable on the local LAN.',
             'success',
             2500,
         );
@@ -2804,7 +2822,7 @@ async function reconnectSyncNow() {
             persistAdminBase();
         }
     } catch (e: any) {
-        showBanner(e?.message || 'Invalid Admin Host address.', 'error', 4000);
+        showBanner(e?.message || 'Invalid Event Host address.', 'error', 4000);
         focusSyncSetup();
         return;
     }
@@ -2829,7 +2847,7 @@ async function reconnectSyncNow() {
         if (!selectedTournamentId.value) {
             showBanner(
                 hasKnownDeviceCredentials.value
-                    ? 'Connection refreshed. Waiting for Admin assignment or manual recovery values.'
+                    ? 'Connection refreshed. Waiting for Event Host assignment or manual recovery values.'
                     : 'Connection refreshed. Choose a tournament to continue.',
                 'success',
                 2400,
@@ -3162,8 +3180,7 @@ function formatResultSyncFailureMessage(
             'Event Host rejected the winner mapping. Reconcile the live queue before scoring again.';
         usedMappedMessage = true;
     } else if (normalizedFailureClass === 'network_failure') {
-        base =
-            'Event Host unreachable. Result saved locally pending sync.';
+        base = 'Event Host unreachable. Result saved locally pending sync.';
         usedMappedMessage = true;
     } else if (normalizedFailureClass === 'skipped_missing_winner_id') {
         base =
@@ -4020,7 +4037,8 @@ function getAutoLoadPausedReason(
     const assessedCandidates = candidates.map((item: any) => ({
         item,
         assessment: assessMatchQueueEligibility(item, null, {
-            requireExplicitSignals: shouldRequireExplicitQueueSignalsForProgression(),
+            requireExplicitSignals:
+                shouldRequireExplicitQueueSignalsForProgression(),
         }),
     }));
     const loadable = assessedCandidates.filter(
@@ -4074,7 +4092,9 @@ function getWaitingForNextBoutMessage(
 ) {
     const pausedReason = getAutoLoadPausedReason(excludeMatchId);
     if (pausedReason) {
-        const detail = pausedReason.replace(/^Auto-load paused:\s*/i, '').trim();
+        const detail = pausedReason
+            .replace(/^Auto-load paused:\s*/i, '')
+            .trim();
         return detail
             ? `Match finished. ${detail}`
             : 'Match finished. Waiting for the next resolved bout from the saved queue snapshot.';
@@ -4316,7 +4336,7 @@ function consumeAdminBaseSetupQueryParam() {
         showBanner(
             error instanceof Error
                 ? error.message
-                : 'Setup link contained an invalid Admin Host address.',
+                : 'Setup link contained an invalid Event Host address.',
             'error',
             5000,
         );
@@ -5114,7 +5134,8 @@ function isRealPlayer(name: string) {
 
 function canLoadMatch(m: any) {
     return assessMatchQueueEligibility(m, null, {
-        requireExplicitSignals: shouldRequireExplicitQueueSignalsForProgression(),
+        requireExplicitSignals:
+            shouldRequireExplicitQueueSignalsForProgression(),
     }).ready;
 }
 
@@ -5276,9 +5297,13 @@ async function refreshCurrentMatchSubmitGate(
     const ringText = (selectedRing.value || '').toString().trim();
     if (!syncHasServer.value || tournamentId == null || !ringText) {
         clearResultSubmitGateState();
-        const assessment = assessMatchQueueEligibility(localMatch, selectedMatchId, {
-            requireExplicitSignals: false,
-        });
+        const assessment = assessMatchQueueEligibility(
+            localMatch,
+            selectedMatchId,
+            {
+                requireExplicitSignals: false,
+            },
+        );
         resultSubmitBlockReason.value = assessment.ready
             ? null
             : assessment.message;
@@ -5319,7 +5344,10 @@ async function refreshCurrentMatchSubmitGate(
         resultSubmitBlockReason.value = reason;
         resultSubmitStatusReasonCode.value = assessment.reasonCode;
         resultSubmitStatusDetail.value = reason;
-        if (!assessment.ready && assessment.reasonCode === 'moved_to_different_match') {
+        if (
+            !assessment.ready &&
+            assessment.reasonCode === 'moved_to_different_match'
+        ) {
             resultSubmitRequiresReconcile.value = true;
         }
 
@@ -5391,11 +5419,7 @@ async function refreshCurrentMatchSubmitGate(
         resultSubmitBlockReason.value = detail;
 
         if (options.announceFailures) {
-            showBanner(
-                detail,
-                options.bannerType ?? 'error',
-                6500,
-            );
+            showBanner(detail, options.bannerType ?? 'error', 6500);
         }
 
         return {
@@ -5448,7 +5472,8 @@ async function reconcileRejectedResultSubmission(config: {
     ringText: string;
 }) {
     markResultSubmitReconcileRequired(
-        config.message || 'Live queue rejected this result. Reconcile before scoring again.',
+        config.message ||
+            'Live queue rejected this result. Reconcile before scoring again.',
         'semantic_reject',
     );
     showFinishModal.value = false;
@@ -5671,8 +5696,11 @@ async function loadMatch(m: any): Promise<boolean> {
     );
     currentMatchId.value = getRemoteMatchId(m);
     currentMatchRingNumber.value =
-        firstNonEmptyString(m?.ring_number, getMatchRingText(m), selectedRing.value) ||
-        null;
+        firstNonEmptyString(
+            m?.ring_number,
+            getMatchRingText(m),
+            selectedRing.value,
+        ) || null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -6015,7 +6043,8 @@ async function handleSubmitResult() {
                 currentMatch,
                 currentMatchId.value,
                 {
-                    requireExplicitSignals: shouldRequireLocalFirstQueueSignals(),
+                    requireExplicitSignals:
+                        shouldRequireLocalFirstQueueSignals(),
                 },
             );
             if (!assessment.ready) {
@@ -6121,7 +6150,8 @@ async function handleSubmitResult() {
             upstream_generated_at: upstreamGeneratedAt.value ?? null,
             controller_generated_at: controllerGeneratedAt.value ?? null,
             submit_queue_mode: resultSubmitQueueMode.value,
-            submit_queue_reason_code: resultSubmitStatusReasonCode.value ?? null,
+            submit_queue_reason_code:
+                resultSubmitStatusReasonCode.value ?? null,
             submit_queue_degraded:
                 resultSubmitQueueMode.value === 'offline_degraded',
             submit_queue_reconcile_required:
@@ -6396,7 +6426,7 @@ async function handleSubmitResult() {
                     'local_first_pending_admin_sync',
                 );
                 showBanner(
-                    'Result saved locally. Admin sync will run in the background when the Event Host is reachable.',
+                    'Result saved locally. Event Host sync will run in the background when the Event Host is reachable.',
                     'info',
                     5200,
                 );
@@ -6537,7 +6567,7 @@ async function handleSubmitResult() {
             );
 
             resultPopupMessage.value = resultQueuedForAdminReplay
-                ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Admin sync.`
+                ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Event Host sync.`
                 : adminSyncOk
                   ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
                   : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`;

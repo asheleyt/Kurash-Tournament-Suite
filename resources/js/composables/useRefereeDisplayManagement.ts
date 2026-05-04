@@ -410,7 +410,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return 'Some saved Gilam Match Order selections are unavailable right now.'
     }
     return selectedRingMatchOrderDisplayIds.value.length > 1
-      ? 'The selected screens will receive the same Admin-fed ring projection.'
+      ? 'The selected screens will receive the same Event Host ring projection.'
       : 'This screen will be used when you launch Gilam Match Order.'
   })
   const shouldAutoExpandRingMatchOrderPanel = computed(() =>
@@ -444,11 +444,11 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     const status = getDisplayStatusEntryForRole('ring_match_order', displayId)
     if (isControllerDisplay(displayId)) {
       return status.selected
-        ? 'Controller screen is included in Gilam Match Order output. The Admin-fed projection will also appear here.'
+        ? 'Controller screen is included in Gilam Match Order output. The Event Host projection will also appear here.'
         : 'Controller stays active here. Usually left free unless this screen should also host the ring projection.'
     }
     if (status.live) {
-      return 'This screen is currently showing the Admin-fed Gilam Match Order projection.'
+      return 'This screen is currently showing the Event Host Gilam Match Order projection.'
     }
     if (status.selected) {
       return 'Included in the current Gilam Match Order selection.'
@@ -800,7 +800,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     }
 
     if (!options.getSyncConfigurationReady() || !options.getRingMatchOrderProjectionKey()) {
-      const message = 'Configure Admin Host, fallback tournament, and fallback gilam first so Gilam Match Order can follow the correct Admin projection.'
+      const message = 'Configure Event Host, recovery tournament, and recovery gilam first so Gilam Match Order can follow the correct Event Host projection.'
       displayErrorMessage.value = message
       options.showBanner(message, 'error', 4500)
       return

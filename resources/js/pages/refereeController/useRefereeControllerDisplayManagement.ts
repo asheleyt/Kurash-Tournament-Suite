@@ -256,22 +256,22 @@ export function useRefereeControllerDisplayManagement(
     );
     const ringMatchOrderProjectionStatusSummary = computed(() => {
         if (!ringMatchOrderProjectionKey.value) {
-            return 'Pick Admin Host, fallback tournament, and fallback gilam first so the controller can track a projection cache key for this role.';
+            return 'Pick Event Host, recovery tournament, and recovery gilam first so the controller can track a projection cache key for this role.';
         }
 
         if (!ringMatchOrderProjectionRecord.value?.lastSuccessAt) {
-            return `No successful Admin-backed projection snapshot yet. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s and offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
+            return `No successful Event Host projection snapshot yet. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s and offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
         }
 
         if (ringMatchOrderProjectionFreshnessState.value === 'fresh') {
-            return `Admin-backed projection snapshot is current. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s.`;
+            return `Event Host projection snapshot is current. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s.`;
         }
 
         if (ringMatchOrderProjectionFreshnessState.value === 'stale') {
-            return `Showing the last successful Admin-backed projection snapshot while polling retries. Offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
+            return `Showing the last successful Event Host projection snapshot while polling retries. Offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
         }
 
-        return 'Projection polling is offline. The last successful Admin-backed snapshot stays visible until updates resume.';
+        return 'Projection polling is offline. The last successful Event Host snapshot stays visible until updates resume.';
     });
 
     const displayManagementPanelModel = {

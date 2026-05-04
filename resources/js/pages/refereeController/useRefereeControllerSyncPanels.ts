@@ -110,8 +110,7 @@ export function useRefereeControllerSyncPanels(
     });
     const syncServerAddressDetail = computed(() => {
         const raw = (options.adminBase.value || '').toString().trim();
-        if (!raw)
-            return 'Add the Admin Host address to enable Admin-backed snapshots.';
+        if (!raw) return 'Add the Event Host address to enable live snapshots.';
         try {
             return options.normalizeApiBaseInput(raw);
         } catch {
@@ -142,7 +141,9 @@ export function useRefereeControllerSyncPanels(
     const assignedSetupUpdatedAtLabel = computed(() => {
         if (!options.assignedSetupUpdatedAt.value) return 'Not yet received';
         try {
-            return new Date(options.assignedSetupUpdatedAt.value).toLocaleString();
+            return new Date(
+                options.assignedSetupUpdatedAt.value,
+            ).toLocaleString();
         } catch {
             return 'Unknown';
         }
@@ -220,7 +221,7 @@ export function useRefereeControllerSyncPanels(
             return 'Assigned setup active';
         if (assignmentState.value === 'assignment_stale')
             return 'Assigned setup stale';
-        return 'No Admin assignment yet';
+        return 'Waiting for Event Host assignment';
     });
     const canExitFallbackAndResync = computed(
         () =>
@@ -271,8 +272,8 @@ export function useRefereeControllerSyncPanels(
     );
     const liveRecoveryBannerMessage = computed(() =>
         snapshotMode.value === 'recovering'
-            ? 'The controller is exiting fallback and refreshing the current Admin-assigned live queue for this gilam.'
-            : 'The Event Host is reachable and this controller has Admin-assigned setup. Exit fallback to restore the live queue snapshot now.',
+            ? 'The controller is exiting fallback and refreshing the current Event Host live queue for this gilam.'
+            : 'The Event Host is reachable and this controller has an assignment. Exit fallback to restore the live queue snapshot now.',
     );
     const syncRecoveryActionLabel = computed(() => {
         if (snapshotMode.value === 'recovering') return 'Recovering...';
@@ -320,37 +321,37 @@ export function useRefereeControllerSyncPanels(
     const syncFallbackReasonLabel = computed(() => {
         switch ((options.queueDegradedReason.value || '').toString()) {
             case 'local_cache':
-                return 'Using the last saved Admin-backed queue snapshot on this controller.';
+                return 'Using the last saved Event Host queue snapshot on this controller.';
             case 'cached_queue':
-                return 'Showing the saved Admin-backed queue snapshot while live updates catch up.';
+                return 'Showing the saved Event Host queue snapshot while live updates catch up.';
             case 'offline_cache':
-                return 'The Admin Host is offline, so the controller is using its saved Admin-backed queue snapshot.';
+                return 'The Event Host is offline, so the controller is using its saved queue snapshot.';
             case 'queue_api_unavailable':
                 return 'The live ring queue could not be loaded, so the controller fell back to its local tournament copy.';
             case 'offline_legacy_adapter':
-                return 'The Admin Host is offline, so the controller is showing the local tournament copy.';
+                return 'The Event Host is offline, so the controller is showing the local tournament copy.';
             case 'ring_number_mismatch_filtered':
                 return 'Some queue items were assigned to another gilam and were filtered out for safety.';
             case 'fallback':
                 return 'Live updates are temporarily unavailable, so the controller switched to a safer fallback snapshot source.';
             default:
                 return options.queueIsDegraded.value
-                    ? 'Admin-backed snapshots are available with warnings. Review diagnostics if something looks unexpected.'
-                    : 'Admin-backed snapshot and fallback behavior are operating normally.';
+                    ? 'Live snapshots are available with warnings. Review diagnostics if something looks unexpected.'
+                    : 'Live snapshot and fallback behavior are operating normally.';
         }
     });
     const currentConnectionWarningLabel = computed(() => {
         if (hasUnsupportedAssignedTarget.value) {
-            return 'Admin assigned an unsupported ring_display target. Local display roles remain manual on this controller in this release.';
+            return 'Event Host assigned an unsupported ring_display target. Local display roles remain manual on this controller in this release.';
         }
         if (assignmentState.value === 'assignment_stale') {
-            return 'The last matching Admin-assigned setup is cached on this controller, but the latest assignment refresh failed.';
+            return 'The last matching Event Host assignment is cached on this controller, but the latest refresh failed.';
         }
         if (
             options.hasKnownDeviceCredentials.value &&
             assignmentState.value === 'no_assignment'
         ) {
-            return 'This controller is paired as a known device, but Admin has not assigned tournament and gilam details yet.';
+            return 'This controller is paired as a known device, but the Event Host has not assigned tournament and gilam details yet.';
         }
         return syncFallbackReasonLabel.value;
     });
@@ -358,22 +359,22 @@ export function useRefereeControllerSyncPanels(
         if (snapshotMode.value === 'recovering')
             return 'Rejoining Event Host live snapshot';
         if (options.setupSource.value === 'assigned_setup')
-            return 'Admin-assigned setup';
+            return 'Event Host assignment';
         if (
             options.hasKnownDeviceCredentials.value &&
             assignmentState.value === 'no_assignment'
         )
             return 'Known device waiting for assignment';
         if (options.queueSourceMode.value === 'queue_api')
-            return 'Admin-backed live snapshot';
+            return 'Event Host live snapshot';
         if (options.queueSourceMode.value === 'cached_queue')
-            return 'Saved controller snapshot';
+            return 'Saved snapshot';
         if (options.queueSourceMode.value === 'offline_cache')
             return 'Offline snapshot cache';
         if (options.queueSourceMode.value === 'legacy_adapter')
             return 'Local tournament copy';
-        if (options.isOnline.value) return 'Admin Host ready';
-        return 'Waiting for Admin Host';
+        if (options.isOnline.value) return 'Event Host ready';
+        return 'Waiting for Event Host';
     });
     const syncModeLabel = computed(() => {
         if (snapshotMode.value === 'recovering')
@@ -384,7 +385,8 @@ export function useRefereeControllerSyncPanels(
             options.isCheckingStatus.value
         )
             return 'Refreshing';
-        if (options.queueSourceMode.value === 'queue_api') return 'Live snapshot';
+        if (options.queueSourceMode.value === 'queue_api')
+            return 'Live snapshot';
         if (options.queueSourceMode.value === 'cached_queue')
             return 'Cached snapshot';
         if (options.queueSourceMode.value === 'offline_cache')
@@ -396,7 +398,7 @@ export function useRefereeControllerSyncPanels(
     const syncReconnectPolicyLabel = computed(() =>
         options.hasKnownDeviceCredentials.value
             ? 'Background health checks keep known devices alive with heartbeat every 10 seconds and refresh assignment periodically over the local event LAN.'
-            : 'Background health checks watch the Admin Host over the local event LAN every 10 seconds.',
+            : 'Background health checks watch the Event Host over the local event LAN every 10 seconds.',
     );
     const upstreamGeneratedAtLabel = computed(() => {
         if (!options.upstreamGeneratedAt.value) return 'Unknown';
@@ -409,7 +411,9 @@ export function useRefereeControllerSyncPanels(
     const controllerGeneratedAtLabel = computed(() => {
         if (!options.controllerGeneratedAt.value) return 'Unknown';
         try {
-            return new Date(options.controllerGeneratedAt.value).toLocaleString();
+            return new Date(
+                options.controllerGeneratedAt.value,
+            ).toLocaleString();
         } catch {
             return 'Unknown';
         }
@@ -433,11 +437,15 @@ export function useRefereeControllerSyncPanels(
         }
     });
     const queueFreshnessLabel = computed(() => {
-        if (snapshotMode.value === 'recovering') return 'Recovering Live Snapshot';
+        if (snapshotMode.value === 'recovering')
+            return 'Recovering Live Snapshot';
         if (options.isLoadingMatches.value) return 'Syncing';
-        if (!options.syncConfigurationReady.value) return 'Setup needed';
-        if (options.queueSourceMode.value === 'queue_api') return 'Live Snapshot';
-        if (options.queueSourceMode.value === 'cached_queue') return 'Cached Snapshot';
+        if (!options.syncConfigurationReady.value)
+            return 'Choose tournament to continue recovery';
+        if (options.queueSourceMode.value === 'queue_api')
+            return 'Live Snapshot';
+        if (options.queueSourceMode.value === 'cached_queue')
+            return 'Cached Snapshot';
         if (options.queueSourceMode.value === 'offline_cache')
             return 'Offline Snapshot';
         if (options.queueSourceMode.value === 'legacy_adapter')
@@ -479,10 +487,10 @@ export function useRefereeControllerSyncPanels(
             !options.syncHasServer.value
         ) {
             return {
-                label: 'Setup needed',
-                title: 'Add the Admin Host address to begin pairing or manual recovery.',
+                label: 'Event Host needed',
+                title: 'Add the Event Host address to begin pairing or manual recovery.',
                 message:
-                    'This controller is ready for local live operation, but it needs the local Admin Host address before it can pair or receive Admin-backed queue snapshots.',
+                    'This controller is ready for local live operation, but it needs the local Event Host address before it can pair or receive live queue snapshots.',
                 badgeClass:
                     'border-amber-400/30 bg-amber-500/10 text-amber-200',
                 dotClass: 'bg-amber-400',
@@ -494,10 +502,10 @@ export function useRefereeControllerSyncPanels(
             options.hasKnownDeviceCredentials.value
         ) {
             return {
-                label: 'Setup needed',
+                label: 'Waiting for Event Host assignment',
                 title: 'Known device connected, but it still needs assignment or recovery values.',
                 message:
-                    'Admin has not assigned tournament and gilam details yet. Pairing is complete, and manual fallback remains available as a temporary recovery path.',
+                    'The Event Host has not assigned tournament and gilam details yet. Pairing is complete, and manual recovery remains available as a temporary recovery path.',
                 badgeClass:
                     'border-amber-400/30 bg-amber-500/10 text-amber-200',
                 dotClass: 'bg-amber-400',
@@ -506,10 +514,10 @@ export function useRefereeControllerSyncPanels(
 
         if (connectionState.value === 'setup_needed') {
             return {
-                label: 'Setup needed',
-                title: 'Choose the fallback tournament and gilam to continue.',
+                label: 'Choose tournament to continue recovery',
+                title: 'Choose the recovery tournament and gilam to continue.',
                 message:
-                    'The controller can reach Admin Host, but it still needs temporary recovery values until Admin-assigned setup is available.',
+                    'The controller can reach Event Host, but it still needs temporary recovery values until an assignment is available.',
                 badgeClass:
                     'border-amber-400/30 bg-amber-500/10 text-amber-200',
                 dotClass: 'bg-amber-400',
@@ -524,12 +532,12 @@ export function useRefereeControllerSyncPanels(
                         ? 'Exiting fallback and rejoining the live Event Host snapshot.'
                         : options.hasKnownDeviceCredentials.value
                           ? 'Reconnecting as a known device.'
-                          : 'Refreshing the Admin-backed snapshot link.',
+                          : 'Refreshing the live snapshot link.',
                 message: options.hasKnownDeviceCredentials.value
                     ? snapshotMode.value === 'recovering'
                         ? 'Verifying the saved device token, refreshing assignment, and replacing the fallback queue with the current live snapshot.'
-                        : 'Verifying the saved device token, refreshing assignment, and restoring the latest Admin-backed queue snapshot.'
-                    : `Trying to restore or refresh live queue snapshots from Admin Host for Gilam ${options.selectedRing.value}.`,
+                        : 'Verifying the saved device token, refreshing assignment, and restoring the latest live queue snapshot.'
+                    : `Trying to restore or refresh live queue snapshots from Event Host for Gilam ${options.selectedRing.value}.`,
                 badgeClass: 'border-blue-400/30 bg-blue-500/10 text-blue-200',
                 dotClass: 'bg-blue-400',
             };
@@ -540,12 +548,12 @@ export function useRefereeControllerSyncPanels(
                 label: 'Connected',
                 title:
                     options.setupSource.value === 'assigned_setup'
-                        ? 'Admin-assigned setup is active on this controller.'
-                        : 'Receiving live Admin-backed queue snapshots.',
+                        ? 'Event Host assignment is active on this controller.'
+                        : 'Receiving live queue snapshots.',
                 message:
                     options.setupSource.value === 'assigned_setup'
-                        ? `This controller is using Admin-assigned tournament and gilam values for ${options.selectedTournamentNameLabel.value}.`
-                        : `Gilam ${options.selectedRing.value} is following the Admin-backed queue snapshot for ${options.selectedTournamentNameLabel.value}.`,
+                        ? `This controller is using Event Host tournament and gilam values for ${options.selectedTournamentNameLabel.value}.`
+                        : `Gilam ${options.selectedRing.value} is following the live queue snapshot for ${options.selectedTournamentNameLabel.value}.`,
                 badgeClass:
                     'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
                 dotClass: 'bg-emerald-400',
@@ -557,9 +565,9 @@ export function useRefereeControllerSyncPanels(
                 label: 'Connected with warnings',
                 title: options.hasKnownDeviceCredentials.value
                     ? snapshotMode.value === 'fallback'
-                        ? 'The Admin Host connection is up, but this controller is still using fallback snapshot data.'
-                        : 'The Admin Host connection is up, but this controller still needs attention.'
-                    : 'The Admin Host connection is up, but snapshots are using a fallback path.',
+                        ? 'The Event Host connection is up, but this controller is still using fallback snapshot data.'
+                        : 'The Event Host connection is up, but this controller still needs attention.'
+                    : 'The Event Host connection is up, but snapshots are using a fallback path.',
                 message: currentConnectionWarningLabel.value,
                 badgeClass:
                     'border-yellow-400/30 bg-yellow-500/10 text-yellow-100',
@@ -574,11 +582,11 @@ export function useRefereeControllerSyncPanels(
             return {
                 label: options.hasKnownDeviceCredentials.value
                     ? 'Known device offline'
-                    : 'Manual fallback active',
-                title: 'Admin-backed snapshots are unavailable, but this controller can keep operating.',
+                    : 'Manual Recovery Mode Active',
+                title: 'Live snapshots are unavailable, but this controller can keep operating.',
                 message: options.hasKnownDeviceCredentials.value
-                    ? 'The saved device identity remains valid locally, and the controller will retry the Admin Host while recovery-only setup stays available.'
-                    : 'The last saved Admin-backed queue snapshot remains available here, and the manual fallback tools stay available for recovery only.',
+                    ? 'The saved device identity remains valid locally, and the controller will retry the Event Host while recovery-only setup stays available.'
+                    : 'The last saved queue snapshot remains available here, and the manual recovery tools stay available for recovery only.',
                 badgeClass:
                     'border-orange-400/30 bg-orange-500/10 text-orange-100',
                 dotClass: 'bg-orange-300',
@@ -589,10 +597,10 @@ export function useRefereeControllerSyncPanels(
             label: options.hasKnownDeviceCredentials.value
                 ? 'Known device offline'
                 : 'Disconnected',
-            title: 'Admin-backed snapshots are unavailable right now.',
+            title: 'Live snapshots are unavailable right now.',
             message: options.hasKnownDeviceCredentials.value
-                ? 'The controller cannot reach the Admin Host right now. The saved device identity remains on this machine, and reconnect will retry automatically.'
-                : 'The controller cannot reach Admin Host at the moment. Manual recovery remains available while the local LAN connection is restored.',
+                ? 'The controller cannot reach the Event Host right now. The saved device identity remains on this machine, and reconnect will retry automatically.'
+                : 'The controller cannot reach Event Host at the moment. Manual recovery remains available while the local LAN connection is restored.',
             badgeClass: 'border-red-400/30 bg-red-500/10 text-red-100',
             dotClass: 'bg-red-300',
         };
@@ -606,7 +614,7 @@ export function useRefereeControllerSyncPanels(
             options.manualSelectedRing.value
         )
             return 'Configured';
-        return 'Setup Needed';
+        return 'Choose tournament to continue recovery';
     });
     const fallbackSetupStatusToneClass = computed(() => {
         if (fallbackSetupStatusLabel.value === 'Locked')
@@ -634,7 +642,8 @@ export function useRefereeControllerSyncPanels(
     );
     const fallbackRecoveryPanelModel = computed(() => ({
         setupSource: options.setupSource.value,
-        isFallbackSetupPanelExpanded: options.isFallbackSetupPanelExpanded.value,
+        isFallbackSetupPanelExpanded:
+            options.isFallbackSetupPanelExpanded.value,
         isAdminRecoveryLocked: isAdminRecoveryLocked.value,
         fallbackSetupStatusToneClass: fallbackSetupStatusToneClass.value,
         fallbackSetupStatusLabel: fallbackSetupStatusLabel.value,
@@ -659,6 +668,10 @@ export function useRefereeControllerSyncPanels(
     }));
     const fallbackRecoveryPanelActions = {
         toggleFallbackSetupPanel: options.toggleFallbackSetupPanel,
+        updateAdminBase: (value: string) => {
+            options.adminBase.value = value;
+        },
+        onApiBaseBlur: options.onApiBaseBlur,
         selectTournament: (tournamentId: number | null) => {
             options.manualSelectedTournamentId.value = tournamentId;
         },
@@ -678,8 +691,15 @@ export function useRefereeControllerSyncPanels(
                 !options.manualSelectedRing.value ||
                 connectionState.value === 'setup_needed'),
     );
+    const showRecoverySetupPanel = computed(() => {
+        if (isAdminRecoveryLocked.value) return false;
+        if (!options.syncHasServer.value) return true;
+        if (!options.syncConfigurationReady.value) return true;
+        if (options.setupSource.value === 'manual_fallback') return true;
+        if (options.queueIsDegraded.value) return true;
+        return connectionState.value !== 'connected';
+    });
     const connectionPanelModel = computed(() => ({
-        adminBase: options.adminBase.value,
         pairingCode: options.pairingCode.value,
         pairingStateToneClass: pairingStateToneClass.value,
         pairingStateLabel: pairingStateLabel.value,
@@ -713,7 +733,7 @@ export function useRefereeControllerSyncPanels(
         if (options.syncHasServer.value) {
             items.push({
                 key: 'server',
-                label: `Host ${syncServerAddressLabel.value}`,
+                label: 'Event Host ready',
             });
         }
 
@@ -722,9 +742,9 @@ export function useRefereeControllerSyncPanels(
         }
 
         if (options.setupSource.value === 'assigned_setup') {
-            items.push({ key: 'setup-source', label: 'Admin-assigned setup' });
+            items.push({ key: 'setup-source', label: 'Event Host assignment' });
         } else {
-            items.push({ key: 'setup-source', label: 'Manual fallback' });
+            items.push({ key: 'setup-source', label: 'Manual recovery' });
         }
 
         if (options.syncHasTournament.value) {
@@ -755,7 +775,7 @@ export function useRefereeControllerSyncPanels(
             const count = options.pendingResultSyncCount.value;
             items.push({
                 key: 'pending-results',
-                label: `${count} result${count === 1 ? '' : 's'} pending Admin sync`,
+                label: `${count} result${count === 1 ? '' : 's'} pending sync`,
             });
         }
 
@@ -783,7 +803,7 @@ export function useRefereeControllerSyncPanels(
             value: syncSourceLabel.value,
             detail:
                 options.setupSource.value === 'assigned_setup'
-                    ? 'Admin assignment is authoritative while it is available.'
+                    ? 'Event Host assignment is authoritative while it is available.'
                     : options.selectedTournamentNameLabel.value,
         },
         {
@@ -794,7 +814,7 @@ export function useRefereeControllerSyncPanels(
                 : 'Not set',
             detail:
                 options.setupSource.value === 'assigned_setup'
-                    ? 'Queue filtered to the Admin-assigned gilam.'
+                    ? 'Queue filtered to the Event Host assigned gilam.'
                     : options.selectedTournamentId.value
                       ? 'Queue filtered to the active gilam.'
                       : 'Select a tournament to choose a gilam.',
@@ -804,7 +824,7 @@ export function useRefereeControllerSyncPanels(
             label: 'Last Sync',
             value: lastSyncLabel.value,
             detail: options.lastSyncAt.value
-                ? 'Last successful Admin-backed queue snapshot stored on this controller.'
+                ? 'Last successful live queue snapshot stored on this controller.'
                 : 'No saved queue snapshot yet.',
         },
         {
@@ -822,7 +842,7 @@ export function useRefereeControllerSyncPanels(
                     ? currentConnectionWarningLabel.value
                     : options.queueIsDegraded.value
                       ? syncFallbackReasonLabel.value
-                      : 'Admin-backed snapshots are using their normal source.',
+                      : 'Live snapshots are using their normal source.',
         },
     ]);
     const syncQueueCountItems = computed(() => [
@@ -837,8 +857,7 @@ export function useRefereeControllerSyncPanels(
             key: 'provisional',
             label: 'Provisional',
             value: options.queueProvisionalCount.value,
-            toneClass:
-                'bg-amber-500/10 border-amber-500/20 text-amber-200',
+            toneClass: 'bg-amber-500/10 border-amber-500/20 text-amber-200',
         },
         {
             key: 'auto-advance',
@@ -857,8 +876,7 @@ export function useRefereeControllerSyncPanels(
             key: 'removed',
             label: 'Removed',
             value: options.queueCompletedRemovedCount.value,
-            toneClass:
-                'bg-slate-500/10 border-slate-500/20 text-slate-200',
+            toneClass: 'bg-slate-500/10 border-slate-500/20 text-slate-200',
         },
     ]);
 
@@ -875,6 +893,7 @@ export function useRefereeControllerSyncPanels(
         fallbackRecoveryPanelModel,
         fallbackRecoveryPanelActions,
         shouldAutoExpandFallbackSetup,
+        showRecoverySetupPanel,
         assignmentState,
         assignedSetupUpdatedAtLabel,
         pairingStateLabel,

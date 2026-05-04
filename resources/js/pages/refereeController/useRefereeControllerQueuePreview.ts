@@ -312,15 +312,15 @@ export function useRefereeControllerQueuePreview(
 
         if (!options.syncHasServer.value) {
             return {
-                title: 'Add the Admin Host address to begin.',
+                title: 'Add the Event Host address to begin.',
                 message:
-                    'The queue snapshot will appear after the Admin Host source is set.',
+                    'The queue snapshot will appear after the Event Host source is set.',
             };
         }
 
         if (!options.syncHasTournament.value || !options.syncHasRing.value) {
             return {
-                title: 'Choose the fallback tournament and gilam to continue.',
+                title: 'Choose tournament to continue recovery.',
                 message:
                     'This preview stays empty until the controller has temporary recovery values for tournament and gilam.',
             };

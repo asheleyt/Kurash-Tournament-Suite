@@ -733,7 +733,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
   async function getScoreboardDataAdminDirect(id: number) {
     await options.ensureConfigLoaded()
     const adminBase = (options.adminBase.value || options.normalizedControllerAdminBase.value || '').toString().trim()
-    if (!adminBase) throw new Error('Admin Host address is required')
+    if (!adminBase) throw new Error('Event Host address is required')
 
     const base = options.normalizeApiBaseInput(adminBase).replace(/\/$/, '')
     const url = new URL(`${base}/tournaments/${encodeURIComponent(String(id))}/scoreboard-data`)
@@ -1214,7 +1214,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
       }
     } catch (error: any) {
       if (config.showBanner) {
-        options.showBanner(error?.message || 'Invalid Admin Host address.', 'error', 4000)
+        options.showBanner(error?.message || 'Invalid Event Host address.', 'error', 4000)
       }
       options.isLiveSnapshotRecoveryBusy.value = false
       return false

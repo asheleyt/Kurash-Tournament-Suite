@@ -191,7 +191,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
   const isControllerHeartbeatBusy = ref(false)
   const isAssignedSetupLoading = ref(false)
   const isAssignedSetupStale = ref(false)
-  const pairingStatusDetail = ref('Enter the Admin Host and pairing code to register this controller as a known event device.')
+  const pairingStatusDetail = ref('Enter the Event Host and pairing code to register this controller as a known event device.')
   let knownDeviceSessionVersion = 0
 
   function createKnownDeviceSessionGuard() {
@@ -310,9 +310,9 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       case 'forgotten_locally':
         return 'Local pairing was cleared on this machine. Pair again when you are ready.'
       case 'transport_error':
-        return 'The controller could not reach the Admin Host for pairing. Check the local LAN connection and host address.'
+        return 'The controller could not reach the Event Host for pairing. Check the local LAN connection and host address.'
       default:
-        return 'Enter the Admin Host and pairing code to register this controller as a known event device.'
+        return 'Enter the Event Host and pairing code to register this controller as a known event device.'
     }
   }
 
@@ -329,7 +329,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
     }
 
     if (assignedSetup.value && !isAssignedSetupStale.value) {
-      pairingStatusDetail.value = 'Known device connected. Admin-assigned tournament and gilam are authoritative for queue selection.'
+      pairingStatusDetail.value = 'Known device connected. Event Host tournament and gilam assignment is active for queue selection.'
       return
     }
 
@@ -338,7 +338,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       return
     }
 
-    pairingStatusDetail.value = 'Known device connected. Waiting for Admin to provide assigned tournament and gilam details.'
+    pairingStatusDetail.value = 'Known device connected. Waiting for Event Host assignment.'
   }
 
   function applyControllerAuthState(nextState: ControllerAuthState) {
@@ -356,8 +356,8 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
 
     if (controllerAuthState.value.token) {
       pairingState.value = 'paired_known_device'
-      if (!pairingStatusDetail.value || pairingStatusDetail.value.includes('Enter the Admin Host and pairing code')) {
-        pairingStatusDetail.value = 'Known device credentials are saved locally. The controller will reconnect automatically when the Admin Host is reachable.'
+      if (!pairingStatusDetail.value || pairingStatusDetail.value.includes('Enter the Admin Host and pairing code') || pairingStatusDetail.value.includes('Enter the Event Host and pairing code')) {
+        pairingStatusDetail.value = 'Known device credentials are saved locally. The controller will reconnect automatically when the Event Host is reachable.'
       }
       return
     }
@@ -467,7 +467,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
     pairingState.value = 'paired_known_device'
     isAssignedSetupStale.value = false
     pairingCode.value = ''
-    updatePairingStatusDetail('Pairing succeeded. Reconnecting as a known device and requesting Admin-assigned setup.')
+    updatePairingStatusDetail('Pairing succeeded. Reconnecting as a known device and requesting Event Host assignment.')
     return nextState
   }
 
@@ -622,14 +622,14 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
 
       updatePairingStatusDetail(null)
       if (optionsForHeartbeat.showSuccessBanner) {
-        options.showBanner('Known device reconnected to the Admin Host.', 'success', 2500)
+        options.showBanner('Known device reconnected to the Event Host.', 'success', 2500)
       }
       return true
     } catch (error: any) {
       return handleKnownDeviceSessionFailure(
         error,
         refreshAssignment
-          ? 'Known device reconnect failed. Manual fallback remains available while the local LAN connection is restored.'
+          ? 'Known device reconnect failed. Manual recovery remains available while the local LAN connection is restored.'
           : 'Known device heartbeat failed. Background retries will continue.',
       )
     } finally {
@@ -650,7 +650,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
     } catch (error: any) {
       return handleKnownDeviceSessionFailure(
         error,
-        'Known device reconnect failed. Manual fallback remains available while the local LAN connection is restored.',
+        'Known device reconnect failed. Manual recovery remains available while the local LAN connection is restored.',
       )
     } finally {
       isControllerReconnectBusy.value = false
@@ -660,12 +660,12 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
   async function submitControllerPairing() {
     try {
       if (!options.adminBase.value) {
-        const error = new Error('Enter the Admin Host address first.') as Error & { code?: string }
+        const error = new Error('Enter the Event Host address first.') as Error & { code?: string }
         error.code = 'admin_base_required'
         throw error
       }
       if (!pairingCode.value.trim()) {
-        const error = new Error('Enter the short-lived pairing code from Admin.') as Error & { code?: string }
+        const error = new Error('Enter the 6-digit pairing code from the Event Host.') as Error & { code?: string }
         error.code = 'validation_error'
         throw error
       }
@@ -673,7 +673,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       options.adminBase.value = options.normalizeApiBaseInput(options.adminBase.value)
       options.persistAdminBase()
     } catch (error: any) {
-      const message = error?.message || 'Invalid Admin Host address.'
+      const message = error?.message || 'Invalid Event Host address.'
       pairingState.value = 'pair_failed'
       pairingResetReason.value = error?.code === 'transport_error' ? 'transport_error' : pairingResetReason.value
       updatePairingStatusDetail(message)
@@ -684,7 +684,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
 
     isPairingBusy.value = true
     pairingState.value = 'pairing'
-    updatePairingStatusDetail('Sending the pairing code to the Admin Host and registering this controller.')
+    updatePairingStatusDetail('Sending the pairing code to the Event Host and registering this controller.')
 
     try {
       const payload = await pairControllerRemote()
@@ -702,9 +702,9 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       }
       updatePairingStatusDetail(null)
       if (assignedSetup.value) {
-        options.showBanner('Controller paired and Admin-assigned setup is active.', 'success', 3000)
+        options.showBanner('Controller paired and Event Host assignment is active.', 'success', 3000)
       } else {
-        options.showBanner('Controller paired successfully. Waiting for Admin-assigned setup.', 'success', 3000)
+        options.showBanner('Controller paired successfully. Waiting for Event Host assignment.', 'success', 3000)
       }
     } catch (error: any) {
       const code = normalizeOptionalText(error?.code)
