@@ -2400,6 +2400,47 @@ const normalizedControllerAdminBase = computed(() => {
         return raw;
     }
 });
+const supportCurrentEventHostLabel = computed(
+    () => normalizedControllerAdminBase.value || 'Not configured',
+);
+const supportSavedEventHostLabel = computed(() => {
+    try {
+        return (localStorage.getItem('admin_base') || '').trim() || 'Not saved';
+    } catch {
+        return 'Not saved';
+    }
+});
+const supportRawApiBaseLabel = computed(
+    () => (getAPIBase() || '').toString().trim() || 'Not configured',
+);
+function buildSupportEndpointDetail(path: string) {
+    try {
+        const url = localApiUrl(path);
+        attachAdminBase(url);
+        return url.toString();
+    } catch {
+        return 'Unavailable';
+    }
+}
+const supportStatusEndpointDetail = computed(() =>
+    buildSupportEndpointDetail('/status'),
+);
+const supportTournamentsEndpointDetail = computed(() =>
+    buildSupportEndpointDetail('/tournaments'),
+);
+const supportQueueEndpointDetail = computed(() => {
+    const tournamentId = selectedTournamentId.value;
+    const ring = (selectedRing.value || '').toString().trim();
+    if (hasKnownDeviceCredentials.value && hasAssignedSetup.value) {
+        return buildSupportEndpointDetail('/controller/queue');
+    }
+    if (tournamentId != null && ring) {
+        return buildSupportEndpointDetail(
+            `/tournaments/${tournamentId}/rings/${ring}/queue`,
+        );
+    }
+    return 'Queue endpoint available after Event Host assignment or recovery selection.';
+});
 const assignedTournamentId = computed<number | null>(() => {
     const raw = assignedSetup.value?.tournament_id;
     if (raw == null || raw === '') return null;
@@ -2788,9 +2829,6 @@ function focusSyncSetup() {
 function openManualFallbackTab() {
     settingsTab.value = 'match';
     nextTick(() => scrollControllerToTop('smooth'));
-}
-function updateAdminBaseFromInput(event: Event) {
-    adminBase.value = (event.target as HTMLInputElement).value;
 }
 async function testSyncConnection() {
     try {
@@ -4356,7 +4394,7 @@ function onApiBaseBlur() {
         adminBase.value = normalizeApiBaseInput(adminBase.value);
         persistAdminBase();
     } catch (e: any) {
-        showBanner(e?.message || 'Invalid API base URL', 'error', 3500);
+        showBanner(e?.message || 'Invalid Event Host address.', 'error', 3500);
     }
 }
 async function autoDetectApiBase() {

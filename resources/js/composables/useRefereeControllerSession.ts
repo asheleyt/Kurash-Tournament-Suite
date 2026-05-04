@@ -310,7 +310,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       case 'forgotten_locally':
         return 'Local pairing was cleared on this machine. Pair again when you are ready.'
       case 'transport_error':
-        return 'The controller could not reach the Event Host for pairing. Check the local LAN connection and host address.'
+        return 'Could not reach the Event Host over the local event network. Check the host address and local LAN connection.'
       default:
         return 'Enter the Event Host and pairing code to register this controller as a known event device.'
     }
@@ -719,7 +719,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
 
   async function forgetControllerPairing() {
     await clearControllerAuthState('forgotten_locally', pairingResetReasonMessage('forgotten_locally'))
-    options.showBanner('Local pairing has been cleared from this controller.', 'info', 3200)
+    options.showBanner('Local pairing cleared. Pair again when ready.', 'info', 3200)
   }
 
   return {

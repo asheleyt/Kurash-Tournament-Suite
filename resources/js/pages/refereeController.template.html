@@ -32,7 +32,7 @@
                     class="w-full rounded-2xl px-1 py-1 text-white focus:outline-none"
                     :aria-expanded="isSettingsOpen ? 'true' : 'false'"
                 >
-                    <div class="flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
                         <div class="flex items-center gap-3">
                             <div
                                 class="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
@@ -55,6 +55,29 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="relative flex-1">
+                            <div
+                                v-if="statusBanner.show"
+                                class="pointer-events-none absolute top-[60%] left-1/2 z-50 w-[min(48vw,560px)] max-w-full -translate-x-1/2 -translate-y-1/2 sm:top-1/2"
+                            >
+                                <div
+                                    role="status"
+                                    aria-live="polite"
+                                    :class="[
+                                            'w-full rounded-xl border px-4 py-2.5 text-center text-sm leading-snug font-semibold whitespace-normal break-words shadow-xl',
+                                            statusBanner.type === 'success'
+                                                ? 'border-green-500/50 bg-green-700/30 text-green-100'
+                                                : statusBanner.type === 'error'
+                                                  ? 'border-red-500/50 bg-red-700/30 text-red-100'
+                                                  : 'border-blue-500/50 bg-blue-700/30 text-blue-100',
+                                        ]"
+                                >
+                                    {{ statusBanner.message }}
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="flex items-center">
                             <div
                                 class="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
@@ -145,23 +168,6 @@
                         class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pr-1"
                         :class="'controller-scrollbar-hidden'"
                     >
-                        <div
-                            v-if="statusBanner.show"
-                            class="fixed top-4 right-4 z-50"
-                        >
-                            <div
-                                :class="[
-                                        'rounded-xl border px-3 py-2 text-xs font-bold tracking-wider uppercase shadow-lg',
-                                        statusBanner.type === 'success'
-                                            ? 'border-green-500/50 bg-green-700/30 text-green-300'
-                                            : statusBanner.type === 'error'
-                                              ? 'border-red-500/50 bg-red-700/30 text-red-300'
-                                              : 'border-blue-500/50 bg-blue-700/30 text-blue-300',
-                                    ]"
-                            >
-                                {{ statusBanner.message }}
-                            </div>
-                        </div>
                         <div
                             v-if="isSyncConfigurationTab"
                             class="flex w-full animate-in flex-col gap-6 duration-150 fade-in slide-in-from-left-2"
@@ -634,33 +640,70 @@
                                         class="mt-5 space-y-5 rounded-2xl border border-white/8 bg-white/2 p-4 md:p-5"
                                     >
                                         <div
-                                            class="rounded-2xl border border-white/10 bg-white/3 p-4"
+                                            class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
                                         >
-                                            <label
-                                                class="mb-2 block text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                                                >Event Host Address</label
-                                            >
-                                            <input
-                                                :value="adminBase"
-                                                @input="updateAdminBaseFromInput"
-                                                @blur="onApiBaseBlur"
-                                                placeholder="https://event-host.example.com/api"
-                                                class="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                                                title="Event Host Address"
-                                            />
                                             <div
-                                                class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
                                             >
-                                                Support-only override. Pairing,
-                                                reconnect, recovery setup, and
-                                                queue snapshots use this Event
-                                                Host.
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Current Event Host
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-sm font-black break-all text-white"
+                                                >
+                                                    {{
+                                                    supportCurrentEventHostLabel
+                                                    }}
+                                                </div>
                                             </div>
-                                        </div>
-
-                                        <div
-                                            class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                                        >
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Last Paired Host
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-sm font-black break-all text-white"
+                                                >
+                                                    {{
+                                                    connectionPanelModel.controllerAuthState.last_paired_host
+                                                    || notPairedYetLabel }}
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Saved Host
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-sm font-black break-all text-white"
+                                                >
+                                                    {{
+                                                    supportSavedEventHostLabel
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Raw API Base
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-sm font-black break-all text-white"
+                                                >
+                                                    {{ supportRawApiBaseLabel }}
+                                                </div>
+                                            </div>
                                             <div
                                                 class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
                                             >
@@ -703,22 +746,6 @@
                                                 <div
                                                     class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
                                                 >
-                                                    Last Paired Host
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    connectionPanelModel.controllerAuthState.last_paired_host
-                                                    || notPairedYetLabel }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
                                                     Assigned Setup
                                                 </div>
                                                 <div
@@ -732,6 +759,57 @@
                                                 >
                                                     Updated {{
                                                     assignedSetupUpdatedAtLabel
+                                                    }}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-3 xl:grid-cols-3">
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Raw Status Endpoint
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                >
+                                                    {{
+                                                    supportStatusEndpointDetail
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Raw Tournaments Endpoint
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                >
+                                                    {{
+                                                    supportTournamentsEndpointDetail
+                                                    }}
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                            >
+                                                <div
+                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                >
+                                                    Raw Queue Endpoint
+                                                </div>
+                                                <div
+                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                >
+                                                    {{
+                                                    supportQueueEndpointDetail
                                                     }}
                                                 </div>
                                             </div>
@@ -2147,7 +2225,7 @@
 
                         <!-- Timer Adjustments -->
                         <div class="mb-4 flex gap-2">
-                            <Dialog v-model:open="isAdjustTimeOpen">
+                            <dialog v-model:open="isAdjustTimeOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         @click="openAdjustTime"
@@ -2349,22 +2427,22 @@
                                         <DialogClose as-child>
                                             <button
                                                 variant="outline"
-                                                class="border-gray-600 bg-transparent text-white hover:bg-gray-800 hover:text-white"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                                             >
                                                 Cancel
                                             </button>
                                         </DialogClose>
                                         <button
                                             @click="saveAdjustTime"
-                                            class="bg-blue-600 font-black text-white hover:bg-blue-500"
+                                            class="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
                                         >
                                             Update
                                         </button>
                                     </DialogFooter>
                                 </DialogContent>
-                            </Dialog>
+                            </dialog>
 
-                            <Dialog v-model:open="isSetStartTimeOpen">
+                            <dialog v-model:open="isSetStartTimeOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         @click="openSetStartTime"
@@ -2556,20 +2634,20 @@
                                         <DialogClose as-child>
                                             <button
                                                 variant="outline"
-                                                class="border-gray-600 bg-transparent text-white hover:bg-gray-800 hover:text-white"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                                             >
                                                 Cancel
                                             </button>
                                         </DialogClose>
                                         <button
                                             @click="saveStartTime"
-                                            class="bg-blue-600 font-black text-white hover:bg-blue-500"
+                                            class="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
                                         >
                                             Set Time
                                         </button>
                                     </DialogFooter>
                                 </DialogContent>
-                            </Dialog>
+                            </dialog>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -2598,7 +2676,7 @@
                                 >
                             </button>
 
-                            <Dialog v-model:open="isResetTimerOpen">
+                            <dialog v-model:open="isResetTimerOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         class="relative flex h-12 items-center justify-center gap-2 overflow-hidden rounded-xl bg-linear-to-br from-red-600 to-red-700 font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-red-600"
@@ -2633,7 +2711,7 @@
                                         <DialogClose as-child>
                                             <button
                                                 variant="outline"
-                                                class="border-gray-600 bg-transparent text-white hover:bg-gray-800 hover:text-white"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                                             >
                                                 Cancel
                                             </button>
@@ -2642,13 +2720,14 @@
                                             <button
                                                 @click="confirmResetTime"
                                                 variant="destructive"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
                                             >
                                                 Reset
                                             </button>
                                         </DialogClose>
                                     </DialogFooter>
                                 </DialogContent>
-                            </Dialog>
+                            </dialog>
                         </div>
                     </div>
 
@@ -2684,7 +2763,7 @@
                                     >
                                 </button>
 
-                                <Dialog v-model:open="isSetBreakTimeOpen">
+                                <dialog v-model:open="isSetBreakTimeOpen">
                                     <DialogTrigger as-child>
                                         <button
                                             v-if="
@@ -2894,20 +2973,20 @@
                                             <DialogClose as-child>
                                                 <button
                                                     variant="outline"
-                                                    class="border-gray-600 bg-transparent text-white hover:bg-gray-800 hover:text-white"
+                                                    class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                                                 >
                                                     Cancel
                                                 </button>
                                             </DialogClose>
                                             <button
                                                 @click="saveBreakTime"
-                                                class="bg-blue-600 font-black text-white hover:bg-blue-500"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
                                             >
                                                 Start Timer
                                             </button>
                                         </DialogFooter>
                                     </DialogContent>
-                                </Dialog>
+                                </dialog>
                             </div>
 
                             <button
@@ -2945,7 +3024,7 @@
                                 >
                             </button>
 
-                            <Dialog v-model:open="isResetMatchOpen">
+                            <dialog v-model:open="isResetMatchOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         class="relative flex h-12 items-center justify-center gap-2 rounded-xl bg-linear-to-br from-red-600 to-red-700 font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-red-600"
@@ -2977,7 +3056,7 @@
                                         <DialogClose as-child>
                                             <button
                                                 variant="outline"
-                                                class="border-gray-600 bg-transparent text-white hover:bg-gray-800 hover:text-white"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                                             >
                                                 Cancel
                                             </button>
@@ -2986,13 +3065,14 @@
                                             <button
                                                 @click="confirmResetAll"
                                                 variant="destructive"
+                                                class="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
                                             >
                                                 Reset All
                                             </button>
                                         </DialogClose>
                                     </DialogFooter>
                                 </DialogContent>
-                            </Dialog>
+                            </dialog>
                         </div>
                     </div>
                 </div>
@@ -3985,7 +4065,7 @@
             </div>
         </div>
 
-        <Dialog
+        <dialog
             v-if="isElectronAppControlAvailable"
             v-model:open="isExitApplicationDialogOpen"
         >
@@ -4026,22 +4106,23 @@
                         <button
                             variant="outline"
                             :disabled="isRequestingApplicationExit"
-                            class="border-slate-600 bg-transparent text-white hover:bg-slate-800 hover:text-white disabled:opacity-50"
+                            class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
                         >
                             Cancel
                         </button>
                     </DialogClose>
                     <button
+                        variant="destructive"
                         :disabled="isRequestingApplicationExit"
                         @click="requestApplicationExit"
-                        class="border border-red-400/30 bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+                        class="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
                     >
                         {{ isRequestingApplicationExit ? 'Exiting...' :
                         exitApplicationLabel }}
                     </button>
                 </DialogFooter>
             </DialogContent>
-        </Dialog>
+        </dialog>
 
         <!-- Confirmation Modal -->
         <div

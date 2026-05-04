@@ -97,31 +97,6 @@
         </div>
 
         <div class="grid gap-4">
-            <div>
-                <label
-                    class="mb-2 block text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                    >Event Host</label
-                >
-                <input
-                    :value="props.model.adminBase"
-                    @input="handleAdminBaseInput"
-                    @blur="props.actions.onApiBaseBlur()"
-                    :disabled="props.model.isAdminRecoveryLocked"
-                    placeholder="http://event-host.local:8000/api"
-                    class="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    title="Event Host"
-                />
-                <div
-                    class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
-                >
-                    {{
-                        props.model.syncHasServer
-                            ? 'Recovery and pairing use this Event Host.'
-                            : 'Enter the Event Host address, then refresh tournaments.'
-                    }}
-                </div>
-            </div>
-
             <div
                 class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]"
             >
@@ -344,7 +319,6 @@ interface RefereeFallbackRecoveryPanelModel {
     fallbackSetupHostSummaryLabel: string;
     fallbackTournamentSummaryLabel: string;
     fallbackGilamSummaryLabel: string;
-    adminBase: string;
     manualSelectedTournamentNameLabel: string;
     manualSelectedTournamentId: number | null;
     tournaments: TournamentOption[];
@@ -362,8 +336,6 @@ interface RefereeFallbackRecoveryPanelModel {
 
 interface RefereeFallbackRecoveryPanelActions {
     toggleFallbackSetupPanel: () => void;
-    updateAdminBase: (value: string) => void;
-    onApiBaseBlur: () => void;
     selectTournament: (tournamentId: number | null) => void;
     selectRing: (ring: string) => void;
     testSyncConnection: () => void;
@@ -375,8 +347,4 @@ const props = defineProps<{
     model: RefereeFallbackRecoveryPanelModel;
     actions: RefereeFallbackRecoveryPanelActions;
 }>();
-
-function handleAdminBaseInput(event: Event) {
-    props.actions.updateAdminBase((event.target as HTMLInputElement).value);
-}
 </script>

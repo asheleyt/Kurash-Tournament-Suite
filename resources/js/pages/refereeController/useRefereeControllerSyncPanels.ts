@@ -650,7 +650,6 @@ export function useRefereeControllerSyncPanels(
         fallbackSetupHostSummaryLabel: fallbackSetupHostSummaryLabel.value,
         fallbackTournamentSummaryLabel: fallbackTournamentSummaryLabel.value,
         fallbackGilamSummaryLabel: fallbackGilamSummaryLabel.value,
-        adminBase: options.adminBase.value,
         manualSelectedTournamentNameLabel:
             options.manualSelectedTournamentNameLabel.value,
         manualSelectedTournamentId: options.manualSelectedTournamentId.value,
@@ -668,10 +667,6 @@ export function useRefereeControllerSyncPanels(
     }));
     const fallbackRecoveryPanelActions = {
         toggleFallbackSetupPanel: options.toggleFallbackSetupPanel,
-        updateAdminBase: (value: string) => {
-            options.adminBase.value = value;
-        },
-        onApiBaseBlur: options.onApiBaseBlur,
         selectTournament: (tournamentId: number | null) => {
             options.manualSelectedTournamentId.value = tournamentId;
         },
@@ -700,6 +695,7 @@ export function useRefereeControllerSyncPanels(
         return connectionState.value !== 'connected';
     });
     const connectionPanelModel = computed(() => ({
+        adminBase: options.adminBase.value,
         pairingCode: options.pairingCode.value,
         pairingStateToneClass: pairingStateToneClass.value,
         pairingStateLabel: pairingStateLabel.value,

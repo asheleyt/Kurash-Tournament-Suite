@@ -775,7 +775,7 @@ function confirmUploadClubLogo() {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" @click="isAdjustTimeOpen = false" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">Cancel</Button>
-                    <Button @click="saveAdjustTime" class="bg-blue-600 hover:bg-blue-500 text-white">Update Time</Button>
+                    <Button @click="saveAdjustTime" class="bg-blue-600 hover:bg-blue-700 text-white">Update Time</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -809,7 +809,7 @@ function confirmUploadClubLogo() {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" @click="isSetStartTimeOpen = false" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">Cancel</Button>
-                    <Button @click="saveStartTime" class="bg-blue-600 hover:bg-blue-500 text-white">Set Time</Button>
+                    <Button @click="saveStartTime" class="bg-blue-600 hover:bg-blue-700 text-white">Set Time</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -848,7 +848,7 @@ function confirmUploadClubLogo() {
                       <Button variant="outline" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">Cancel</Button>
                     </DialogClose>
                     <DialogClose as-child>
-                      <Button @click="confirmResetTime" variant="destructive">Reset</Button>
+                      <Button @click="confirmResetTime" variant="destructive" class="bg-red-600 hover:bg-red-700 text-white">Reset</Button>
                     </DialogClose>
                   </DialogFooter>
                 </DialogContent>
@@ -919,7 +919,7 @@ function confirmUploadClubLogo() {
                       <DialogClose as-child>
                         <Button variant="outline" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">Cancel</Button>
                       </DialogClose>
-                      <Button @click="saveBreakTime" class="bg-blue-600 hover:bg-blue-500 text-white">Start Timer</Button>
+                      <Button @click="saveBreakTime" class="bg-blue-600 hover:bg-blue-700 text-white">Start Timer</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -967,7 +967,7 @@ function confirmUploadClubLogo() {
                       <Button variant="outline" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">Cancel</Button>
                     </DialogClose>
                     <DialogClose as-child>
-                      <Button @click="confirmResetAll" variant="destructive">Reset All</Button>
+                      <Button @click="confirmResetAll" variant="destructive" class="bg-red-600 hover:bg-red-700 text-white">Reset All</Button>
                     </DialogClose>
                   </DialogFooter>
                 </DialogContent>
