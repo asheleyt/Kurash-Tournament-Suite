@@ -299,6 +299,9 @@ const logoPreviewUrl = ref<string>('');
 const clubLogoInput = ref<HTMLInputElement | null>(null);
 const showResultPopup = ref(false);
 const resultPopupMessage = ref('');
+type ControllerToastTone = 'success' | 'error' | 'info';
+type ControllerToastId = 'status' | 'result';
+const resultPopupType = ref<ControllerToastTone>('success');
 const isResultSubmitting = ref(false);
 const isResultGateChecking = ref(false);
 const resultSubmitBlockReason = ref<string | null>(null);
@@ -1555,12 +1558,11 @@ function handleUpdateMatchClick() {
         !isValidName(tempSettings.player1.name) ||
         !isValidName(tempSettings.player2.name)
     ) {
-        resultPopupMessage.value =
-            "Invalid player name. Use letters, numbers, spaces, - ' .";
-        showResultPopup.value = true;
-        setTimeout(() => {
-            showResultPopup.value = false;
-        }, 3000);
+        showResultToast(
+            "Invalid player name. Use letters, numbers, spaces, - ' .",
+            'error',
+            3000,
+        );
         return;
     }
 
@@ -1961,12 +1963,13 @@ const isCheckingStatus = ref(false);
 const statusBanner = ref<{
     show: boolean;
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: ControllerToastTone;
 }>({ show: false, message: '', type: 'info' });
 let bannerTimer: number | null = null;
+let resultPopupTimer: number | null = null;
 function showBanner(
     message: string,
-    type: 'success' | 'error' | 'info' = 'info',
+    type: ControllerToastTone = 'info',
     timeout = 3000,
 ) {
     statusBanner.value = { show: true, message, type };
@@ -1974,6 +1977,83 @@ function showBanner(
     bannerTimer = setTimeout(() => {
         statusBanner.value.show = false;
     }, timeout) as unknown as number;
+}
+function showResultToast(
+    message: string,
+    type: ControllerToastTone = 'success',
+    timeout = 6500,
+) {
+    resultPopupMessage.value = message;
+    resultPopupType.value = type;
+    showResultPopup.value = true;
+    if (resultPopupTimer) clearTimeout(resultPopupTimer);
+    resultPopupTimer = setTimeout(() => {
+        showResultPopup.value = false;
+        resultPopupTimer = null;
+    }, timeout) as unknown as number;
+}
+function hideResultToast() {
+    showResultPopup.value = false;
+    if (resultPopupTimer) {
+        clearTimeout(resultPopupTimer);
+        resultPopupTimer = null;
+    }
+}
+const controllerToastToneClasses: Record<ControllerToastTone, string> = {
+    success: 'border-emerald-500/45 bg-emerald-950/85 text-emerald-50',
+    error: 'border-rose-500/45 bg-rose-950/85 text-rose-50',
+    info: 'border-blue-500/45 bg-slate-900/90 text-blue-50',
+};
+const controllerToastIconClasses: Record<ControllerToastTone, string> = {
+    success: 'text-emerald-300',
+    error: 'text-rose-300',
+    info: 'text-blue-300',
+};
+const visibleControllerToasts = computed(() => {
+    const toasts: {
+        id: ControllerToastId;
+        message: string;
+        type: ControllerToastTone;
+        toneClass: string;
+        iconClass: string;
+        closable: boolean;
+    }[] = [];
+
+    if (statusBanner.value.show && statusBanner.value.message) {
+        toasts.push({
+            id: 'status',
+            message: statusBanner.value.message,
+            type: statusBanner.value.type,
+            toneClass: controllerToastToneClasses[statusBanner.value.type],
+            iconClass: controllerToastIconClasses[statusBanner.value.type],
+            closable: false,
+        });
+    }
+
+    if (showResultPopup.value && resultPopupMessage.value) {
+        toasts.push({
+            id: 'result',
+            message: resultPopupMessage.value,
+            type: resultPopupType.value,
+            toneClass: controllerToastToneClasses[resultPopupType.value],
+            iconClass: controllerToastIconClasses[resultPopupType.value],
+            closable: true,
+        });
+    }
+
+    return toasts.slice(-2);
+});
+function dismissControllerToast(id: ControllerToastId) {
+    if (id === 'result') {
+        hideResultToast();
+        return;
+    }
+
+    statusBanner.value.show = false;
+    if (bannerTimer) {
+        clearTimeout(bannerTimer);
+        bannerTimer = null;
+    }
 }
 const lastOnlineState = ref<boolean | null>(null);
 const tournaments = ref<
@@ -2020,6 +2100,7 @@ const localResultOverrides = ref<Record<string, PersistedResultOverride>>({});
 const pendingResultSyncItems = ref<PendingResultSyncItem[]>([]);
 const isPendingResultSyncBusy = ref(false);
 const localStatusOverrides = ref<Record<string, string>>({});
+const syncQueueSnapshotOpen = ref(true);
 const syncDiagnosticsOpen = ref(false);
 const syncQueueDetailsOpen = ref(false);
 const pendingDeviceIdentityLabel = 'Pending local device identity';
@@ -5844,11 +5925,7 @@ onMounted(() => {
                                   return String(msg);
                               }
                           })();
-                resultPopupMessage.value = text || '';
-                showResultPopup.value = true;
-                setTimeout(() => {
-                    showResultPopup.value = false;
-                }, 2500);
+                showResultToast(text || '', 'info', 2500);
             };
         }
     } catch {}
@@ -6604,15 +6681,15 @@ async function handleSubmitResult() {
                 },
             );
 
-            resultPopupMessage.value = resultQueuedForAdminReplay
-                ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Event Host sync.`
-                : adminSyncOk
-                  ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
-                  : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`;
-            showResultPopup.value = true;
-            setTimeout(() => {
-                showResultPopup.value = false;
-            }, 3000);
+            showResultToast(
+                resultQueuedForAdminReplay
+                    ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Event Host sync.`
+                    : adminSyncOk
+                      ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
+                      : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`,
+                'success',
+                7500,
+            );
             gameState.winner = null;
             clearResultSubmitGateState();
             showFinishModal.value = false;
@@ -6721,11 +6798,11 @@ async function handleSubmitResult() {
         clearIntervalIfAny();
         gameState.isRunning = false;
         await confirmResetAll();
-        resultPopupMessage.value = `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`;
-        showResultPopup.value = true;
-        setTimeout(() => {
-            showResultPopup.value = false;
-        }, 3000);
+        showResultToast(
+            `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`,
+            'success',
+            7500,
+        );
         gameState.winner = null;
         clearResultSubmitGateState();
         showFinishModal.value = false;
@@ -6734,11 +6811,7 @@ async function handleSubmitResult() {
         console.error('Error handling match result:', error);
         isUpdatingMatches.value = false;
         updatingMatchId.value = null;
-        resultPopupMessage.value = 'Failed to record match result.';
-        showResultPopup.value = true;
-        setTimeout(() => {
-            showResultPopup.value = false;
-        }, 3000);
+        showResultToast('Failed to record match result.', 'error', 6500);
     }
 }
 
@@ -6956,5 +7029,13 @@ onBeforeUnmount(() => {
     if (settingsScrollTimeoutId != null) {
         window.clearTimeout(settingsScrollTimeoutId);
         settingsScrollTimeoutId = null;
+    }
+    if (bannerTimer) {
+        clearTimeout(bannerTimer);
+        bannerTimer = null;
+    }
+    if (resultPopupTimer) {
+        clearTimeout(resultPopupTimer);
+        resultPopupTimer = null;
     }
 });

@@ -1,7 +1,16 @@
 const { BrowserWindow, screen } = require('electron');
 const { EventEmitter } = require('events');
+const path = require('path');
 const { cloneBounds } = require('./display-manager');
 const { DISPLAY_ROLES, normalizeDisplayId, normalizeDisplayIds } = require('./settings-store');
+
+function getKtsWindowIcon(app) {
+  if (process.platform !== 'win32' || !app || typeof app.getAppPath !== 'function') {
+    return undefined;
+  }
+
+  return path.join(app.getAppPath(), 'build-resources', 'KTS_Icon.ico');
+}
 
 function isDisplayRole(value) {
   return DISPLAY_ROLES.includes(value);
@@ -270,6 +279,7 @@ class WindowManager extends EventEmitter {
 
   createControllerWindow(url) {
     const primaryDisplay = this.displayManager.getPrimaryDisplay();
+    const icon = getKtsWindowIcon(this.app);
     const controllerWindow = new BrowserWindow({
       title: 'Gilam Controller',
       show: false,
@@ -281,6 +291,7 @@ class WindowManager extends EventEmitter {
       resizable: false,
       backgroundColor: '#0f172a',
       paintWhenInitiallyHidden: true,
+      icon,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -404,6 +415,7 @@ class WindowManager extends EventEmitter {
     if (!url) return null;
     const targetUrl = getNestedPublicTargetUrl(url);
     const roleLabel = role === 'ring_match_order' ? 'Gilam Match Order' : 'Scoreboard';
+    const icon = getKtsWindowIcon(this.app);
 
     const win = new BrowserWindow({
       title: this.getWindowTitleForRole(role, normalizedId, preview),
@@ -416,6 +428,7 @@ class WindowManager extends EventEmitter {
       resizable: false,
       backgroundColor: '#0f172a',
       paintWhenInitiallyHidden: true,
+      icon,
       webPreferences: { nodeIntegration: false, contextIsolation: true, preload: this.preloadPath },
     });
     const loadingWindow = new BrowserWindow({
@@ -429,6 +442,7 @@ class WindowManager extends EventEmitter {
       resizable: false,
       backgroundColor: '#020617',
       paintWhenInitiallyHidden: true,
+      icon,
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     });
 
@@ -588,6 +602,7 @@ class WindowManager extends EventEmitter {
     const existingWindow = this.displayTestWindows.get(normalizedId);
     if (existingWindow && !existingWindow.isDestroyed()) return existingWindow;
 
+    const icon = getKtsWindowIcon(this.app);
     const win = new BrowserWindow({
       title: `Scoreboard Display Test ${normalizedId}`,
       show: false,
@@ -601,6 +616,7 @@ class WindowManager extends EventEmitter {
       focusable: false,
       skipTaskbar: true,
       backgroundColor: '#03111f',
+      icon,
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     });
 

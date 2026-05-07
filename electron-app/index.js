@@ -8,10 +8,16 @@ const { SettingsStore } = require('./settings-store');
 const { WindowManager } = require('./window-manager');
 const { RuntimeOrchestrator, formatRuntimeError } = require('./runtime-orchestrator');
 
+const WINDOWS_APP_ID = 'com.kurashteam.scoreboard';
+const KTS_ICON_PATH = path.join(__dirname, 'build-resources', 'KTS_Icon.ico');
+
 app.commandLine.appendSwitch('disable-http-cache');
 // Keep the visible Electron app name aligned with Windows-facing branding while preserving
 // the existing userData/runtime root for compatibility with current local installs.
 app.setName('Kurash Tournament Suite');
+if (process.platform === 'win32') {
+  app.setAppUserModelId(WINDOWS_APP_ID);
+}
 app.setPath('userData', path.join(app.getPath('appData'), 'Kurash Scoreboard'));
 
 const requestedUserDataRoot = String(process.env.KURASH_USER_DATA_ROOT || '').trim();
@@ -285,6 +291,7 @@ function createStartupWindow() {
     resizable: false,
     backgroundColor: '#0f172a',
     paintWhenInitiallyHidden: true,
+    icon: KTS_ICON_PATH,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

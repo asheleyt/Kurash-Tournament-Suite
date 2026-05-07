@@ -56,27 +56,7 @@
                             </div>
                         </div>
 
-                        <div class="relative flex-1">
-                            <div
-                                v-if="statusBanner.show"
-                                class="pointer-events-none absolute top-[60%] left-1/2 z-50 w-[min(48vw,560px)] max-w-full -translate-x-1/2 -translate-y-1/2 sm:top-1/2"
-                            >
-                                <div
-                                    role="status"
-                                    aria-live="polite"
-                                    :class="[
-                                            'w-full rounded-xl border px-4 py-2.5 text-center text-sm leading-snug font-semibold whitespace-normal break-words shadow-xl',
-                                            statusBanner.type === 'success'
-                                                ? 'border-green-500/50 bg-green-700/30 text-green-100'
-                                                : statusBanner.type === 'error'
-                                                  ? 'border-red-500/50 bg-red-700/30 text-red-100'
-                                                  : 'border-blue-500/50 bg-blue-700/30 text-blue-100',
-                                        ]"
-                                >
-                                    {{ statusBanner.message }}
-                                </div>
-                            </div>
-                        </div>
+                        <div class="relative flex-1"></div>
 
                         <div class="flex items-center">
                             <div
@@ -317,33 +297,53 @@
                                 </div>
 
                                 <div
-                                    class="rounded-3xl border border-white/10 bg-black/30 p-5 shadow-xl shadow-black/10"
+                                    class="flex flex-col rounded-3xl border border-white/10 bg-black/30 p-5 shadow-xl shadow-black/10"
                                 >
-                                    <div
-                                        class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
+                                    <button
+                                        @click="
+                                            syncQueueSnapshotOpen =
+                                                !syncQueueSnapshotOpen
+                                        "
+                                        class="order-0 flex w-full items-center justify-between gap-4 rounded-2xl px-1 py-1 text-left text-white focus:outline-none"
+                                        :aria-expanded="
+                                            syncQueueSnapshotOpen
+                                                ? 'true'
+                                                : 'false'
+                                        "
                                     >
                                         <div class="min-w-0">
                                             <div
-                                                class="text-[11px] font-black tracking-[0.22em] text-cyan-300 uppercase"
+                                                class="text-xl font-black tracking-[0.16em] text-white uppercase"
                                             >
                                                 Queue Snapshot
                                             </div>
                                             <div
-                                                class="mt-2 text-xl font-black text-white"
+                                                class="mt-1 text-xs leading-5 font-semibold text-slate-400"
                                             >
                                                 <template v-if="syncHasRing"
                                                     >Gilam {{ selectedRing
                                                     }}</template
                                                 >
                                                 <template v-else
-                                                    >Queue Snapshot</template
+                                                    >Gilam not selected</template
                                                 >
+                                                &middot; {{ matchesList.length }} queue
+                                                item{{ matchesList.length === 1
+                                                ? '' : 's' }} &middot; {{
+                                                queueFreshnessLabel }} &middot; Last
+                                                sync: {{ lastSyncLabel }}
                                             </div>
                                             <div
-                                                class="mt-2 text-sm leading-6 font-semibold text-slate-400"
+                                                class="mt-2 text-[12px] leading-5 font-semibold text-slate-400"
                                             >
                                                 <template
-                                                    v-if="syncConfigurationReady"
+                                                    v-if="showSyncAttentionNotice"
+                                                    >{{
+                                                    currentConnectionWarningLabel
+                                                    }}</template
+                                                >
+                                                <template
+                                                    v-else-if="syncConfigurationReady"
                                                     >Ready to load the live
                                                     queue snapshot for {{
                                                     selectedTournamentNameLabel
@@ -358,28 +358,40 @@
                                             </div>
                                         </div>
                                         <div
-                                            class="flex flex-wrap items-center gap-2"
+                                            class="flex shrink-0 items-center gap-2"
                                         >
-                                            <span
-                                                class="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-slate-300 uppercase"
+                                            <div
+                                                class="hidden flex-wrap items-center justify-end gap-2 md:flex"
                                             >
-                                                {{ matchesList.length }} queue
-                                                items
-                                            </span>
-                                            <span
-                                                class="inline-flex rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] uppercase"
-                                                :class="
-                                                        queueFreshnessToneClass
-                                                    "
+                                                <span
+                                                    class="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-slate-300 uppercase"
+                                                >
+                                                    {{ matchesList.length }}
+                                                    queue items
+                                                </span>
+                                                <span
+                                                    class="inline-flex rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] uppercase"
+                                                    :class="
+                                                            queueFreshnessToneClass
+                                                        "
+                                                >
+                                                    {{ queueFreshnessLabel }}
+                                                </span>
+                                            </div>
+                                            <div
+                                                class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
                                             >
-                                                {{ queueFreshnessLabel }}
-                                            </span>
+                                                <ChevronDownIcon
+                                                    :class="`h-5 w-5 text-slate-300 transition-transform duration-300 ${syncQueueSnapshotOpen ? 'rotate-180' : ''}`"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </button>
 
                                     <div
                                         v-if="showSyncAttentionNotice"
-                                        class="mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-[12px] leading-6 font-semibold text-yellow-100"
+                                        v-show="syncQueueSnapshotOpen"
+                                        class="order-1 mt-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-[12px] leading-6 font-semibold text-yellow-100"
                                     >
                                         {{ currentConnectionWarningLabel }}
                                     </div>
@@ -388,7 +400,8 @@
                                                 selectedRingBracketLabels.length &&
                                                 previewMatchSlots.length
                                             "
-                                        class="mt-1 mb-3 flex flex-wrap gap-2"
+                                        v-show="syncQueueSnapshotOpen"
+                                        class="order-2 mt-3 mb-3 flex flex-wrap gap-2"
                                     >
                                         <span
                                             v-for="b in selectedRingBracketLabels"
@@ -400,7 +413,8 @@
                                     </div>
                                     <div
                                         v-if="previewMatchSlots.length"
-                                        class="mb-6 grid gap-3"
+                                        v-show="syncQueueSnapshotOpen"
+                                        class="order-3 mb-6 grid gap-3"
                                     >
                                         <div
                                             v-for="(
@@ -594,7 +608,8 @@
                                     </div>
                                     <div
                                         v-else
-                                        class="mt-5 mb-6 rounded-2xl border border-dashed border-white/10 bg-white/3 px-5 py-6"
+                                        v-show="syncQueueSnapshotOpen"
+                                        class="order-3 mt-5 mb-6 rounded-2xl border border-dashed border-white/10 bg-white/3 px-5 py-6"
                                     >
                                         <div
                                             class="text-sm font-black text-white"
@@ -607,476 +622,554 @@
                                             {{ syncQueueEmptyState.message }}
                                         </div>
                                     </div>
-                                    <div
-                                        class="mt-4 flex flex-wrap justify-end gap-2 pt-1"
+                                    <button
+                                        v-show="syncQueueSnapshotOpen"
+                                        @click="
+                                            syncQueueDetailsOpen =
+                                                !syncQueueDetailsOpen
+                                        "
+                                        class="order-5 mt-2 flex w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-left text-white transition-all hover:bg-white/6 focus:outline-none"
+                                        :aria-expanded="
+                                            syncQueueDetailsOpen
+                                                ? 'true'
+                                                : 'false'
+                                        "
                                     >
-                                        <button
-                                            @click="
-                                                    syncQueueDetailsOpen =
-                                                        !syncQueueDetailsOpen
-                                                "
-                                            class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-slate-300 uppercase transition-all hover:bg-white/10"
+                                        <div class="min-w-0">
+                                            <div
+                                                class="text-sm font-black tracking-[0.18em] text-white uppercase"
+                                            >
+                                                Full Queue
+                                            </div>
+                                            <div
+                                                class="mt-1 text-xs font-semibold text-slate-400"
+                                            >
+                                                Detailed table view of the same
+                                                queue snapshot.
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
                                         >
-                                            Full Queue
                                             <ChevronDownIcon
-                                                :class="`h-3.5 w-3.5 transition-transform duration-300 ${syncQueueDetailsOpen ? 'rotate-180' : ''}`"
+                                                :class="`h-5 w-5 text-slate-300 transition-transform duration-300 ${syncQueueDetailsOpen ? 'rotate-180' : ''}`"
                                             />
-                                        </button>
-                                        <button
-                                            @click="
-                                                    syncDiagnosticsOpen =
-                                                        !syncDiagnosticsOpen
-                                                "
-                                            class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-slate-400 uppercase transition-all hover:bg-white/10"
-                                        >
-                                            Support Details
-                                            <ChevronDownIcon
-                                                :class="`h-3.5 w-3.5 transition-transform duration-300 ${syncDiagnosticsOpen ? 'rotate-180' : ''}`"
-                                            />
-                                        </button>
-                                    </div>
-                                    <div
-                                        v-show="syncDiagnosticsOpen"
-                                        class="mt-5 space-y-5 rounded-2xl border border-white/8 bg-white/2 p-4 md:p-5"
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        @click="
+                                            syncDiagnosticsOpen =
+                                                !syncDiagnosticsOpen
+                                        "
+                                        class="order-7 mt-5 flex w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/3 px-4 py-4 text-left text-white transition-all hover:bg-white/6 focus:outline-none"
+                                        :aria-expanded="
+                                            syncDiagnosticsOpen
+                                                ? 'true'
+                                                : 'false'
+                                        "
                                     >
-                                        <div
-                                            class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-                                        >
+                                        <div class="min-w-0">
                                             <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                class="text-sm font-black tracking-[0.18em] text-white uppercase"
                                             >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Current Event Host
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    supportCurrentEventHostLabel
-                                                    }}
-                                                </div>
+                                                Support Details
                                             </div>
                                             <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                class="mt-1 text-xs text-slate-400"
                                             >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Last Paired Host
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    connectionPanelModel.controllerAuthState.last_paired_host
-                                                    || notPairedYetLabel }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Saved Host
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    supportSavedEventHostLabel
-                                                    }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Raw API Base
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{ supportRawApiBaseLabel }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-2 text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    <Hash class="h-3.5 w-3.5" />
-                                                    Device ID
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    connectionPanelModel.controllerAuthState.device_id
-                                                    ||
-                                                    pendingDeviceIdentityLabel
-                                                    }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="flex items-center gap-2 text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    <User class="h-3.5 w-3.5" />
-                                                    Known Device
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black break-all text-white"
-                                                >
-                                                    {{
-                                                    connectionPanelModel.controllerAuthState.controller_name
-                                                    || notPairedYetLabel }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Assigned Setup
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black text-white"
-                                                >
-                                                    {{ assignedSetupStatusLabel
-                                                    }}
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-[11px] font-semibold text-slate-400"
-                                                >
-                                                    Updated {{
-                                                    assignedSetupUpdatedAtLabel
-                                                    }}
-                                                </div>
+                                                Technical diagnostics and
+                                                recovery actions.
                                             </div>
                                         </div>
-
-                                        <div class="grid gap-3 xl:grid-cols-3">
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Raw Status Endpoint
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
-                                                >
-                                                    {{
-                                                    supportStatusEndpointDetail
-                                                    }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Raw Tournaments Endpoint
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
-                                                >
-                                                    {{
-                                                    supportTournamentsEndpointDetail
-                                                    }}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
-                                                >
-                                                    Raw Queue Endpoint
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-[11px] font-semibold break-all text-slate-200"
-                                                >
-                                                    {{
-                                                    supportQueueEndpointDetail
-                                                    }}
-                                                </div>
-                                            </div>
-                                        </div>
-
                                         <div
-                                            v-if="assignedTargetBadges.length"
-                                            class="flex flex-wrap gap-2"
+                                            class="flex shrink-0 items-center gap-2"
                                         >
                                             <span
-                                                v-for="target in assignedTargetBadges"
-                                                :key="target.key"
-                                                class="inline-flex rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] uppercase"
-                                                :class="target.toneClass"
-                                            >
-                                                {{ target.label }}
-                                            </span>
-                                        </div>
-
-                                        <div class="grid gap-3 xl:grid-cols-3">
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                                                >
-                                                    Setup Source
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black text-white"
-                                                >
-                                                    <template
-                                                        v-if="
-                                                            setupSource ===
-                                                            'assigned_setup'
-                                                        "
-                                                        >Event Host
-                                                        assignment</template
-                                                    >
-                                                    <template v-else
-                                                        >Manual
-                                                        recovery</template
-                                                    >
-                                                </div>
-                                                <div
-                                                    class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
-                                                >
-                                                    <template
-                                                        v-if="
-                                                            setupSource ===
-                                                            'assigned_setup'
-                                                        "
-                                                        >Event Host assignment
-                                                        active.</template
-                                                    >
-                                                    <template v-else
-                                                        >Temporary recovery
-                                                        values.</template
-                                                    >
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                                                >
-                                                    Freshness Scope
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black text-white"
-                                                >
-                                                    Snapshot age only
-                                                </div>
-                                                <div
-                                                    class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
-                                                >
-                                                    Last successful live queue
-                                                    snapshot.
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                                                >
-                                                    Offline LAN
-                                                </div>
-                                                <div
-                                                    class="mt-1 text-sm font-black text-white"
-                                                >
-                                                    One Local Event Network
-                                                </div>
-                                                <div
-                                                    class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
-                                                >
-                                                    Local network only.
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mb-2">
-                                            <span
-                                                class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-blue-300 uppercase"
-                                            >
-                                                Gilam {{ selectedRing || 'N/A'
-                                                }}
-                                            </span>
-                                            <span
-                                                class="ml-2 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-gray-300 uppercase"
-                                            >
-                                                Last Sync: {{ lastSyncLabel }}
-                                            </span>
-                                            <span
-                                                class="ml-2 rounded border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase"
+                                                class="hidden rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] uppercase md:inline-flex"
                                                 :class="
                                                         queueFreshnessToneClass
                                                     "
                                             >
                                                 {{ queueFreshnessLabel }}
                                             </span>
-                                            <span
-                                                v-if="
+                                            <div
+                                                class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
+                                            >
+                                                <ChevronDownIcon
+                                                    :class="`h-5 w-5 text-slate-300 transition-transform duration-300 ${syncDiagnosticsOpen ? 'rotate-180' : ''}`"
+                                                />
+                                            </div>
+                                        </div>
+                                    </button>
+                                    <div
+                                        v-show="syncDiagnosticsOpen"
+                                        class="order-8 mt-4 space-y-5 rounded-2xl border border-white/8 bg-white/2 p-4 md:p-5"
+                                    >
+                                        <section class="space-y-3">
+                                            <div
+                                                class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                            >
+                                                Quick Fix Actions
+                                            </div>
+                                            <div
+                                                class="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-white/3 p-4"
+                                            >
+                                                <button
+                                                    @click="fetchAllTournaments"
+                                                    :disabled="
+                                                        isFetchingAll ||
+                                                        isLoadingTournaments
+                                                    "
+                                                    class="h-10 rounded-2xl border border-white/10 bg-white/5 px-4 text-xs font-black tracking-[0.18em] text-white uppercase transition-all hover:bg-white/10 disabled:opacity-50"
+                                                >
+                                                    Refresh Tournaments
+                                                </button>
+                                                <button
+                                                    @click="readLocalCacheMeta()"
+                                                    class="h-10 rounded-2xl border border-white/10 bg-white/5 px-4 text-xs font-black tracking-[0.18em] text-slate-200 uppercase transition-all hover:bg-white/10"
+                                                >
+                                                    Reload Cache Info
+                                                </button>
+                                            </div>
+                                        </section>
+
+                                        <section class="space-y-3">
+                                            <div
+                                                class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                            >
+                                                Connection Summary
+                                            </div>
+                                            <div
+                                                class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+                                            >
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Current Event Host
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        supportCurrentEventHostLabel
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Last Paired Host
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        connectionPanelModel.controllerAuthState.last_paired_host
+                                                        || notPairedYetLabel }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Saved Host
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        supportSavedEventHostLabel
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="flex items-center gap-2 text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        <User
+                                                            class="h-3.5 w-3.5"
+                                                        />
+                                                        Known Device
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        connectionPanelModel.controllerAuthState.controller_name
+                                                        || notPairedYetLabel }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Assigned Setup
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black text-white"
+                                                    >
+                                                        {{
+                                                        assignedSetupStatusLabel
+                                                        }}
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-[11px] font-semibold text-slate-400"
+                                                    >
+                                                        Updated {{
+                                                        assignedSetupUpdatedAtLabel
+                                                        }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        <section class="space-y-3">
+                                            <div
+                                                class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                            >
+                                                Recovery / Snapshot Status
+                                            </div>
+                                            <div
+                                                class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+                                            >
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                                    >
+                                                        Setup Source
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black text-white"
+                                                    >
+                                                        <template
+                                                            v-if="
+                                                                setupSource ===
+                                                                'assigned_setup'
+                                                            "
+                                                            >Event Host
+                                                            assignment</template
+                                                        >
+                                                        <template v-else
+                                                            >Manual
+                                                            recovery</template
+                                                        >
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
+                                                    >
+                                                        <template
+                                                            v-if="
+                                                                setupSource ===
+                                                                'assigned_setup'
+                                                            "
+                                                            >Event Host
+                                                            assignment
+                                                            active.</template
+                                                        >
+                                                        <template v-else
+                                                            >Temporary recovery
+                                                            values.</template
+                                                        >
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                                    >
+                                                        Freshness Scope
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black text-white"
+                                                    >
+                                                        Snapshot age only
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
+                                                    >
+                                                        Last successful live
+                                                        queue snapshot.
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                                    >
+                                                        Offline LAN
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black text-white"
+                                                    >
+                                                        One Local Event Network
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 text-[11px] leading-5 font-semibold text-slate-400"
+                                                    >
+                                                        Local network only.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-white/3 p-4"
+                                            >
+                                                <span
+                                                    class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-blue-300 uppercase"
+                                                >
+                                                    Gilam {{ selectedRing ||
+                                                    'N/A' }}
+                                                </span>
+                                                <span
+                                                    class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-gray-300 uppercase"
+                                                >
+                                                    Last Sync: {{ lastSyncLabel
+                                                    }}
+                                                </span>
+                                                <span
+                                                    class="rounded border px-2 py-0.5 text-[10px] font-black tracking-wider uppercase"
+                                                    :class="
+                                                            queueFreshnessToneClass
+                                                        "
+                                                >
+                                                    {{ queueFreshnessLabel }}
+                                                </span>
+                                                <span
+                                                    v-if="
                                                         upstreamQueueVersionShort
                                                     "
-                                                class="ml-2 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-slate-300 uppercase"
-                                            >
-                                                Upstream {{
-                                                upstreamQueueVersionShort }}
-                                            </span>
-                                            <span
-                                                v-if="
+                                                    class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-slate-300 uppercase"
+                                                >
+                                                    Upstream {{
+                                                    upstreamQueueVersionShort }}
+                                                </span>
+                                                <span
+                                                    v-if="
                                                         controllerSnapshotVersionShort
                                                     "
-                                                class="ml-2 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-slate-300 uppercase"
-                                            >
-                                                Snapshot {{
-                                                controllerSnapshotVersionShort
-                                                }}
-                                            </span>
-                                            <span
-                                                v-if="queueIsDegraded"
-                                                class="ml-2 rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-black tracking-wider text-yellow-200 uppercase"
-                                                :title="
+                                                    class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-black tracking-wider text-slate-300 uppercase"
+                                                >
+                                                    Snapshot {{
+                                                    controllerSnapshotVersionShort
+                                                    }}
+                                                </span>
+                                                <span
+                                                    v-if="queueIsDegraded"
+                                                    class="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-black tracking-wider text-yellow-200 uppercase"
+                                                    :title="
                                                         queueDegradedReason ||
                                                         'Degraded mode'
                                                     "
-                                            >
-                                                Degraded
-                                            </span>
-                                        </div>
-                                        <div class="mb-4 flex flex-wrap gap-2">
-                                            <span
-                                                class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-200"
-                                            >
-                                                Ready {{ queueReadyCount }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-200"
-                                            >
-                                                Provisional {{
-                                                queueProvisionalCount }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2 py-1 text-[11px] font-bold text-fuchsia-200"
-                                            >
-                                                Auto-Advance {{
-                                                queueAutoAdvanceCount }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-200"
-                                            >
-                                                Hidden {{ queueHiddenCount }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-slate-500/20 bg-slate-500/10 px-2 py-1 text-[11px] font-bold text-slate-200"
-                                            >
-                                                Removed {{
-                                                queueCompletedRemovedCount }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-slate-300"
-                                            >
-                                                Upstream Gen {{
-                                                upstreamGeneratedAtLabel }}
-                                            </span>
-                                            <span
-                                                class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-slate-300"
-                                            >
-                                                Snapshot {{
-                                                controllerGeneratedAtLabel }}
-                                            </span>
-                                        </div>
-                                        <div class="grid gap-4 md:grid-cols-2">
+                                                >
+                                                    Degraded
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-200"
+                                                >
+                                                    Ready {{ queueReadyCount }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-200"
+                                                >
+                                                    Provisional {{
+                                                    queueProvisionalCount }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-2 py-1 text-[11px] font-bold text-fuchsia-200"
+                                                >
+                                                    Auto-Advance {{
+                                                    queueAutoAdvanceCount }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-200"
+                                                >
+                                                    Hidden {{ queueHiddenCount
+                                                    }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-slate-500/20 bg-slate-500/10 px-2 py-1 text-[11px] font-bold text-slate-200"
+                                                >
+                                                    Removed {{
+                                                    queueCompletedRemovedCount
+                                                    }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-slate-300"
+                                                >
+                                                    Upstream Gen {{
+                                                    upstreamGeneratedAtLabel }}
+                                                </span>
+                                                <span
+                                                    class="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-slate-300"
+                                                >
+                                                    Snapshot {{
+                                                    controllerGeneratedAtLabel
+                                                    }}
+                                                </span>
+                                                <span
+                                                    v-for="target in assignedTargetBadges"
+                                                    :key="target.key"
+                                                    class="inline-flex rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] uppercase"
+                                                    :class="target.toneClass"
+                                                >
+                                                    {{ target.label }}
+                                                </span>
+                                            </div>
+                                        </section>
+
+                                        <section class="space-y-3">
                                             <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 p-4"
+                                                class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                            >
+                                                Advanced Technical Diagnostics
+                                            </div>
+                                            <div
+                                                class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
                                             >
                                                 <div
-                                                    class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
                                                 >
-                                                    Raw Endpoint Details
+                                                    <div
+                                                        class="flex items-center gap-2 text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        <Hash
+                                                            class="h-3.5 w-3.5"
+                                                        />
+                                                        Device ID
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        connectionPanelModel.controllerAuthState.device_id
+                                                        ||
+                                                        pendingDeviceIdentityLabel
+                                                        }}
+                                                    </div>
                                                 </div>
                                                 <div
-                                                    class="mt-2 space-y-2 text-[12px] leading-6 font-semibold text-slate-300"
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
                                                 >
-                                                    <div>
-                                                        Status:
-                                                        <span
-                                                            class="font-black text-white"
-                                                            >/api/status</span
-                                                        >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Raw API Base
                                                     </div>
-                                                    <div>
-                                                        Queue:
-                                                        <span
-                                                            class="font-black text-white"
-                                                            >/api/tournaments/{id}/rings/{ring}/queue</span
-                                                        >
+                                                    <div
+                                                        class="mt-1 text-sm font-black break-all text-white"
+                                                    >
+                                                        {{
+                                                        supportRawApiBaseLabel
+                                                        }}
                                                     </div>
-                                                    <div>
-                                                        Tournaments:
-                                                        <span
-                                                            class="font-black text-white"
-                                                            >/api/tournaments</span
-                                                        >
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Raw Status Endpoint
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                    >
+                                                        {{
+                                                        supportStatusEndpointDetail
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Raw Tournaments Endpoint
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                    >
+                                                        {{
+                                                        supportTournamentsEndpointDetail
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 px-4 py-3"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.18em] text-slate-500 uppercase"
+                                                    >
+                                                        Raw Queue Endpoint
+                                                    </div>
+                                                    <div
+                                                        class="mt-1 text-[11px] font-semibold break-all text-slate-200"
+                                                    >
+                                                        {{
+                                                        supportQueueEndpointDetail
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="rounded-2xl border border-white/10 bg-white/3 p-4"
+                                                >
+                                                    <div
+                                                        class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
+                                                    >
+                                                        Raw Endpoint Details
+                                                    </div>
+                                                    <div
+                                                        class="mt-2 space-y-2 text-[12px] leading-6 font-semibold text-slate-300"
+                                                    >
+                                                        <div>
+                                                            Status:
+                                                            <span
+                                                                class="font-black text-white"
+                                                                >/api/status</span
+                                                            >
+                                                        </div>
+                                                        <div>
+                                                            Queue:
+                                                            <span
+                                                                class="font-black text-white"
+                                                                >/api/tournaments/{id}/rings/{ring}/queue</span
+                                                            >
+                                                        </div>
+                                                        <div>
+                                                            Tournaments:
+                                                            <span
+                                                                class="font-black text-white"
+                                                                >/api/tournaments</span
+                                                            >
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div
-                                                class="rounded-2xl border border-white/10 bg-white/3 p-4"
-                                            >
-                                                <div
-                                                    class="text-[10px] font-black tracking-[0.2em] text-slate-500 uppercase"
-                                                >
-                                                    Support Actions
-                                                </div>
-                                                <div
-                                                    class="mt-4 flex flex-wrap gap-2"
-                                                >
-                                                    <button
-                                                        @click="
-                                                                fetchAllTournaments
-                                                            "
-                                                        :disabled="
-                                                                isFetchingAll ||
-                                                                isLoadingTournaments
-                                                            "
-                                                        class="h-10 rounded-2xl border border-white/10 bg-white/5 px-4 text-xs font-black tracking-[0.18em] text-white uppercase transition-all hover:bg-white/10 disabled:opacity-50"
-                                                    >
-                                                        Refresh Tournaments
-                                                    </button>
-                                                    <button
-                                                        @click="
-                                                                readLocalCacheMeta()
-                                                            "
-                                                        class="h-10 rounded-2xl border border-white/10 bg-white/5 px-4 text-xs font-black tracking-[0.18em] text-slate-200 uppercase transition-all hover:bg-white/10"
-                                                    >
-                                                        Reload Cache Info
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        </section>
                                     </div>
                                     <div
-                                        v-show="syncQueueDetailsOpen"
-                                        class="mt-6 overflow-x-auto rounded-2xl border border-white/8 bg-white/2 p-3 md:p-4"
+                                        v-show="
+                                            syncQueueSnapshotOpen &&
+                                            syncQueueDetailsOpen
+                                        "
+                                        class="order-6 mt-4 overflow-x-auto rounded-2xl border border-white/8 bg-white/2 p-3 md:p-4"
                                     >
                                         <table
                                             class="min-w-full text-left text-sm"
@@ -2225,7 +2318,7 @@
 
                         <!-- Timer Adjustments -->
                         <div class="mb-4 flex gap-2">
-                            <dialog v-model:open="isAdjustTimeOpen">
+                            <Dialog v-model:open="isAdjustTimeOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         @click="openAdjustTime"
@@ -2440,9 +2533,9 @@
                                         </button>
                                     </DialogFooter>
                                 </DialogContent>
-                            </dialog>
+                            </Dialog>
 
-                            <dialog v-model:open="isSetStartTimeOpen">
+                            <Dialog v-model:open="isSetStartTimeOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         @click="openSetStartTime"
@@ -2647,7 +2740,7 @@
                                         </button>
                                     </DialogFooter>
                                 </DialogContent>
-                            </dialog>
+                            </Dialog>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -2676,7 +2769,7 @@
                                 >
                             </button>
 
-                            <dialog v-model:open="isResetTimerOpen">
+                            <Dialog v-model:open="isResetTimerOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         class="relative flex h-12 items-center justify-center gap-2 overflow-hidden rounded-xl bg-linear-to-br from-red-600 to-red-700 font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-red-600"
@@ -2727,7 +2820,7 @@
                                         </DialogClose>
                                     </DialogFooter>
                                 </DialogContent>
-                            </dialog>
+                            </Dialog>
                         </div>
                     </div>
 
@@ -2763,11 +2856,10 @@
                                     >
                                 </button>
 
-                                <dialog v-model:open="isSetBreakTimeOpen">
+                                <Dialog v-model:open="isSetBreakTimeOpen">
                                     <DialogTrigger as-child>
                                         <button
                                             v-if="
-                                                    gameState.isBreakMode &&
                                                     showBreakTimeSetup
                                                 "
                                             @click="openSetBreakTime"
@@ -2986,7 +3078,7 @@
                                             </button>
                                         </DialogFooter>
                                     </DialogContent>
-                                </dialog>
+                                </Dialog>
                             </div>
 
                             <button
@@ -3024,7 +3116,7 @@
                                 >
                             </button>
 
-                            <dialog v-model:open="isResetMatchOpen">
+                            <Dialog v-model:open="isResetMatchOpen">
                                 <DialogTrigger as-child>
                                     <button
                                         class="relative flex h-12 items-center justify-center gap-2 rounded-xl bg-linear-to-br from-red-600 to-red-700 font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-red-600"
@@ -3072,7 +3164,7 @@
                                         </DialogClose>
                                     </DialogFooter>
                                 </DialogContent>
-                            </dialog>
+                            </Dialog>
                         </div>
                     </div>
                 </div>
@@ -4048,24 +4140,47 @@
         </div>
 
         <div
-            v-if="showResultPopup"
-            class="fixed top-6 left-1/2 z-50 -translate-x-1/2"
+            v-if="visibleControllerToasts.length"
+            class="pointer-events-none fixed inset-x-3 bottom-20 z-[45] flex justify-center sm:bottom-20"
         >
-            <div
-                class="flex items-center gap-3 rounded-2xl border border-blue-500/40 bg-[#1e293b] px-5 py-3 text-white shadow-2xl"
-            >
-                <CheckCircle2 class="h-5 w-5 text-green-400" />
-                <span class="text-sm font-bold">{{ resultPopupMessage }}</span>
-                <button
-                    @click="showResultPopup = false"
-                    class="ml-2 h-7 rounded-lg bg-white/5 px-3 text-gray-300 hover:bg-white/10"
+            <div class="flex w-full max-w-2xl flex-col gap-2">
+                <div
+                    v-for="toast in visibleControllerToasts"
+                    :key="toast.id"
+                    role="status"
+                    aria-live="polite"
+                    :class="[
+                        'pointer-events-auto flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm leading-snug font-bold text-white shadow-2xl backdrop-blur-md',
+                        toast.toneClass,
+                    ]"
                 >
-                    Close
-                </button>
+                    <CheckCircle2
+                        v-if="toast.type === 'success'"
+                        :class="['h-5 w-5 shrink-0', toast.iconClass]"
+                    />
+                    <XCircle
+                        v-else-if="toast.type === 'error'"
+                        :class="['h-5 w-5 shrink-0', toast.iconClass]"
+                    />
+                    <RefreshCw
+                        v-else
+                        :class="['h-5 w-5 shrink-0', toast.iconClass]"
+                    />
+                    <span class="min-w-0 flex-1 break-words">
+                        {{ toast.message }}
+                    </span>
+                    <button
+                        v-if="toast.closable"
+                        @click="dismissControllerToast(toast.id)"
+                        class="h-8 shrink-0 rounded-lg bg-white/8 px-3 text-xs font-bold text-white/85 transition hover:bg-white/12"
+                    >
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
 
-        <dialog
+        <Dialog
             v-if="isElectronAppControlAvailable"
             v-model:open="isExitApplicationDialogOpen"
         >
@@ -4122,7 +4237,7 @@
                     </button>
                 </DialogFooter>
             </DialogContent>
-        </dialog>
+        </Dialog>
 
         <!-- Confirmation Modal -->
         <div
