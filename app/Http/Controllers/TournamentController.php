@@ -766,6 +766,7 @@ class TournamentController extends Controller
                 'player_one_name',
                 'player_two_name',
                 'weight_category',
+                'rollback_sequence',
                 'local_only',
                 'sync_mode',
             ]),
@@ -786,6 +787,7 @@ class TournamentController extends Controller
                 'player_one_name' => 'nullable|string',
                 'player_two_name' => 'nullable|string',
                 'weight_category' => 'nullable|string',
+                'rollback_sequence' => 'nullable|integer|min:0',
             ]);
         } catch (ValidationException $e) {
             Log::warning('[result-sync] controller.relay.validation_failed', [
@@ -810,6 +812,7 @@ class TournamentController extends Controller
                     'player_one_name',
                     'player_two_name',
                     'weight_category',
+                    'rollback_sequence',
                     'local_only',
                     'sync_mode',
                 ]),
@@ -887,6 +890,7 @@ class TournamentController extends Controller
                 'player_one_name' => $data['player_one_name'] ?? null,
                 'player_two_name' => $data['player_two_name'] ?? null,
                 'weight_category' => $data['weight_category'] ?? null,
+                'rollback_sequence' => $data['rollback_sequence'] ?? null,
             ], function ($value) {
                 return $value !== null && $value !== '';
             });
@@ -902,6 +906,13 @@ class TournamentController extends Controller
                 'sync_failure_class' => $syncResult['sync_failure_class'] ?? null,
                 'reject_reason' => $syncResult['reject_reason'] ?? null,
                 'result_trace_id' => $syncResult['result_trace_id'] ?? null,
+                'queue_version' => $syncResult['queue_version'] ?? null,
+                'generated_at' => $syncResult['generated_at'] ?? null,
+                'current_rollback_sequence' => $syncResult['current_rollback_sequence'] ?? null,
+                'current_version' => $syncResult['current_version'] ?? null,
+                'current_match' => $syncResult['current_match'] ?? null,
+                'match_snapshot' => $syncResult['match_snapshot'] ?? null,
+                'queue_snapshot' => $syncResult['queue_snapshot'] ?? null,
                 'runtime' => $this->syncService->resultSyncRuntimeIdentity(),
                 'sync_context' => $syncContext,
             ]);
@@ -912,6 +923,13 @@ class TournamentController extends Controller
                 'sync_failure_class' => $syncResult['sync_failure_class'] ?? null,
                 'reject_reason' => $syncResult['reject_reason'] ?? null,
                 'result_trace_id' => $syncResult['result_trace_id'] ?? null,
+                'queue_version' => $syncResult['queue_version'] ?? null,
+                'generated_at' => $syncResult['generated_at'] ?? null,
+                'current_rollback_sequence' => $syncResult['current_rollback_sequence'] ?? null,
+                'current_version' => $syncResult['current_version'] ?? null,
+                'current_match' => $syncResult['current_match'] ?? null,
+                'match_snapshot' => $syncResult['match_snapshot'] ?? null,
+                'queue_snapshot' => $syncResult['queue_snapshot'] ?? null,
             ]);
         }
         return response()->json([

@@ -36,6 +36,10 @@ interface UseRefereeRingMatchOrderSyncOptions {
   hasAssignedSetup: () => boolean
   isRingMatchOrderLive: () => boolean
   canLoadMatch: (item: any) => boolean
+  onAuthoritativeQueuePayload?: (
+    payload: Record<string, unknown>,
+    source: 'display_batch',
+  ) => void | Promise<void>
 }
 
 type RingPerfSkipReason = 'none' | 'not_live' | 'no_meta' | 'unchanged_payload' | 'error'
@@ -357,6 +361,7 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
         shouldLogPerfSummary = false
         return
       }
+      void options.onAuthoritativeQueuePayload?.(payload, 'display_batch')
 
       const applyStartedAt = nowPerfMs()
       const nextRecord = createRingMatchOrderProjectionRecord(

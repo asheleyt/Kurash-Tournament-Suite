@@ -1305,17 +1305,35 @@ class TournamentSyncService
         string $message,
         ?string $failureClass = null,
         ?string $rejectReason = null,
-        ?string $resultTraceId = null
+        ?string $resultTraceId = null,
+        array $extra = []
     ): array {
-        return array_filter([
+        return array_filter(array_merge([
             'success' => $success,
             'message' => $message,
             'sync_failure_class' => $failureClass,
             'reject_reason' => $rejectReason,
             'result_trace_id' => $resultTraceId,
-        ], function ($value, $key) {
+        ], $extra), function ($value, $key) {
             return $key === 'success' || $key === 'message' || ($value !== null && $value !== '');
         }, ARRAY_FILTER_USE_BOTH);
+    }
+
+    protected function mutationResponseExtra(?array $json): array
+    {
+        if (!is_array($json)) {
+            return [];
+        }
+
+        return array_intersect_key($json, array_flip([
+            'queue_version',
+            'generated_at',
+            'current_rollback_sequence',
+            'current_version',
+            'current_match',
+            'match_snapshot',
+            'queue_snapshot',
+        ]));
     }
 
     protected function mutationResponseOutcome($response, string $fallbackMessage): array
@@ -1336,9 +1354,14 @@ class TournamentSyncService
             }
         }
 
-        $rejectReason = is_array($json) ? trim((string) ($json['reject_reason'] ?? '')) : '';
+        $errorCode = is_array($json) ? trim((string) ($json['error'] ?? '')) : '';
+        $rejectReason = is_array($json) ? trim((string) ($json['reject_reason'] ?? $json['rejectReason'] ?? '')) : '';
+        if ($rejectReason === '' && $response->clientError() && $errorCode !== '') {
+            $rejectReason = $errorCode;
+        }
         $resultTraceId = is_array($json) ? trim((string) ($json['result_trace_id'] ?? '')) : '';
         $message = is_array($json) ? trim((string) ($json['message'] ?? $json['error'] ?? '')) : '';
+        $extra = $this->mutationResponseExtra($json);
 
         if (
             $response->successful()
@@ -1351,7 +1374,8 @@ class TournamentSyncService
                 $message !== '' ? $message : 'Admin request succeeded.',
                 null,
                 $rejectReason !== '' ? $rejectReason : null,
-                $resultTraceId !== '' ? $resultTraceId : null
+                $resultTraceId !== '' ? $resultTraceId : null,
+                $extra
             );
         }
 
@@ -1361,17 +1385,19 @@ class TournamentSyncService
                 $message !== '' ? $message : $fallbackMessage,
                 'admin_reject',
                 $rejectReason !== '' ? $rejectReason : null,
-                $resultTraceId !== '' ? $resultTraceId : null
+                $resultTraceId !== '' ? $resultTraceId : null,
+                $extra
             );
         }
 
-        if (is_array($json) && $rejectReason !== '') {
+        if (is_array($json) && ($rejectReason !== '' || $response->clientError())) {
             return $this->syncResult(
                 false,
                 $message !== '' ? $message : $fallbackMessage,
                 'admin_reject',
-                $rejectReason,
-                $resultTraceId !== '' ? $resultTraceId : null
+                $rejectReason !== '' ? $rejectReason : null,
+                $resultTraceId !== '' ? $resultTraceId : null,
+                $extra
             );
         }
 
@@ -1424,6 +1450,7 @@ class TournamentSyncService
         $playerOneName = $this->contextValue($context, ['player_one_name'], $match->player1_name);
         $playerTwoName = $this->contextValue($context, ['player_two_name'], $match->player2_name);
         $weightCategory = $this->contextValue($context, ['weight_category'], $match->category);
+        $rollbackSequence = $this->contextValue($context, ['rollback_sequence'], null);
 
         $payload = [
             'winner_id' => $winnerId,
@@ -1438,6 +1465,7 @@ class TournamentSyncService
             'player_two_name' => $playerTwoName,
             'weight_category' => $weightCategory,
             'tournament_id' => $tournamentId,
+            'rollback_sequence' => $rollbackSequence,
         ];
 
         if ($ringNumber !== null && $ringNumber !== '') {

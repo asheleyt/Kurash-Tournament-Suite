@@ -62,6 +62,8 @@ export interface NormalizedQueueRow {
   queueReason: string | null
   queue_reason: string | null
   status: string
+  rollbackSequence: number
+  rollback_sequence: number
   queueVersion: string | null
   queue_version: string | null
   generatedAt: string | null
@@ -337,6 +339,7 @@ export function normalizeQueueRows(rawRows: unknown[], options: NormalizeQueueRo
         const weightCategory = asText(raw.weight_category ?? raw.weightCategory ?? raw.category ?? bracket.weight_category)
         const bracketFormat = normalizeBracketFormat(raw.bracket_format ?? raw.bracketFormat ?? bracket.format)
         const roundLabel = asText(raw.round_label ?? raw.roundLabel ?? raw.round_display ?? raw.roundDisplay ?? raw.stage_label ?? raw.stageLabel ?? raw._stageLabel ?? raw.round)
+        const rollbackSequence = asFiniteNumber(raw.rollback_sequence ?? raw.rollbackSequence) ?? 0
 
         return {
           matchId: id,
@@ -375,6 +378,8 @@ export function normalizeQueueRows(rawRows: unknown[], options: NormalizeQueueRo
           queueReason: asText(raw.queue_reason ?? raw.queueReason) || fallbackQueueReason(displayClass),
           queue_reason: asText(raw.queue_reason ?? raw.queueReason) || fallbackQueueReason(displayClass),
           status,
+          rollbackSequence,
+          rollback_sequence: rollbackSequence,
           queueVersion: asText(raw.queue_version ?? raw.queueVersion) || queueVersion,
           queue_version: asText(raw.queue_version ?? raw.queueVersion) || queueVersion,
           generatedAt: asText(raw.generated_at ?? raw.generatedAt ?? raw.synced_at ?? raw.syncedAt) || generatedAt,

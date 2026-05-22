@@ -130,6 +130,11 @@ interface UseRefereeQueueSyncOptions {
   getStorage: () => Storage | null
 }
 
+function normalizeRollbackSequence(value: unknown): number | null {
+  const num = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(num) ? Math.max(0, Math.trunc(num)) : null
+}
+
 export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
   const KNOWN_DEVICE_ASSIGNMENT_REFRESH_MS = 60_000
   const ADMIN_DIRECT_SCOREBOARD_SNAPSHOT_MS = 30_000
@@ -279,6 +284,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
         normalizeQueueFingerprintText(options.getRemoteMatchId(item)),
         normalizeQueueFingerprintText(item?.status).toLowerCase(),
         normalizeQueueFingerprintText(item?.display_class ?? item?.displayClass).toUpperCase(),
+        normalizeQueueFingerprintText(item?.rollback_sequence ?? item?.rollbackSequence ?? 0),
         normalizeQueueFingerprintText(item?.match_number ?? item?.matchNumber ?? null),
       ].join('|')
 
@@ -403,11 +409,55 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
     return countQueueRowsFromRows(rows)
   }
 
-  function reconcileLocalStatusOverrides(nextMatches: any[]) {
+  function reconcileLocalStatusOverrides(
+    nextMatches: any[],
+    reconcileOptions: {
+      sourceMode?: RingQueueSource | null
+      isDegraded?: boolean
+      upstreamQueueVersion?: string | null
+      upstreamGeneratedAt?: string | null
+    } = {},
+  ) {
+    const allowCompletedOverrideRemoval =
+      reconcileOptions.sourceMode === 'queue_api' && !reconcileOptions.isDegraded
+
     options.localResultOverrides.value = reconcileLocalStatusOverridesInMemory({
       overrides: options.localResultOverrides.value,
       nextMatches,
       isMatchIdEqual: options.isMatchIdEqual,
+      allowCompletedOverrideRemoval,
+      getMatchRollbackSequence: (row) => normalizeRollbackSequence(row?.rollback_sequence ?? row?.rollbackSequence),
+      onCompletedOverrideRemoved: ({ id, override, match, reason }) => {
+        const orderSnapshot = {
+          ring_sequence: match?.ring_sequence ?? match?.ringSequence ?? null,
+          official_sequence: match?.official_sequence ?? match?.officialSequence ?? null,
+          global_match_order: match?.global_match_order ?? match?.globalMatchOrder ?? null,
+          match_order: match?.match_order ?? match?.matchOrder ?? null,
+          match_number: match?.match_number ?? match?.matchNumber ?? null,
+          local_order_value: getCacheQueueOrderValue(match, 0),
+        }
+        const overrideOrderSnapshot = {
+          ring_sequence: override?.ring_sequence ?? override?.ringSequence ?? null,
+          official_sequence: override?.official_sequence ?? override?.officialSequence ?? null,
+          global_match_order: override?.global_match_order ?? override?.globalMatchOrder ?? null,
+          match_order: override?.match_order ?? override?.matchOrder ?? null,
+          match_number: override?.match_number ?? override?.matchNumber ?? null,
+        }
+
+        console.info('[queue] cleared completed override after authoritative refresh', {
+          match_id: id,
+          reason,
+          match_status: match?.status ?? null,
+          match_display_class: match?.display_class ?? match?.displayClass ?? null,
+          override_status: override?.status ?? null,
+          override_rollback_sequence: override?.rollback_sequence ?? override?.rollbackSequence ?? null,
+          match_rollback_sequence: match?.rollback_sequence ?? match?.rollbackSequence ?? null,
+          upstream_queue_version: reconcileOptions.upstreamQueueVersion ?? null,
+          upstream_generated_at: reconcileOptions.upstreamGeneratedAt ?? null,
+          match_order: orderSnapshot,
+          override_order: overrideOrderSnapshot,
+        })
+      },
     })
     persistResultOverridesForSelection()
   }
@@ -1046,7 +1096,12 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
       } satisfies ApplyQueuePayloadResult
     }
 
-    reconcileLocalStatusOverrides(filtered)
+    reconcileLocalStatusOverrides(filtered, {
+      sourceMode,
+      isDegraded: nextQueueIsDegraded,
+      upstreamQueueVersion: upstreamVersion,
+      upstreamGeneratedAt: upstreamGeneratedAt,
+    })
     const finalFiltered = applyLocalResultOverrides(filtered)
     const counts = countQueueRows(finalFiltered)
     const appliedOverrideSignature = buildLocalOverrideStateSignature()
@@ -1628,7 +1683,12 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
       const legacySource: RingQueueSource = 'legacy_adapter'
       const legacyAllRowsRaw = options.normalizeQueueRows(allNormalized, { source: legacySource })
       const legacyRowsRaw = options.normalizeQueueRows(normalized, { source: legacySource })
-      reconcileLocalStatusOverrides(legacyRowsRaw)
+      reconcileLocalStatusOverrides(legacyRowsRaw, {
+        sourceMode: legacySource,
+        isDegraded: true,
+        upstreamQueueVersion: null,
+        upstreamGeneratedAt: null,
+      })
       const legacyAllRows = applyLocalResultOverrides(legacyAllRowsRaw)
       const legacyRows = applyLocalResultOverrides(legacyRowsRaw)
       const legacyCounts = countQueueRows(legacyRows)

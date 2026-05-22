@@ -509,6 +509,8 @@ type ResultSubmitQueueMode =
 
 const CONTROLLER_AUTH_STORAGE_KEY = 'kurash_controller_auth_v1';
 const PENDING_RESULT_SYNC_STORAGE_KEY = 'kurash_pending_result_sync_v1';
+const ROLLBACK_SEQUENCE_CONFLICT_MESSAGE =
+    'Result was not accepted because this match changed on Event Host. The queue was refreshed. Please load the updated match before continuing.';
 
 // Initial Data
 const createInitialPlayerScore = (): PlayerScore => ({
@@ -1471,6 +1473,7 @@ async function confirmResetAll() {
     showLegacyFinishBanner.value = false;
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
+    currentLoadedRollbackSequence.value = null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -1483,6 +1486,7 @@ async function clearCompletedBoutToWaitingState(message: string) {
     clearResultSubmitGateState();
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
+    currentLoadedRollbackSequence.value = null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -2143,6 +2147,9 @@ const {
     hasAssignedSetup: () => hasAssignedSetup.value,
     isRingMatchOrderLive: () => isRingMatchOrderLive.value,
     canLoadMatch,
+    onAuthoritativeQueuePayload: (payload, source) => {
+        void handleAuthoritativeQueueMetadataPayload(payload, source);
+    },
 });
 
 const {
@@ -2233,6 +2240,7 @@ const isUpdatingMatches = ref(false);
 const updatingMatchId = ref<number | string | null>(null);
 const currentMatchId = ref<number | string | null>(null);
 const currentMatchRingNumber = ref<string | null>(null);
+const currentLoadedRollbackSequence = ref<number | null>(null);
 const nextUpcomingMatchId = ref<number | string | null>(null);
 const lastSyncAt = ref<number | null>(null);
 const resultSubmitQueueMode = computed<ResultSubmitQueueMode>(() => {
@@ -2261,7 +2269,12 @@ const canFinishCurrentMatch = computed(() => {
     if (isResultSubmitting.value || isResultGateChecking.value) return false;
 
     const manualMatchIdText = (manualMatchId.value || '').toString().trim();
-    if (!currentMatchId.value) return !!manualMatchIdText;
+    if (!currentMatchId.value) {
+        return !shouldUseAuthoritativeResultGuard() && !!manualMatchIdText;
+    }
+
+    const authoritativeGuard = assessCurrentLoadedMatchRollbackGuard();
+    if (!authoritativeGuard.ready) return false;
 
     return !resultSubmitBlockReason.value;
 });
@@ -2319,7 +2332,9 @@ watch(
     [
         () => gameState.winner,
         currentMatchId,
+        currentLoadedRollbackSequence,
         upstreamQueueVersion,
+        upstreamGeneratedAt,
         controllerSnapshotVersion,
     ],
     ([winner]) => {
@@ -2334,6 +2349,16 @@ watch(
             matchesList.value.find((item: any) =>
                 isMatchIdEqual(item, currentMatchId.value),
             ) || null;
+        const authoritativeGuard =
+            assessCurrentLoadedMatchRollbackGuard(currentMatch);
+        if (!authoritativeGuard.ready) {
+            resultSubmitBlockReason.value = authoritativeGuard.message;
+            resultSubmitRequiresReconcile.value = true;
+            resultSubmitStatusDetail.value = authoritativeGuard.message;
+            resultSubmitStatusReasonCode.value = authoritativeGuard.reasonCode;
+            return;
+        }
+
         const assessment = assessMatchQueueEligibility(
             currentMatch,
             currentMatchId.value,
@@ -2358,6 +2383,24 @@ watch(
             resultSubmitStatusReasonCode.value = assessment.reasonCode;
         }
     },
+);
+
+watch(
+    [
+        matchesList,
+        currentMatchId,
+        currentLoadedRollbackSequence,
+        upstreamQueueVersion,
+        upstreamGeneratedAt,
+        controllerSnapshotVersion,
+    ],
+    () => {
+        void clearCurrentLoadedMatchIfAuthoritativeQueueChanged(
+            'authoritative queue refresh',
+            { announce: true },
+        );
+    },
+    { flush: 'post' },
 );
 
 function getCurrentLoadedMatchRingText(): string {
@@ -2387,6 +2430,27 @@ function getCurrentLoadedQueueMatch(): any | null {
         matchesList.value.find((item: any) =>
             isMatchIdEqual(item, loadedMatchId),
         ) || null
+    );
+}
+
+function normalizeRollbackSequence(value: unknown): number {
+    const sequence = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(sequence) ? Math.max(0, Math.trunc(sequence)) : 0;
+}
+
+function getMatchRollbackSequence(match: any): number {
+    if (!match || typeof match !== 'object') return 0;
+    return normalizeRollbackSequence(
+        match.rollback_sequence ?? match.rollbackSequence,
+    );
+}
+
+function hasAuthoritativeQueueSnapshot() {
+    return (
+        syncHasServer.value &&
+        queueSourceMode.value === 'queue_api' &&
+        !queueIsDegraded.value &&
+        Array.isArray(matchesList.value)
     );
 }
 
@@ -2438,6 +2502,7 @@ async function clearCurrentLoadedMatchForRingMismatch(
     showLegacyFinishBanner.value = false;
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
+    currentLoadedRollbackSequence.value = null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -2472,6 +2537,80 @@ async function clearCurrentLoadedMatchForRingMismatch(
 
     return true;
 }
+
+async function clearCurrentLoadedMatchForAuthoritativeChange(
+    contextLabel: string,
+    message =
+        'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+    options: {
+        announce?: boolean;
+        broadcast?: boolean;
+        reasonCode?: string;
+    } = {},
+) {
+    const loadedMatchId = currentMatchId.value;
+    if (loadedMatchId == null) return false;
+
+    resetLiveBoutState();
+    clearResultSubmitGateState();
+    showFinishModal.value = false;
+    showLegacyFinishBanner.value = false;
+    currentMatchId.value = null;
+    currentMatchRingNumber.value = null;
+    currentLoadedRollbackSequence.value = null;
+    manualMatchId.value = '';
+    persistManualMatchId();
+    syncTempSettings();
+
+    markResultSubmitReconcileRequired(
+        message,
+        options.reasonCode || 'rollback_sequence_stale',
+    );
+
+    if (options.broadcast !== false) {
+        await broadcastAll();
+    }
+
+    console.warn('Cleared loaded match after authoritative queue change.', {
+        context: contextLabel,
+        match_id: loadedMatchId,
+        reason: options.reasonCode || 'rollback_sequence_stale',
+    });
+
+    if (options.announce !== false) {
+        showBanner(message, 'error', 8000);
+    }
+
+    return true;
+}
+
+async function clearCurrentLoadedMatchIfAuthoritativeQueueChanged(
+    contextLabel: string,
+    options: {
+        announce?: boolean;
+        broadcast?: boolean;
+        message?: string;
+        reasonCode?: string;
+    } = {},
+) {
+    if (!hasAuthoritativeQueueSnapshot() || currentMatchId.value == null)
+        return false;
+
+    const guard = assessCurrentLoadedMatchRollbackGuard();
+    if (guard.ready) return false;
+
+    return clearCurrentLoadedMatchForAuthoritativeChange(
+        contextLabel,
+        options.message ||
+            guard.message ||
+            'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+        {
+            ...options,
+            reasonCode: options.reasonCode || guard.reasonCode,
+        },
+    );
+}
+
 const normalizedControllerAdminBase = computed(() => {
     const raw = (adminBase.value || '').toString().trim();
     if (!raw) return '';
@@ -3294,6 +3433,9 @@ function formatResultSyncFailureMessage(
         base =
             'Event Host says this bout is not ready yet. Reconcile the live queue before scoring again.';
         usedMappedMessage = true;
+    } else if (normalizedRejectReason === 'rollback_sequence_conflict') {
+        base = ROLLBACK_SEQUENCE_CONFLICT_MESSAGE;
+        usedMappedMessage = true;
     } else if (normalizedRejectReason === 'winner_id_invalid') {
         base =
             'Event Host rejected the winner mapping. Reconcile the live queue before scoring again.';
@@ -3446,6 +3588,40 @@ function getControllerApiErrorCode(error: unknown): string | null {
     return typeof code === 'string' && code.trim() ? code.trim() : null;
 }
 
+function getControllerApiErrorResponseJson(
+    error: unknown,
+): Record<string, any> | null {
+    const responseJson = (error as ControllerApiError | undefined)
+        ?.responseJson;
+    return responseJson && typeof responseJson === 'object'
+        ? responseJson
+        : null;
+}
+
+function isRollbackSequenceConflict(
+    error: unknown,
+    rejectReason: string | null = null,
+) {
+    const responseJson = getControllerApiErrorResponseJson(error);
+    const status = getControllerApiErrorStatus(error);
+    const text = [
+        getPendingResultSyncErrorMessage(error),
+        getControllerApiErrorCode(error),
+        rejectReason,
+        responseJson?.error,
+        responseJson?.reject_reason,
+        responseJson?.rejectReason,
+    ]
+        .filter((value) => value != null && value !== '')
+        .join(' ')
+        .toLowerCase();
+
+    return (
+        text.includes('rollback_sequence_conflict') ||
+        (status === 409 && text.includes('rollback_sequence'))
+    );
+}
+
 function getPendingResultSyncErrorMessage(error: unknown) {
     if (error instanceof Error) return error.message || 'Unknown sync error';
     return error == null ? 'Unknown sync error' : String(error);
@@ -3468,6 +3644,7 @@ function shouldQueuePendingResultSync(error: unknown) {
         text.includes('winner_id_invalid') ||
         text.includes('tournament_mismatch') ||
         text.includes('ring_mismatch') ||
+        text.includes('rollback_sequence_conflict') ||
         text.includes('ambiguous_match') ||
         text.includes('match_not_found') ||
         text.includes('match not found') ||
@@ -3753,6 +3930,81 @@ function queuePendingResultSync(
     );
 }
 
+function payloadHasRollbackSequence(payload: Record<string, unknown>) {
+    return (
+        Object.prototype.hasOwnProperty.call(payload, 'rollback_sequence') ||
+        Object.prototype.hasOwnProperty.call(payload, 'rollbackSequence')
+    );
+}
+
+function getPayloadRollbackSequence(payload: Record<string, unknown>) {
+    return normalizeRollbackSequence(
+        payload.rollback_sequence ?? payload.rollbackSequence,
+    );
+}
+
+async function assessPendingResultReplayGuard(item: PendingResultSyncItem) {
+    if (!payloadHasRollbackSequence(item.payload)) {
+        return {
+            ready: false,
+            reasonCode: 'rollback_sequence_missing',
+            message:
+                'Pending result is missing the Event Host rollback version and must be reviewed manually.',
+        };
+    }
+
+    const selectedTournamentMatches =
+        item.tournament_id == null ||
+        selectedTournamentId.value == null ||
+        Number(item.tournament_id) === Number(selectedTournamentId.value);
+    const selectedRingMatches =
+        !item.ring_number ||
+        !(selectedRing.value || '').toString().trim() ||
+        String(item.ring_number) === String(selectedRing.value);
+
+    if (
+        selectedTournamentMatches &&
+        selectedRingMatches &&
+        (!hasAuthoritativeQueueSnapshot() ||
+            !matchesList.value.some((row: any) =>
+                isMatchIdEqual(row, item.match_id),
+            ))
+    ) {
+        await refreshAuthoritativeQueueSnapshot('pending result replay guard', {
+            announceLoadedClear: false,
+        });
+    }
+
+    const currentMatch =
+        matchesList.value.find((row: any) =>
+            isMatchIdEqual(row, item.match_id),
+        ) || null;
+    if (!hasAuthoritativeQueueSnapshot() || !currentMatch) {
+        return {
+            ready: false,
+            reasonCode: 'rollback_sequence_match_missing',
+            message:
+                'Pending result no longer exists in the current Event Host queue snapshot.',
+        };
+    }
+
+    const pendingSequence = getPayloadRollbackSequence(item.payload);
+    const currentSequence = getMatchRollbackSequence(currentMatch);
+    if (pendingSequence !== currentSequence) {
+        return {
+            ready: false,
+            reasonCode: 'rollback_sequence_stale',
+            message: ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+        };
+    }
+
+    return {
+        ready: true,
+        reasonCode: 'ready',
+        message: null as string | null,
+    };
+}
+
 async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
     if (isPendingResultSyncBusy.value) return;
     if (!syncHasServer.value || !isOnline.value) return;
@@ -3787,6 +4039,50 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
             };
 
             try {
+                const replayGuard = await assessPendingResultReplayGuard(item);
+                if (!replayGuard.ready) {
+                    updatePendingResultSyncItem(item.id, {
+                        attempts: nextAttempt,
+                        last_error:
+                            replayGuard.message ||
+                            'Pending result is stale against the Event Host queue.',
+                        last_status: 409,
+                        updated_at: new Date().toISOString(),
+                        sync_state: 'blocked',
+                    });
+                    logResultSyncTrace(
+                        'controller.result.pending_sync_blocked_stale',
+                        {
+                            ...attemptContext,
+                            message: replayGuard.message,
+                            reason_code: replayGuard.reasonCode,
+                            status: 409,
+                            retryable: false,
+                            rollback_sequence:
+                                item.payload.rollback_sequence ??
+                                item.payload.rollbackSequence ??
+                                null,
+                        },
+                        'warn',
+                    );
+                    if (
+                        currentMatchId.value != null &&
+                        String(currentMatchId.value) === String(item.match_id)
+                    ) {
+                        await clearCurrentLoadedMatchForAuthoritativeChange(
+                            'pending result replay guard',
+                            replayGuard.message ||
+                                ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+                            {
+                                reasonCode: replayGuard.reasonCode,
+                                announce: !options.silent,
+                            },
+                        );
+                    }
+                    blockedCount += 1;
+                    continue;
+                }
+
                 await submitResultDirectToAdmin(
                     item.admin_base || adminBase.value,
                     item.match_id,
@@ -3818,6 +4114,17 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
                     },
                     'warn',
                 );
+
+                if (isRollbackSequenceConflict(error)) {
+                    await handleRollbackSequenceConflictSubmission({
+                        error,
+                        matchId: item.match_id,
+                        adminBase: item.admin_base || adminBase.value,
+                        traceContext: attemptContext,
+                    });
+                    blockedCount += 1;
+                    continue;
+                }
 
                 if (canRetry) {
                     retryStopped = true;
@@ -4989,6 +5296,65 @@ function assessMatchQueueEligibility(
     };
 }
 
+function shouldUseAuthoritativeResultGuard() {
+    return (
+        syncHasServer.value &&
+        isOnline.value &&
+        queueSourceMode.value === 'queue_api' &&
+        !queueIsDegraded.value &&
+        !pendingLiveSnapshotRecoveryContextKey.value
+    );
+}
+
+function assessCurrentLoadedMatchRollbackGuard(match: any | null = null) {
+    if (!shouldUseAuthoritativeResultGuard()) {
+        return {
+            ready: true,
+            reasonCode: 'not_required',
+            message: null as string | null,
+        };
+    }
+
+    const loadedMatchId = currentMatchId.value;
+    if (loadedMatchId == null) {
+        return {
+            ready: false,
+            reasonCode: 'missing_loaded_match',
+            message:
+                'Load the latest Event Host queue match before recording this result.',
+        };
+    }
+
+    const queueMatch = match || getCurrentLoadedQueueMatch();
+    const assessment = assessMatchQueueEligibility(queueMatch, loadedMatchId, {
+        requireExplicitSignals: true,
+    });
+    if (!assessment.ready) {
+        return {
+            ready: false,
+            reasonCode: assessment.reasonCode,
+            message: assessment.message,
+        };
+    }
+
+    const expectedRollbackSequence = currentLoadedRollbackSequence.value ?? 0;
+    const currentRollbackSequence = getMatchRollbackSequence(queueMatch);
+    if (currentRollbackSequence !== expectedRollbackSequence) {
+        return {
+            ready: false,
+            reasonCode: 'rollback_sequence_stale',
+            message:
+                'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+        };
+    }
+
+    return {
+        ready: true,
+        reasonCode: 'ready',
+        message: null as string | null,
+    };
+}
+
 function getMatchReadyBlockReason(
     match: any,
     selectedMatchId: number | string | null = null,
@@ -5459,13 +5825,25 @@ async function refreshCurrentMatchSubmitGate(
                 requireExplicitSignals: true,
             },
         );
-        const reason = assessment.ready ? null : assessment.message;
+        const rollbackGuard = assessment.ready
+            ? assessCurrentLoadedMatchRollbackGuard(refreshedMatch)
+            : null;
+        const reason =
+            assessment.ready && rollbackGuard && !rollbackGuard.ready
+                ? rollbackGuard.message
+                : assessment.ready
+                  ? null
+                  : assessment.message;
         resultSubmitBlockReason.value = reason;
-        resultSubmitStatusReasonCode.value = assessment.reasonCode;
+        resultSubmitStatusReasonCode.value =
+            rollbackGuard && !rollbackGuard.ready
+                ? rollbackGuard.reasonCode
+                : assessment.reasonCode;
         resultSubmitStatusDetail.value = reason;
         if (
-            !assessment.ready &&
-            assessment.reasonCode === 'moved_to_different_match'
+            reason &&
+            (assessment.reasonCode === 'moved_to_different_match' ||
+                rollbackGuard?.reasonCode === 'rollback_sequence_stale')
         ) {
             resultSubmitRequiresReconcile.value = true;
         }
@@ -5475,7 +5853,7 @@ async function refreshCurrentMatchSubmitGate(
         }
 
         return {
-            ready: assessment.ready,
+            ready: assessment.ready && (rollbackGuard?.ready ?? true),
             match: refreshedMatch,
         };
     } catch (error) {
@@ -5551,6 +5929,236 @@ async function refreshCurrentMatchSubmitGate(
     }
 }
 
+function queueMetaText(value: unknown): string | null {
+    const text = normalizeOptionalText(value);
+    return text || null;
+}
+
+function queuePayloadMeta(payload: Record<string, unknown> | null | undefined) {
+    if (!payload || typeof payload !== 'object') {
+        return { queueVersion: null, generatedAt: null };
+    }
+
+    return {
+        queueVersion: queueMetaText(payload.queue_version ?? payload.queueVersion),
+        generatedAt: queueMetaText(payload.generated_at ?? payload.generatedAt),
+    };
+}
+
+function getQueueSnapshotFromPayload(
+    payload: Record<string, unknown> | null | undefined,
+) {
+    if (!payload || typeof payload !== 'object') return null;
+
+    const candidates = [
+        payload.queue_snapshot,
+        payload.queueSnapshot,
+    ];
+
+    for (const candidate of candidates) {
+        if (
+            candidate &&
+            typeof candidate === 'object' &&
+            Array.isArray((candidate as Record<string, unknown>).items)
+        ) {
+            const snapshot = {
+                ...(candidate as Record<string, unknown>),
+            };
+            const parentMeta = queuePayloadMeta(payload);
+            const snapshotMeta = queuePayloadMeta(snapshot);
+            if (!snapshotMeta.queueVersion && parentMeta.queueVersion) {
+                snapshot.queue_version = parentMeta.queueVersion;
+            }
+            if (!snapshotMeta.generatedAt && parentMeta.generatedAt) {
+                snapshot.generated_at = parentMeta.generatedAt;
+            }
+            return snapshot;
+        }
+    }
+
+    return null;
+}
+
+function queueMetadataDiffersFromCurrent(payload: Record<string, unknown>) {
+    const nextMeta = queuePayloadMeta(payload);
+    const currentVersion = queueMetaText(upstreamQueueVersion.value);
+    const currentGeneratedAt = queueMetaText(upstreamGeneratedAt.value);
+
+    if (
+        nextMeta.queueVersion &&
+        currentVersion &&
+        nextMeta.queueVersion !== currentVersion
+    ) {
+        return true;
+    }
+
+    if (
+        !nextMeta.queueVersion &&
+        nextMeta.generatedAt &&
+        currentGeneratedAt &&
+        nextMeta.generatedAt !== currentGeneratedAt
+    ) {
+        return true;
+    }
+
+    if (nextMeta.queueVersion && !currentVersion) return true;
+    if (!nextMeta.queueVersion && nextMeta.generatedAt && !currentGeneratedAt)
+        return true;
+
+    return false;
+}
+
+let authoritativeQueueRefreshPromise: Promise<boolean> | null = null;
+
+async function applyAuthoritativeQueueSnapshotPayload(
+    payload: Record<string, unknown>,
+    contextLabel: string,
+    options: {
+        clearMessage?: string;
+        announceLoadedClear?: boolean;
+        reasonCode?: string;
+    } = {},
+) {
+    hydrateFetchedTeamBranding(
+        payload,
+        payload?.tournament,
+        payload?.items as any[] | undefined,
+    );
+    applyQueuePayload(payload, 'queue_api');
+    await clearCurrentLoadedMatchIfAuthoritativeQueueChanged(contextLabel, {
+        announce: options.announceLoadedClear,
+        message: options.clearMessage,
+        reasonCode: options.reasonCode,
+    });
+    return true;
+}
+
+async function refreshAuthoritativeQueueSnapshot(
+    contextLabel: string,
+    options: {
+        clearMessage?: string;
+        announceLoadedClear?: boolean;
+        reasonCode?: string;
+    } = {},
+) {
+    if (authoritativeQueueRefreshPromise) return authoritativeQueueRefreshPromise;
+
+    authoritativeQueueRefreshPromise = (async () => {
+        const tournamentId = selectedTournamentId.value;
+        const ringText = (selectedRing.value || '').toString().trim();
+        if (!tournamentId || !ringText) return false;
+
+        try {
+            const queuePayload = await getRingQueueRemote(tournamentId, ringText);
+            await applyAuthoritativeQueueSnapshotPayload(
+                queuePayload,
+                contextLabel,
+                options,
+            );
+            return true;
+        } catch (error) {
+            console.warn('Authoritative queue refresh failed.', {
+                context: contextLabel,
+                error,
+            });
+            return false;
+        } finally {
+            authoritativeQueueRefreshPromise = null;
+        }
+    })();
+
+    return authoritativeQueueRefreshPromise;
+}
+
+async function handleAuthoritativeQueueMetadataPayload(
+    payload: Record<string, unknown>,
+    source: string,
+    options: {
+        forceRefresh?: boolean;
+        clearMessage?: string;
+        announceLoadedClear?: boolean;
+        reasonCode?: string;
+    } = {},
+) {
+    const queueSnapshot = getQueueSnapshotFromPayload(payload);
+    if (queueSnapshot) {
+        return applyAuthoritativeQueueSnapshotPayload(
+            queueSnapshot,
+            `${source}:queue_snapshot`,
+            options,
+        );
+    }
+
+    if (!options.forceRefresh && !queueMetadataDiffersFromCurrent(payload)) {
+        return false;
+    }
+
+    return refreshAuthoritativeQueueSnapshot(`${source}:metadata`, options);
+}
+
+async function handleRollbackSequenceConflictSubmission(config: {
+    error: unknown;
+    matchId: number | string | null;
+    adminBase: string;
+    traceContext: Record<string, unknown>;
+}) {
+    const responseJson = getControllerApiErrorResponseJson(config.error) || {};
+    const pendingId =
+        config.adminBase && config.matchId != null
+            ? pendingResultSyncId(config.adminBase, config.matchId)
+            : null;
+
+    if (pendingId) {
+        updatePendingResultSyncItem(pendingId, {
+            last_error: ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+            last_status: 409,
+            updated_at: new Date().toISOString(),
+            sync_state: 'blocked',
+        });
+    }
+
+    await handleAuthoritativeQueueMetadataPayload(
+        responseJson,
+        'rollback_sequence_conflict',
+        {
+            forceRefresh: true,
+            clearMessage: ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+            announceLoadedClear: true,
+            reasonCode: 'rollback_sequence_conflict',
+        },
+    );
+
+    if (
+        config.matchId != null &&
+        currentMatchId.value != null &&
+        String(currentMatchId.value) === String(config.matchId)
+    ) {
+        await clearCurrentLoadedMatchForAuthoritativeChange(
+            'rollback sequence conflict',
+            ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+            {
+                reasonCode: 'rollback_sequence_conflict',
+                announce: true,
+            },
+        );
+    }
+
+    markResultSubmitReconcileRequired(
+        ROLLBACK_SEQUENCE_CONFLICT_MESSAGE,
+        'rollback_sequence_conflict',
+    );
+    showBanner(ROLLBACK_SEQUENCE_CONFLICT_MESSAGE, 'error', 8500);
+    logResultSyncTrace(
+        'controller.result.rollback_sequence_conflict',
+        {
+            ...config.traceContext,
+            match_id: config.matchId,
+            response_json: responseJson,
+        },
+        'warn',
+    );
+}
+
 function shouldReconcileRejectedResult(
     error: unknown,
     syncFailureClass: string | null = null,
@@ -5575,6 +6183,7 @@ function shouldReconcileRejectedResult(
 
     return [
         'match_not_ready',
+        'rollback_sequence_conflict',
         'winner_id_invalid',
         'ring_mismatch',
         'ambiguous_match',
@@ -5820,6 +6429,7 @@ async function loadMatch(m: any): Promise<boolean> {
             getMatchRingText(m),
             selectedRing.value,
         ) || null;
+    currentLoadedRollbackSequence.value = getMatchRollbackSequence(m);
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
@@ -6171,6 +6781,19 @@ async function handleSubmitResult() {
                 showBanner(message, 'error', 5200);
                 return;
             }
+            const rollbackGuard =
+                assessCurrentLoadedMatchRollbackGuard(currentMatch);
+            if (!rollbackGuard.ready) {
+                const message =
+                    rollbackGuard.message ||
+                    'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.';
+                markResultSubmitReconcileRequired(
+                    message,
+                    rollbackGuard.reasonCode,
+                );
+                showBanner(message, 'error', 6500);
+                return;
+            }
             markResultSubmitOfflineContinuation(
                 'Saving locally first from the saved queue snapshot.',
                 'offline_cached_confirmed',
@@ -6241,6 +6864,7 @@ async function handleSubmitResult() {
             matchIdForSync != null
                 ? (currentMatch?.id ?? matchIdForSync)
                 : null;
+        const rollbackSequenceForSync = getMatchRollbackSequence(currentMatch);
         const refreshBaselineQueueVersion = upstreamQueueVersion.value;
         const refreshBaselineControllerSnapshot =
             controllerSnapshotVersion.value;
@@ -6264,6 +6888,8 @@ async function handleSubmitResult() {
                 controllerSnapshotVersion.value ?? null,
             upstream_generated_at: upstreamGeneratedAt.value ?? null,
             controller_generated_at: controllerGeneratedAt.value ?? null,
+            rollback_sequence: rollbackSequenceForSync,
+            loaded_rollback_sequence: currentLoadedRollbackSequence.value ?? 0,
             submit_queue_mode: resultSubmitQueueMode.value,
             submit_queue_reason_code:
                 resultSubmitStatusReasonCode.value ?? null,
@@ -6298,6 +6924,7 @@ async function handleSubmitResult() {
                 player_one_name: playerOneName,
                 player_two_name: playerTwoName,
                 weight_category: weightCategory,
+                rollback_sequence: rollbackSequenceForSync,
             };
             if (winnerIdNum != null) localPayload.winner_id = winnerIdNum;
             resultPayloadForPendingSync = localPayload;
@@ -6490,6 +7117,24 @@ async function handleSubmitResult() {
                     outcome.accepted ? 'info' : 'warn',
                 );
 
+                if (outcome.responseJson) {
+                    const rollbackConflict =
+                        outcome.rejectReason === 'rollback_sequence_conflict';
+                    await handleAuthoritativeQueueMetadataPayload(
+                        outcome.responseJson,
+                        'result_response',
+                        {
+                            announceLoadedClear: true,
+                            clearMessage: rollbackConflict
+                                ? ROLLBACK_SEQUENCE_CONFLICT_MESSAGE
+                                : undefined,
+                            reasonCode: rollbackConflict
+                                ? 'rollback_sequence_conflict'
+                                : undefined,
+                        },
+                    );
+                }
+
                 if (!outcome.accepted) {
                     remoteError = createControllerApiError(
                         outcome.message || 'Result sync failed.',
@@ -6503,12 +7148,28 @@ async function handleSubmitResult() {
             } catch (e: any) {
                 adminSyncOk = false;
                 remoteError = e;
-                remoteSyncFailureClass = 'network_failure';
+                const responseJson = getControllerApiErrorResponseJson(e);
+                const errorStatus = getControllerApiErrorStatus(e);
+                const rejectReason =
+                    getControllerApiErrorCode(e) ||
+                    normalizeOptionalText(responseJson?.reject_reason) ||
+                    normalizeOptionalText(responseJson?.rejectReason) ||
+                    normalizeOptionalText(responseJson?.error);
+                const resultTraceId = normalizeOptionalText(
+                    responseJson?.result_trace_id ??
+                        responseJson?.resultTraceId,
+                );
+                remoteSyncFailureClass =
+                    errorStatus != null && errorStatus >= 400 && errorStatus < 500
+                        ? 'admin_reject'
+                        : 'network_failure';
+                remoteRejectReason = rejectReason;
+                remoteResultTraceId = resultTraceId;
                 adminSyncMsg = formatResultSyncFailureMessage(
                     e?.message || 'Network error',
-                    'network_failure',
-                    null,
-                    null,
+                    remoteSyncFailureClass,
+                    rejectReason,
+                    resultTraceId,
                 );
                 logResultSyncTrace(
                     'controller.result.sync_failed',
@@ -6516,7 +7177,9 @@ async function handleSubmitResult() {
                         ...syncTraceContext,
                         sync_status: 'request_failed',
                         message: e?.message || 'Network error',
-                        sync_failure_class: 'network_failure',
+                        sync_failure_class: remoteSyncFailureClass,
+                        reject_reason: rejectReason,
+                        result_trace_id: resultTraceId,
                     },
                     'warn',
                 );
@@ -6557,6 +7220,21 @@ async function handleSubmitResult() {
                     matchNum != null
                         ? `${matchIdForSync} (#${matchNum})`
                         : String(matchIdForSync);
+                if (
+                    isRollbackSequenceConflict(
+                        remoteError ?? adminSyncMsg,
+                        remoteRejectReason,
+                    )
+                ) {
+                    await handleRollbackSequenceConflictSubmission({
+                        error: remoteError ?? adminSyncMsg,
+                        matchId: matchIdForSync,
+                        adminBase: resolvedAdminBase,
+                        traceContext: syncTraceContext,
+                    });
+                    return;
+                }
+
                 const shouldQueueReplay =
                     canQueueResultForAdminReplay &&
                     !!resolvedAdminBase &&
@@ -6635,6 +7313,31 @@ async function handleSubmitResult() {
             gameState.isRunning = false;
 
             const completedAt = new Date().toISOString();
+            const rollbackSequence = currentMatch
+                ? getMatchRollbackSequence(currentMatch)
+                : null;
+            const localMatchOrder = {
+                ring_sequence:
+                    currentMatch?.ring_sequence ??
+                    currentMatch?.ringSequence ??
+                    null,
+                official_sequence:
+                    currentMatch?.official_sequence ??
+                    currentMatch?.officialSequence ??
+                    null,
+                global_match_order:
+                    currentMatch?.global_match_order ??
+                    currentMatch?.globalMatchOrder ??
+                    null,
+                match_order:
+                    currentMatch?.match_order ??
+                    currentMatch?.matchOrder ??
+                    null,
+                match_number:
+                    currentMatch?.match_number ??
+                    currentMatch?.matchNumber ??
+                    null,
+            };
             upsertLocalResultOverride(
                 matchIdForSync,
                 {
@@ -6650,6 +7353,12 @@ async function handleSubmitResult() {
                         ringNum != null ? String(ringNum) : ringNumber || null,
                     tournament_id: tournamentId,
                     updated_at: completedAt,
+                    rollback_sequence: rollbackSequence,
+                    ring_sequence: localMatchOrder.ring_sequence,
+                    official_sequence: localMatchOrder.official_sequence,
+                    global_match_order: localMatchOrder.global_match_order,
+                    match_order: localMatchOrder.match_order,
+                    match_number: localMatchOrder.match_number,
                 },
                 tournamentId,
                 ringNum != null ? String(ringNum) : ringNumber,

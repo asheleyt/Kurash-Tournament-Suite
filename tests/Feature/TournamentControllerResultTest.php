@@ -82,6 +82,7 @@ class TournamentControllerResultTest extends TestCase
             'winner_side' => 'player1',
             'red_score' => 10,
             'blue_score' => 0,
+            'rollback_sequence' => 3,
         ]);
 
         $response->assertOk()
@@ -100,6 +101,7 @@ class TournamentControllerResultTest extends TestCase
             'player_one_name' => 'Ali Green',
             'player_two_name' => 'Bek Blue',
             'weight_category' => '-73',
+            'rollback_sequence' => 3,
         ]);
 
         Http::assertSentCount(1);
@@ -333,6 +335,56 @@ class TournamentControllerResultTest extends TestCase
 
         $match->refresh();
         $this->assertFalse((bool) $match->is_synced);
+        Http::assertSentCount(1);
+    }
+
+    public function test_post_result_with_admin_base_forwards_rollback_sequence_and_preserves_conflict_metadata(): void
+    {
+        Http::fake([
+            'http://admin.test/api/matches/1001/result' => Http::response([
+                'error' => 'rollback_sequence_conflict',
+                'message' => 'Rollback sequence is stale.',
+                'current_rollback_sequence' => 5,
+                'current_version' => 5,
+                'current_match' => [
+                    'id' => 1001,
+                    'rollback_sequence' => 5,
+                    'status' => 'scheduled',
+                ],
+                'queue_version' => 'queue-v5',
+                'generated_at' => '2026-05-20T10:00:00Z',
+            ], 409),
+        ]);
+
+        $match = $this->makeSyncableMatch();
+
+        $response = $this->postJson('/api/matches/1001/result?admin_base=http://admin.test/api', [
+            'winner_id' => 501,
+            'winner_side' => 'player1',
+            'red_score' => 10,
+            'blue_score' => 0,
+            'rollback_sequence' => 4,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('sync_status', 'pending_offline')
+            ->assertJsonPath('sync_failure_class', 'admin_reject')
+            ->assertJsonPath('reject_reason', 'rollback_sequence_conflict')
+            ->assertJsonPath('current_rollback_sequence', 5)
+            ->assertJsonPath('current_version', 5)
+            ->assertJsonPath('current_match.rollback_sequence', 5)
+            ->assertJsonPath('queue_version', 'queue-v5')
+            ->assertJsonPath('generated_at', '2026-05-20T10:00:00Z');
+
+        $match->refresh();
+        $this->assertFalse((bool) $match->is_synced);
+
+        $this->assertCanonicalResultRequest('http://admin.test/api/matches/1001/result', [
+            'winner_id' => 501,
+            'match_id' => 1001,
+            'rollback_sequence' => 4,
+        ]);
+
         Http::assertSentCount(1);
     }
 

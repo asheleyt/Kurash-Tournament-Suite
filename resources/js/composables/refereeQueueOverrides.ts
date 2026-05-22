@@ -10,6 +10,18 @@ export interface PersistedResultOverride {
   ring_number?: string | null
   tournament_id?: number | string | null
   updated_at?: string | null
+  rollback_sequence?: number | null
+  rollbackSequence?: number | null
+  ring_sequence?: number | null
+  ringSequence?: number | null
+  official_sequence?: number | null
+  officialSequence?: number | null
+  global_match_order?: number | null
+  globalMatchOrder?: number | null
+  match_order?: number | null
+  matchOrder?: number | null
+  match_number?: number | null
+  matchNumber?: number | null
 }
 
 export interface QueueRowCounts {
@@ -41,6 +53,19 @@ interface ReconcileLocalStatusOverrideOptions {
   overrides: Record<string, PersistedResultOverride>
   nextMatches: any[]
   isMatchIdEqual: (row: any, id: number | string | null) => boolean
+  allowCompletedOverrideRemoval?: boolean
+  getMatchRollbackSequence?: (row: any) => number | null
+  onCompletedOverrideRemoved?: (payload: {
+    id: string
+    override: PersistedResultOverride
+    match: any
+    reason: 'match_reopened' | 'rollback_sequence_changed'
+  }) => void
+}
+
+function asOptionalNumber(value: unknown): number | null {
+  const num = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(num) ? num : null
 }
 
 export function buildSelectionSnapshotScopeKey(options: SelectionSnapshotScopeKeyOptions) {
@@ -136,6 +161,12 @@ export function restoreResultOverridesForSelection(options: OverrideStorageOptio
           ring_number: value.ring_number == null ? null : String(value.ring_number),
           tournament_id: value.tournament_id ?? null,
           updated_at: value.updated_at == null ? null : String(value.updated_at),
+          rollback_sequence: asOptionalNumber(value.rollback_sequence ?? value.rollbackSequence),
+          ring_sequence: asOptionalNumber(value.ring_sequence ?? value.ringSequence),
+          official_sequence: asOptionalNumber(value.official_sequence ?? value.officialSequence),
+          global_match_order: asOptionalNumber(value.global_match_order ?? value.globalMatchOrder),
+          match_order: asOptionalNumber(value.match_order ?? value.matchOrder),
+          match_number: asOptionalNumber(value.match_number ?? value.matchNumber),
         }
       }
     }
@@ -236,12 +267,39 @@ export function countQueueRows(rows: any[]): QueueRowCounts {
 export function reconcileLocalStatusOverrides(options: ReconcileLocalStatusOverrideOptions) {
   const currentOverrides = options.overrides || {}
   const nextOverrides: Record<string, PersistedResultOverride> = {}
+  const allowCompletedOverrideRemoval = options.allowCompletedOverrideRemoval === true
 
   for (const [id, override] of Object.entries(currentOverrides)) {
     const normalizedStatus = (override?.status || '').toString().trim().toLowerCase()
     if (!normalizedStatus) continue
 
     if (normalizedStatus === 'completed') {
+      const match = (options.nextMatches || []).find((item: any) => options.isMatchIdEqual(item, id))
+      if (allowCompletedOverrideRemoval && match) {
+        const matchStatus = (match?.status || '').toString().trim().toLowerCase()
+        const displayClass = (match?.display_class ?? match?.displayClass ?? '').toString().trim().toUpperCase()
+        const matchIsCompleted = matchStatus === 'completed' || displayClass === 'COMPLETED'
+        const overrideRollbackSequence = asOptionalNumber(
+          override?.rollback_sequence ?? override?.rollbackSequence,
+        )
+        const matchRollbackSequence = options.getMatchRollbackSequence
+          ? options.getMatchRollbackSequence(match)
+          : null
+        const rollbackSequenceChanged =
+          overrideRollbackSequence != null
+          && matchRollbackSequence != null
+          && overrideRollbackSequence !== matchRollbackSequence
+        if (!matchIsCompleted || rollbackSequenceChanged) {
+          options.onCompletedOverrideRemoved?.({
+            id,
+            override,
+            match,
+            reason: rollbackSequenceChanged ? 'rollback_sequence_changed' : 'match_reopened',
+          })
+          continue
+        }
+      }
+
       nextOverrides[id] = override
       continue
     }
