@@ -411,18 +411,18 @@
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  isMedicMode && medicActivePlayer === 'player2' && player2Medic >= 1
+                  player2Medic >= 1
                     ? 'border-transparent'
-                    : 'border-yellow-400',
+                    : 'border-cyan-400',
                   medicBoxFillClass('player2', 1)
                 ]">
               </div>
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  isMedicMode && medicActivePlayer === 'player2' && player2Medic >= 2
+                  player2Medic >= 2
                     ? 'border-transparent'
-                    : 'border-yellow-400',
+                    : 'border-cyan-400',
                   medicBoxFillClass('player2', 2)
                 ]">
               </div>
@@ -559,18 +559,18 @@
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  isMedicMode && medicActivePlayer === 'player1' && player1Medic >= 1
+                  player1Medic >= 1
                     ? 'border-transparent'
-                    : 'border-yellow-400',
+                    : 'border-green-400',
                   medicBoxFillClass('player1', 1)
                 ]">
               </div>
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  isMedicMode && medicActivePlayer === 'player1' && player1Medic >= 2
+                  player1Medic >= 2
                     ? 'border-transparent'
-                    : 'border-yellow-400',
+                    : 'border-green-400',
                   medicBoxFillClass('player1', 2)
                 ]">
               </div>
@@ -1034,14 +1034,16 @@ function formatCountryCode(input: string) {
 
 function medicBoxFillClass(player: 'player1' | 'player2', idx: 1 | 2) {
   const usedCount = player === 'player1' ? player1Medic.value : player2Medic.value
-  const baseFill = 'bg-yellow-400/15'
-  if (usedCount < idx) return baseFill
+  const isP1 = player === 'player1'
+  if (usedCount < idx) {
+    return isP1 ? 'bg-green-500/15' : 'bg-cyan-500/15'
+  }
 
   const isActive = isMedicMode.value && medicActivePlayer.value === player && usedCount === idx
   if (isActive) {
     return 'bg-yellow-400 shadow-[0_0_45px_rgba(250,204,21,0.95)] drop-shadow-[0_0_18px_rgba(250,204,21,0.85)] animate-pulse'
   }
-  return 'bg-yellow-400/40 shadow-[0_0_18px_rgba(250,204,21,0.4)]'
+  return 'bg-yellow-400 shadow-[0_0_18px_rgba(250,204,21,0.5)]'
 }
 
 // Winner State
