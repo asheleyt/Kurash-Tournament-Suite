@@ -71,7 +71,8 @@
                   BREAK TIME
                 </div>
 
-                <div v-if="time > 0" class="sb-pop__timer text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold text-white tracking-widest mt-1">
+                <div v-if="time > 0" class="sb-pop__timer text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold tracking-widest mt-1"
+                     :class="isRunning ? 'text-green-400 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'">
                   <span class="inline-flex items-baseline justify-center">
                     <span class="tabular-nums">{{ timeParts.mm }}</span>
                     <span class="tabular-nums leading-none tracking-normal mx-[0.05em]">:</span>
@@ -124,11 +125,12 @@
                 />
               </div>
 
-              <div class="sb-pop__headline text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-[#ff2a2a] drop-shadow-[0_0_18px_rgba(220,38,38,0.55)]">
+              <div class="sb-pop__headline text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400 drop-shadow-[0_0_18px_rgba(250,204,21,0.55)]">
                 MEDIC
               </div>
 
-              <div class="sb-pop__timer text-[4rem] sm:text-[6rem] md:text-[8rem] lg:text-[10rem] xl:text-[12rem] font-bold text-white tabular-nums leading-none mt-1">
+              <div class="sb-pop__timer text-[4rem] sm:text-[6rem] md:text-[8rem] lg:text-[10rem] xl:text-[12rem] font-bold tabular-nums leading-none mt-1"
+                   :class="isRunning ? 'text-green-400' : 'text-red-500'">
                 <span class="inline-flex items-baseline justify-center">
                   <span class="tabular-nums">{{ timeParts.mm }}</span>
                   <span class="tabular-nums leading-none tracking-normal mx-[0.05em]">:</span>
@@ -353,23 +355,23 @@
  
    <!-- Left cluster: Match/Gender -->
    <div class="flex-[1.1] min-w-0 flex items-center justify-end gap-3 sm:gap-4">
-     <div class="flex items-center gap-3 sm:gap-4">
-       <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-4 px-7 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
-         <span class="text-yellow-400 text-[12px] sm:text-[13px] font-black tracking-[0.2em] mb-1.5 block">MATCH ID</span>
-         <div class="text-white text-3xl sm:text-4xl font-black leading-none">{{ matchId || 'N/A' }}</div>
-       </div>
-       <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-4 px-7 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
-         <span class="text-yellow-400 text-[12px] sm:text-[13px] font-black tracking-[0.2em] mb-1.5 block">GENDER</span>
-         <div class="text-white text-3xl sm:text-4xl font-black leading-none uppercase">{{ gender || 'N/A' }}</div>
-       </div>
-     </div>
+      <div class="flex items-center gap-3 sm:gap-4">
+        <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-5 px-8 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
+          <span class="text-yellow-400 text-[14px] sm:text-[16px] font-black tracking-[0.2em] mb-1.5 block">MATCH ID</span>
+          <div class="text-white text-4xl sm:text-5xl font-black leading-none">{{ matchId || 'N/A' }}</div>
+        </div>
+        <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-5 px-8 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
+          <span class="text-yellow-400 text-[14px] sm:text-[16px] font-black tracking-[0.2em] mb-1.5 block">GENDER</span>
+          <div class="text-white text-4xl sm:text-5xl font-black leading-none uppercase">{{ gender || 'N/A' }}</div>
+        </div>
+      </div>
    </div>
  
    <!-- Timer -->
    <div class="min-w-0 flex-[1.7] flex items-center justify-center">
      <div
-       class="min-w-0 w-full text-center font-black leading-none transition-colors duration-300 drop-shadow-[0_0_30px_rgba(220,38,38,0.5)] text-[13.5rem] tracking-tighter tabular-nums whitespace-nowrap"
-       :class="isRunning ? 'text-red-500' : 'text-red-600'">
+        class="min-w-0 w-full text-center font-black leading-none transition-colors duration-300 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)] text-[13.5rem] tracking-tighter tabular-nums whitespace-nowrap"
+        :class="isRunning ? 'text-green-400 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'">
        <span class="inline-flex items-baseline justify-center">
         <span class="tabular-nums">{{ timeParts.mm }}</span>
         <span class="tabular-nums leading-none tracking-normal mx-[0.05em]">:</span>
@@ -380,16 +382,16 @@
 
    <!-- Right cluster: Category/Weight -->
    <div class="flex-[1.1] min-w-0 flex items-center justify-start gap-3 sm:gap-4">
-     <div class="flex items-center gap-3 sm:gap-4">
-       <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-4 px-7 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
-         <span class="text-yellow-400 text-[12px] sm:text-[13px] font-black tracking-[0.2em] mb-1.5 block">CATEGORY</span>
-         <div class="text-white text-3xl sm:text-4xl font-black leading-none uppercase">{{ categoryLabel || 'N/A' }}</div>
-       </div>
-       <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-4 px-7 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
-         <span class="text-yellow-400 text-[12px] sm:text-[13px] font-black tracking-[0.2em] mb-1.5 block">WEIGHT DIVISION</span>
-         <div class="text-white text-3xl sm:text-4xl font-black leading-none uppercase">{{ weightDivision }}</div>
-       </div>
-     </div>
+      <div class="flex items-center gap-3 sm:gap-4">
+        <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-5 px-8 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
+          <span class="text-yellow-400 text-[14px] sm:text-[16px] font-black tracking-[0.2em] mb-1.5 block">CATEGORY</span>
+          <div class="text-white text-4xl sm:text-5xl font-black leading-none uppercase">{{ categoryLabel || 'N/A' }}</div>
+        </div>
+        <div class="bg-white/10 backdrop-blur rounded-2xl border border-white/10 py-5 px-8 w-48 sm:w-52 md:w-60 lg:w-64 text-center">
+          <span class="text-yellow-400 text-[14px] sm:text-[16px] font-black tracking-[0.2em] mb-1.5 block">WEIGHT DIVISION</span>
+          <div class="text-white text-4xl sm:text-5xl font-black leading-none uppercase">{{ weightDivision }}</div>
+        </div>
+      </div>
  
    </div>
 
@@ -404,19 +406,23 @@
         <!-- Row 1: Penalties -->
         <div class="flex items-center justify-center pb-2">
           <div class="flex items-center gap-2 sm:gap-3">
-            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-[#ff2a2a] font-extrabold text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(220,38,38,0.55)] leading-none">MEDIC</span>
+            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-yellow-400 font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
             <div class="flex gap-2">
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  'border-cyan-400',
+                  isMedicMode && medicActivePlayer === 'player2' && player2Medic >= 1
+                    ? 'border-transparent'
+                    : 'border-yellow-400',
                   medicBoxFillClass('player2', 1)
                 ]">
               </div>
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  'border-cyan-400',
+                  isMedicMode && medicActivePlayer === 'player2' && player2Medic >= 2
+                    ? 'border-transparent'
+                    : 'border-yellow-400',
                   medicBoxFillClass('player2', 2)
                 ]">
               </div>
@@ -428,9 +434,10 @@
         <div class="flex justify-center items-end pb-2">
           <button
             :class="player2Penalties.g
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
-              : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player2Penalties.g ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             G
           </button>
         </div>
@@ -439,11 +446,12 @@
         <div class="flex justify-center items-end pb-2">
           <button :disabled="!canClickD(player2Penalties)"
             :class="player2Penalties.d
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
               : !canClickD(player2Penalties)
-                ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 cursor-not-allowed border-2 border-transparent'
-                : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+                ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 cursor-not-allowed border-2 border-transparent'
+                : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player2Penalties.d ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             D
           </button>
         </div>
@@ -452,9 +460,10 @@
         <div class="flex justify-center items-end pb-2">
           <button
             :class="player2Penalties.t
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
-              : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player2Penalties.t ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             T
           </button>
         </div>
@@ -470,7 +479,7 @@
           <div
             class="flex flex-col justify-center h-full p-3 sm:p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl">
             <div
-              class="text-xl sm:text-2xl md:text-3xl font-bold text-cyan-400 mb-1 sm:mb-2 wrap-break-word leading-tight">{{
+              class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-cyan-400 mb-1 sm:mb-2 wrap-break-word leading-tight">{{
               player2Country }}</div>
             <!-- <div v-if="player1ClubCode" class="text-lg sm:text-xl font-bold text-gray-300 mb-1">
                {{ player1ClubCode }}
@@ -545,19 +554,23 @@
       <div class="grid grid-cols-5 gap-2 shrink-0">
         <div class="flex items-center justify-center py-2">
           <div class="flex items-center gap-2 sm:gap-3">
-            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-[#ff2a2a] font-extrabold text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(220,38,38,0.55)] leading-none">MEDIC</span>
+            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-yellow-400 font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
             <div class="flex gap-2">
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  'border-[#00ff00]',
+                  isMedicMode && medicActivePlayer === 'player1' && player1Medic >= 1
+                    ? 'border-transparent'
+                    : 'border-yellow-400',
                   medicBoxFillClass('player1', 1)
                 ]">
               </div>
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
                 :class="[
-                  'border-[#00ff00]',
+                  isMedicMode && medicActivePlayer === 'player1' && player1Medic >= 2
+                    ? 'border-transparent'
+                    : 'border-yellow-400',
                   medicBoxFillClass('player1', 2)
                 ]">
               </div>
@@ -595,7 +608,7 @@
           <!-- Player Info -->
           <div
             class="flex flex-col justify-center h-full p-3 sm:p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl">
-            <div class="text-xl sm:text-2xl md:text-3xl font-bold text-[#00ff00] mb-1 sm:mb-2 wrap-break-word leading-tight">
+            <div class="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#00ff00] mb-1 sm:mb-2 wrap-break-word leading-tight">
               {{ player1Country }}</div>
             <!-- <div v-if="player2ClubCode" class="text-lg sm:text-xl font-bold text-gray-300 mb-1">
                {{ player2ClubCode }}
@@ -672,9 +685,10 @@
         <div class="flex justify-center items-start pt-2">
           <button
             :class="player1Penalties.g
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
-              : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player1Penalties.g ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             G
           </button>
         </div>
@@ -683,11 +697,12 @@
         <div class="flex justify-center items-start pt-2">
           <button :disabled="!canClickD(player1Penalties)"
             :class="player1Penalties.d
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
               : !canClickD(player1Penalties)
-                ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 cursor-not-allowed border-2 border-transparent'
-                : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+                ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 cursor-not-allowed border-2 border-transparent'
+                : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player1Penalties.d ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             D
           </button>
         </div>
@@ -696,9 +711,10 @@
         <div class="flex justify-center items-start pt-2">
           <button
             :class="player1Penalties.t
-              ? 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
-              : 'w-full h-20 rounded-xl text-3xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
-            style="backdrop-filter: blur(4px)">
+              ? 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-red-600 text-white shadow-lg border-2 border-red-400'
+              : 'w-full h-20 rounded-xl text-4xl font-bold transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50 border-2 border-transparent'"
+            style="backdrop-filter: blur(4px)"
+            :style="player1Penalties.t ? 'text-shadow: 1px 1px 0 #000, 0 0 4px #000' : ''">
             T
           </button>
         </div>
@@ -1018,14 +1034,14 @@ function formatCountryCode(input: string) {
 
 function medicBoxFillClass(player: 'player1' | 'player2', idx: 1 | 2) {
   const usedCount = player === 'player1' ? player1Medic.value : player2Medic.value
-  const baseFill = player === 'player1' ? 'bg-[#00ff00]/30' : 'bg-blue-500/30'
+  const baseFill = 'bg-yellow-400/15'
   if (usedCount < idx) return baseFill
 
   const isActive = isMedicMode.value && medicActivePlayer.value === player && usedCount === idx
   if (isActive) {
-    return 'bg-[#ff2a2a] shadow-[0_0_45px_rgba(255,42,42,0.95)] drop-shadow-[0_0_18px_rgba(255,42,42,0.85)] animate-pulse'
+    return 'bg-yellow-400 shadow-[0_0_45px_rgba(250,204,21,0.95)] drop-shadow-[0_0_18px_rgba(250,204,21,0.85)] animate-pulse'
   }
-  return 'bg-[#ff2a2a]/65 shadow-[0_0_18px_rgba(255,42,42,0.4)]'
+  return 'bg-yellow-400/40 shadow-[0_0_18px_rgba(250,204,21,0.4)]'
 }
 
 // Winner State
@@ -1185,6 +1201,11 @@ watch(winner, (next, prev) => {
 // Internal Timer Reference
 let intervalId: number | null = null
 
+// Timer sync tracking — used to prevent drift-induced visible jumps
+let lastTimerBroadcastAt = 0
+let lastTimerBroadcastTime = 0
+const TIMER_DRIFT_THRESHOLD_SEC = 2
+
 /* --- CONSTANTS & HELPERS --- */
 const BUZZER_SOUND = '/Sound/basketball-buzzer-game-over-bosnow-1-00-09.mp3'
 
@@ -1343,21 +1364,30 @@ watchEffect(() => {
 /* --- TIMER & GAME LOGIC FUNCTIONS --- */
 /**
  * Starts the local timer interval.
- * Decrements the time every second until it reaches 0.
+ * Uses wall-clock correction to avoid cumulative drift:
+ * each tick compares against Date.now() to stay in sync.
  */
 function startInterval() {
   if (intervalId !== null) return
+  let lastTickAt = Date.now()
   intervalId = window.setInterval(() => {
-    if (time.value <= 1) {
+    const now = Date.now()
+    const elapsedMs = now - lastTickAt
+    lastTickAt = now
+
+    if (time.value <= 0) {
       isRunning.value = false
-      time.value = 0
       if (!isMedicMode.value && !isBreakTime.value) {
         playBuzzer()
       }
       clearIntervalIfAny()
       return
     }
-    time.value = time.value - 1
+
+    // Only decrement if at least 900ms have passed (tolerance for minor OS timer jitter)
+    if (elapsedMs >= 900) {
+      time.value = Math.max(0, time.value - 1)
+    }
   }, 1000)
 }
 
@@ -1372,15 +1402,64 @@ function clearIntervalIfAny() {
   }
 }
 
-function applyTimerPayload(e: { isRunning: boolean; time: number; activeTimer?: string | null; timerPlayer?: string | null }) {
+function applyTimerPayload(e: { isRunning: boolean; time: number; activeTimer?: string | null; timerPlayer?: string | null; broadcastAt?: number }) {
+  const incomingTime = e.time
+  const broadcastAt = typeof e.broadcastAt === 'number' ? e.broadcastAt : Date.now()
+
+  // Stale broadcast guard: if the local timer is running and this broadcast
+  // is not newer than the last one we already applied, skip the time correction.
+  // This prevents stale timer values from the localStorage cache (carried by
+  // partial score/medic/etc. updates) from jumping the countdown backward.
+  const isStaleBroadcast = lastTimerBroadcastAt > 0 && broadcastAt <= lastTimerBroadcastAt
+
   if (e.isRunning) {
-    clearIntervalIfAny()
-    time.value = e.time
-    isRunning.value = e.isRunning
-    startInterval()
+    if (isStaleBroadcast && isRunning.value) {
+      // Stale broadcast while running — skip time, only update mode flags below
+    } else if (!isRunning.value) {
+      // Scoreboard timer wasn't running — always sync to the broadcast
+      const elapsedSinceBroadcast = Math.max(0, (Date.now() - broadcastAt)) / 1000
+      const expectedLocalTime = Math.max(0, Math.round(incomingTime - elapsedSinceBroadcast))
+      clearIntervalIfAny()
+      time.value = expectedLocalTime
+      isRunning.value = true
+      lastTimerBroadcastAt = broadcastAt
+      lastTimerBroadcastTime = incomingTime
+      startInterval()
+    } else {
+      // Timer is running on both sides. Calculate expected local time.
+      const elapsedSinceBroadcast = Math.max(0, (Date.now() - broadcastAt)) / 1000
+      const expectedLocalTime = Math.max(0, Math.round(incomingTime - elapsedSinceBroadcast))
+
+      // Core rule: NEVER let the timer jump backward during normal operation.
+      // Only correct if the broadcast is significantly AHEAD (controller reset/adjusted
+      // the timer forward) or if drift is very large.
+      const drift = expectedLocalTime - time.value
+
+      if (drift > TIMER_DRIFT_THRESHOLD_SEC) {
+        // Broadcast is ahead — controller adjusted timer forward, accept it
+        clearIntervalIfAny()
+        time.value = expectedLocalTime
+        lastTimerBroadcastAt = broadcastAt
+        lastTimerBroadcastTime = incomingTime
+        startInterval()
+      } else if (drift < -TIMER_DRIFT_THRESHOLD_SEC && broadcastAt > lastTimerBroadcastAt) {
+        // Broadcast is behind AND it's a genuinely newer broadcast (not stale).
+        // This means controller explicitly set the timer backward (adjust/reset).
+        clearIntervalIfAny()
+        time.value = expectedLocalTime
+        lastTimerBroadcastAt = broadcastAt
+        lastTimerBroadcastTime = incomingTime
+        startInterval()
+      }
+      // else: minor drift or stale broadcast — let local interval continue
+    }
   } else {
-    isRunning.value = e.isRunning
-    time.value = e.time
+    // Timer stopped — apply the time directly (authoritative stop from controller)
+    clearIntervalIfAny()
+    isRunning.value = false
+    time.value = incomingTime
+    lastTimerBroadcastAt = broadcastAt
+    lastTimerBroadcastTime = incomingTime
   }
 
   const nextActiveTimer = typeof e.activeTimer === 'string' ? e.activeTimer : null
@@ -1812,7 +1891,7 @@ function setupBroadcastListeners() {
   if (!window.Echo) return
 
   // Subscribe to timer broadcasts from referee
-  window.Echo.channel('kurash.timer').listen('.timer.toggled', (e: { isRunning: boolean; time: number; activeTimer?: string; timerPlayer?: string }) => {
+  window.Echo.channel('kurash.timer').listen('.timer.toggled', (e: { isRunning: boolean; time: number; activeTimer?: string; timerPlayer?: string; broadcastAt?: number }) => {
     console.log('TimerToggled received on viewer:', e)
     applyTimerPayload(e)
   })
@@ -1974,7 +2053,7 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--winner .broadcast-pop__surface,
   .sb-fit-card--medic .broadcast-pop__surface {
-    gap: 1.4rem;
+    gap: 1.75rem;
     padding: 1.75rem 2rem;
   }
 
@@ -2031,13 +2110,13 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 12.5rem;
-    height: 12.5rem;
+    width: 15rem;
+    height: 15rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 4.8rem;
+    font-size: 5.8rem;
     line-height: 1;
   }
 
@@ -2090,17 +2169,17 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 9rem;
-    height: 9rem;
+    width: 11rem;
+    height: 11rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 3.35rem;
+    font-size: 4rem;
     line-height: 1;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 4.4rem;
+    font-size: 5.2rem;
     margin-top: 0;
   }
 }
@@ -2143,16 +2222,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 9.75rem;
-    height: 9.75rem;
+    width: 11.75rem;
+    height: 11.75rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 3.6rem;
+    font-size: 4.3rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 4.7rem;
+    font-size: 5.5rem;
   }
 }
 
@@ -2181,13 +2260,13 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 10.25rem;
-    height: 10.25rem;
+    width: 12rem;
+    height: 12rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 3.9rem;
+    font-size: 4.7rem;
   }
 
   .sb-fit-card--break .sb-pop__timer {
@@ -2217,16 +2296,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 8rem;
-    height: 8rem;
+    width: 9.5rem;
+    height: 9.5rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 3rem;
+    font-size: 3.5rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 4rem;
+    font-size: 4.7rem;
   }
 }
 
@@ -2239,25 +2318,25 @@ onBeforeUnmount(() => {
 
 .sb-fit-card--break .broadcast-pop__surface,
 .sb-fit-card--jazo .broadcast-pop__surface {
-  gap: 2.1rem;
+  gap: 2.5rem;
 }
 
 .sb-fit-card--break .sb-pop__icon,
 .sb-fit-card--jazo .sb-pop__icon {
-  width: 17rem;
-  height: 17rem;
+  width: 20rem;
+  height: 20rem;
 }
 
 .sb-fit-card--break .sb-pop__icon-glow,
 .sb-fit-card--jazo .sb-pop__icon-glow {
-  width: 17rem;
-  height: 17rem;
+  width: 20rem;
+  height: 20rem;
 }
 
 .sb-fit-card--break .sb-pop__headline,
 .sb-fit-card--jazo .sb-pop__headline {
   max-width: 88%;
-  font-size: 6.2rem;
+  font-size: 7.5rem;
   line-height: 0.95;
 }
 
@@ -2267,21 +2346,21 @@ onBeforeUnmount(() => {
 }
 
 .sb-fit-card--medic .broadcast-pop__surface {
-  gap: 1.75rem;
+  gap: 2.5rem;
 }
 
 .sb-fit-card--medic .sb-pop__icon {
-  width: 12.5rem;
-  height: 12.5rem;
+  width: 15rem;
+  height: 15rem;
 }
 
 .sb-fit-card--medic .sb-pop__icon-glow {
-  width: 12.5rem;
-  height: 12.5rem;
+  width: 15rem;
+  height: 15rem;
 }
 
 .sb-fit-card--medic .sb-pop__headline {
-  font-size: 5.5rem;
+  font-size: 6.5rem;
   line-height: 0.94;
 }
 

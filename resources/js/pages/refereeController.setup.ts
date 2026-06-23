@@ -1396,13 +1396,17 @@ async function handleBreakTime() {
         gameState.savedGameTime = gameState.time;
         gameState.savedWasRunning = gameState.isRunning;
 
-        // Initial state: 0 time, not running, waiting for setup
-        gameState.time = 0;
+        // Transition into break-setup: keep showing previous time briefly
+        // until saveBreakTime() sets the actual break duration.
         gameState.isRunning = false;
         gameState.isBreakMode = true;
         gameState.timerPlayer = null;
 
         showBreakTimeSetup.value = true;
+
+        // Broadcast break state immediately (without zeroing the timer)
+        // so the scoreboard can show the break overlay without flickering.
+        await broadcastBreakState();
     } else {
         // Ending Break
         gameState.isRunning = false;
@@ -1414,10 +1418,10 @@ async function handleBreakTime() {
         }
         gameState.savedWasRunning = null;
         showBreakTimeSetup.value = false;
-    }
 
-    await broadcastTimerState();
-    await broadcastBreakState();
+        await broadcastTimerState();
+        await broadcastBreakState();
+    }
 }
 
 function openSetBreakTime() {
@@ -1434,7 +1438,10 @@ async function saveBreakTime() {
         gameState.time = total;
         gameState.isRunning = true;
         showBreakTimeSetup.value = false;
+        // Broadcast timer + break state atomically so the scoreboard
+        // receives the break time and running state in one update.
         await broadcastTimerState();
+        await broadcastBreakState();
     }
     isSetBreakTimeOpen.value = false;
 }
@@ -1774,6 +1781,7 @@ function buildTimerPayload() {
         time: gameState.time,
         activeTimer,
         timerPlayer: gameState.timerPlayer,
+        broadcastAt: Date.now(),
     };
 }
 
@@ -1820,14 +1828,10 @@ function publishLocalScoreboardState(
     } = {},
 ) {
     const nextUpdatedAt = new Date().toISOString();
-    const nextState = {
-        ...(options.replace ? {} : localScoreboardStateCache),
-        ...(partialState || {}),
-        updatedAt: nextUpdatedAt,
-    };
-    localScoreboardStateCache = nextState;
-    writeLocalScoreboardState(nextState);
 
+    // For the BroadcastChannel, send ONLY the partial update (no stale carry-over).
+    // This prevents stale timer values from score/medic/etc. updates
+    // from causing the scoreboard to jump the countdown backward.
     try {
         localScoreboardChannel?.postMessage({
             type: 'scoreboard_state:update',
@@ -1837,12 +1841,38 @@ function publishLocalScoreboardState(
     } catch (error) {
         console.warn('Failed to publish local scoreboard state', error);
     }
+
+    // For localStorage (hydration recovery), merge with cache but strip
+    // the timer field unless this partial update explicitly includes it.
+    // This avoids persisting stale timer values that would override the
+    // scoreboard's local countdown on page reload or storage events.
+    const hasTimerInPartial = !!(partialState && typeof partialState === 'object' && 'timer' in partialState);
+    const cacheForStorage = options.replace
+        ? { ...(partialState || {}), updatedAt: nextUpdatedAt }
+        : (() => {
+              const merged: Record<string, unknown> = {
+                  ...localScoreboardStateCache,
+                  ...(partialState || {}),
+                  updatedAt: nextUpdatedAt,
+              };
+              // Drop stale timer from cache when this update doesn't touch it.
+              // The scoreboard's local countdown is the source of truth for
+              // running timers — persisting an old timer snapshot would cause
+              // backward jumps on storage-event recovery.
+              if (!hasTimerInPartial && 'timer' in merged) {
+                  delete merged.timer;
+              }
+              return merged;
+          })();
+    localScoreboardStateCache = cacheForStorage;
+    writeLocalScoreboardState(cacheForStorage);
 }
 
 async function broadcastTimerState() {
     try {
-        publishLocalScoreboardState({ timer: buildTimerPayload() });
-        queueBatch({ timer: buildTimerPayload() });
+        const payload = buildTimerPayload();
+        publishLocalScoreboardState({ timer: payload });
+        queueBatch({ timer: payload });
     } catch (e) {
         console.error('Failed to queue timer update', e);
     }
@@ -1850,8 +1880,9 @@ async function broadcastTimerState() {
 
 async function broadcastScoreState() {
     try {
-        publishLocalScoreboardState({ score: buildScorePayload() });
-        queueBatch({ score: buildScorePayload() });
+        const payload = buildScorePayload();
+        publishLocalScoreboardState({ score: payload });
+        queueBatch({ score: payload });
     } catch (e) {
         console.error('Failed to queue score update', e);
     }
@@ -1859,10 +1890,9 @@ async function broadcastScoreState() {
 
 async function broadcastBreakState() {
     try {
-        publishLocalScoreboardState({
-            break: { isBreak: gameState.isBreakMode },
-        });
-        queueBatch({ break: { isBreak: gameState.isBreakMode } });
+        const payload = { isBreak: gameState.isBreakMode };
+        publishLocalScoreboardState({ break: payload });
+        queueBatch({ break: payload });
     } catch (e) {
         console.error('Failed to queue break update', e);
     }
@@ -1870,18 +1900,12 @@ async function broadcastBreakState() {
 
 async function broadcastMedicState() {
     try {
-        publishLocalScoreboardState({
-            medic: {
-                isMedic: gameState.isMedicMode,
-                timerPlayer: gameState.timerPlayer,
-            },
-        });
-        queueBatch({
-            medic: {
-                isMedic: gameState.isMedicMode,
-                timerPlayer: gameState.timerPlayer,
-            },
-        });
+        const payload = {
+            isMedic: gameState.isMedicMode,
+            timerPlayer: gameState.timerPlayer,
+        };
+        publishLocalScoreboardState({ medic: payload });
+        queueBatch({ medic: payload });
     } catch (e) {
         console.error('Failed to queue medic update', e);
     }
@@ -1889,8 +1913,9 @@ async function broadcastMedicState() {
 
 async function broadcastJazoState() {
     try {
-        publishLocalScoreboardState({ jazo: { isJazo: gameState.isJazo } });
-        queueBatch({ jazo: { isJazo: gameState.isJazo } });
+        const payload = { isJazo: gameState.isJazo };
+        publishLocalScoreboardState({ jazo: payload });
+        queueBatch({ jazo: payload });
     } catch (e) {
         console.error('Failed to queue jazo update', e);
     }
@@ -1898,8 +1923,9 @@ async function broadcastJazoState() {
 
 async function broadcastWinnerState() {
     try {
-        publishLocalScoreboardState({ winner: { winner: gameState.winner } });
-        queueBatch({ winner: { winner: gameState.winner } });
+        const payload = { winner: gameState.winner };
+        publishLocalScoreboardState({ winner: payload });
+        queueBatch({ winner: payload });
     } catch (e) {
         console.error('Failed to queue winner update', e);
     }

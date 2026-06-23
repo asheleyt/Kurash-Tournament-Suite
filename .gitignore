@@ -40,6 +40,12 @@ KTSI/
 *.exe
 *.zip
 
+.agents/
+.opencode/
+AGENTS.md
+UI_CHANGES_PLAN.md
+skills-lock.json
+
 .codex_flag_codes.txt
 
 public/images/player-logos/

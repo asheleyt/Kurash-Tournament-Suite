@@ -24,6 +24,7 @@ class TimerToggled implements ShouldBroadcastNow
 
     public ?string $activeTimer;
     public ?string $timerPlayer;
+    public int $broadcastAt;
 
     public function __construct(bool $isRunning, int $time, ?string $activeTimer = null, ?string $timerPlayer = null)
     {
@@ -31,6 +32,7 @@ class TimerToggled implements ShouldBroadcastNow
         $this->time = $time;
         $this->activeTimer = $activeTimer;
         $this->timerPlayer = $timerPlayer;
+        $this->broadcastAt = (int) (microtime(true) * 1000);
     }
 
     public function broadcastOn(): Channel

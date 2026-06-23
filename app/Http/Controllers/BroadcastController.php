@@ -92,6 +92,7 @@ class BroadcastController extends Controller
                 'time' => $data['time'],
                 'activeTimer' => $data['activeTimer'] ?? null,
                 'timerPlayer' => $data['timerPlayer'] ?? null,
+                'broadcastAt' => $data['broadcastAt'] ?? (int) (microtime(true) * 1000),
             ],
         ]);
 
@@ -210,6 +211,7 @@ class BroadcastController extends Controller
             'timer.time' => ['required_with:timer', 'integer'],
             'timer.activeTimer' => ['nullable', 'string'],
             'timer.timerPlayer' => ['nullable', 'string'],
+            'timer.broadcastAt' => ['nullable', 'numeric'],
 
             'score' => ['nullable', 'array'],
             'score.player1' => ['required_with:score', 'array'],
@@ -274,6 +276,7 @@ class BroadcastController extends Controller
                 'time' => $data['timer']['time'],
                 'activeTimer' => $data['timer']['activeTimer'] ?? null,
                 'timerPlayer' => $data['timer']['timerPlayer'] ?? null,
+                'broadcastAt' => $data['timer']['broadcastAt'] ?? (int) (microtime(true) * 1000),
             ];
         }
 
@@ -561,6 +564,15 @@ public function updatePlayerInfo(Request $request)
     private function rememberBroadcastState(array $partialState): array
     {
         $currentState = $this->getCachedBroadcastState();
+
+        // When this partial update does NOT include a timer, remove any
+        // cached timer to prevent stale timer values from persisting
+        // across score/medic/break/etc. updates. This stops the scoreboard
+        // from re-applying old timer data on hydration or storage events.
+        if (!isset($partialState['timer']) && isset($currentState['timer'])) {
+            unset($currentState['timer']);
+        }
+
         $nextState = array_merge($currentState, $partialState, [
             'updatedAt' => now()->toIso8601String(),
         ]);
