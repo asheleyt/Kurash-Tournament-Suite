@@ -1,795 +1,557 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Starting Kurash Tournament Suite...</title>
     <style>
+        /* ============================================================
+           KTS Loading Screen — Hacker Terminal
+           ============================================================ */
+
         :root {
             color-scheme: dark;
-            --bg-top: #071120;
-            --bg-bottom: #030913;
-            --card-top: rgba(13, 24, 45, 0.95);
-            --card-bottom: rgba(8, 15, 30, 0.97);
-            --card-border: rgba(152, 187, 255, 0.22);
-            --card-highlight: rgba(255, 255, 255, 0.08);
-            --text-primary: #f4f8ff;
-            --text-secondary: #c5d2e5;
-            --text-muted: #8ea3bf;
-            --accent-cyan: #39def2;
-            --accent-blue: #7ec1ff;
-            --accent-violet: #8a82ff;
-            --accent-gold: #e4c36e;
-            --panel-bg: rgba(15, 27, 50, 0.82);
-            --panel-border: rgba(126, 193, 255, 0.14);
-            --panel-glow: rgba(73, 217, 240, 0.18);
         }
 
-        * {
+        *,
+        *::before,
+        *::after {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         [hidden] {
             display: none !important;
         }
 
-        html,
-        body {
-            min-height: 100%;
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
 
+        /* --- Body fills the Electron window directly --- */
         body {
-            margin: 0;
-            min-height: 100vh;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at 50% 0%, rgba(53, 111, 201, 0.34), transparent 34%),
-                radial-gradient(circle at 0% 100%, rgba(9, 45, 90, 0.42), transparent 38%),
-                linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
-            color: var(--text-primary);
-            font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+            background: linear-gradient(160deg, #0a0f18 0%, #05080c 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 36px 48px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- Logo --- */
+        .kts-logo {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 18px;
+            border-radius: 18px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 20px rgba(0, 229, 255, 0.15));
+        }
+
+        .kts-logo-fallback {
+            width: 72px;
+            height: 72px;
+            margin-bottom: 18px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 28px;
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            color: #fff;
+            text-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+            border: 1px solid rgba(0, 229, 255, 0.12);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        body::before,
-        body::after {
-            content: "";
-            position: fixed;
-            inset: auto;
-            pointer-events: none;
-            border-radius: 999px;
-            opacity: 0.75;
+        /* --- Heading --- */
+        .kts-heading {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 6px;
+            line-height: 1.1;
         }
 
-        body::before {
-            width: 360px;
-            height: 360px;
-            top: -140px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: radial-gradient(circle, rgba(45, 173, 235, 0.22) 0%, rgba(45, 173, 235, 0) 70%);
-        }
-
-        body::after {
-            width: 320px;
-            height: 320px;
-            right: -100px;
-            bottom: -120px;
-            background: radial-gradient(circle, rgba(132, 97, 255, 0.16) 0%, rgba(132, 97, 255, 0) 72%);
-        }
-
-        .card {
-            position: relative;
-            width: min(760px, 100%);
-            padding: 34px 34px 20px;
-        }
-
-        .card::before,
-        .card::after {
-            content: none;
-        }
-
-        .card::before {
-            display: none;
-        }
-
-        .card::after {
-            display: none;
-        }
-
-        .brand {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            justify-content: center;
+        /* --- Subtitle (glowing yellow) --- */
+        .kts-subtitle {
+            font-size: 0.92rem;
+            font-weight: 600;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            text-align: center;
+            color: #ffcc00;
+            text-shadow:
+                0 0 10px rgba(255, 204, 0, 0.35),
+                0 0 30px rgba(255, 204, 0, 0.12);
             margin-bottom: 24px;
         }
 
-        .brand-lockup {
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            text-align: left;
-        }
-
-        .brand-mark-shell {
-            width: 82px;
-            height: 82px;
-            border-radius: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background:
-                radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 34%),
-                linear-gradient(180deg, rgba(30, 53, 92, 0.96), rgba(11, 20, 40, 0.94));
-            border: 1px solid rgba(145, 181, 239, 0.2);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.12),
-                0 18px 30px rgba(4, 10, 22, 0.28);
-        }
-
-        .brand-logo {
-            width: 66px;
-            height: 66px;
-            display: block;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 16px rgba(5, 12, 24, 0.18));
-        }
-
-        .brand-logo-fallback {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 66px;
-            height: 66px;
-            color: #f7fbff;
-            font-size: 1.55rem;
-            font-weight: 800;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-        }
-
-        .brand-copy {
-            display: flex;
-            align-items: center;
-            min-width: 0;
-        }
-
-        .brand-wordmark {
-            width: 320px;
-            max-width: min(50vw, 320px);
-            height: auto;
-            display: block;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 22px rgba(4, 10, 22, 0.24));
-        }
-
-        .brand-wordmark-fallback {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-            align-items: flex-start;
-        }
-
-        .brand-wordmark-fallback-title {
-            color: #f5f8ff;
-            font-size: 3.06rem;
-            font-weight: 800;
-            letter-spacing: -0.055em;
-            line-height: 0.84;
-            text-transform: uppercase;
-            font-family: "Segoe UI", Arial, sans-serif;
-            white-space: nowrap;
-        }
-
-        .brand-wordmark-fallback-subtitle {
-            color: #d4dfef;
-            font-size: 0.98rem;
-            font-weight: 700;
-            letter-spacing: 0.065em;
-            line-height: 1;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-
-        .hero {
+        /* --- Progress Bar (4px thin) --- */
+        .kts-progress-track {
             position: relative;
-            z-index: 1;
-            text-align: center;
-        }
-
-        h1 {
-            margin: 0;
-            font-size: clamp(2.05rem, 4.3vw, 2.95rem);
-            line-height: 0.98;
-            letter-spacing: -0.04em;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: #ffd86b;
-            text-shadow:
-                0 0 12px rgba(255, 216, 107, 0.34),
-                0 0 26px rgba(255, 216, 107, 0.18),
-                0 8px 30px rgba(2, 8, 20, 0.24);
-        }
-
-        p {
-            margin: 0;
-            line-height: 1.55;
-        }
-
-        .subtitle {
-            max-width: 540px;
-            margin: 16px auto 0;
-            color: var(--text-secondary);
-            font-size: 1.04rem;
-        }
-
-        .status-panel {
-            position: relative;
-            z-index: 1;
-            margin-top: 30px;
-            padding: 24px 24px 22px;
-            border-radius: 22px;
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
-                var(--panel-bg);
-            border: 1px solid var(--panel-border);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.05),
-                0 18px 40px rgba(4, 10, 22, 0.3);
-        }
-
-        .status-heading {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 16px;
-            color: var(--text-secondary);
-            font-size: 0.92rem;
-            font-weight: 600;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-        }
-
-        .status-heading strong {
-            color: var(--text-primary);
-            font-weight: 700;
-        }
-
-        .progress-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .progress-track {
-            position: relative;
-            overflow: hidden;
-            height: 16px;
+            width: 100%;
+            height: 4px;
             border-radius: 999px;
-            background:
-                linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(255, 255, 255, 0.03)),
-                rgba(8, 16, 34, 0.86);
-            border: 1px solid rgba(131, 158, 211, 0.24);
-            box-shadow:
-                inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-                inset 0 6px 14px rgba(1, 4, 11, 0.38),
-                0 0 0 1px rgba(57, 222, 242, 0.05);
+            background: rgba(0, 229, 255, 0.07);
+            margin-bottom: 28px;
+            overflow: visible;
         }
 
-        .progress-fill {
+        .kts-progress-fill {
             position: absolute;
-            top: 2px;
-            bottom: 2px;
-            left: 2px;
-            width: calc(8% - 4px);
-            border-radius: inherit;
-            background:
-                linear-gradient(90deg, rgba(57, 222, 242, 0.96) 0%, rgba(102, 198, 255, 0.98) 50%, rgba(138, 130, 255, 0.96) 100%);
-            background-size: 180% 100%;
-            box-shadow:
-                0 0 18px rgba(57, 222, 242, 0.42),
-                0 0 34px rgba(138, 130, 255, 0.24);
-            animation: progress-gradient-shift 2.2s linear infinite;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 8%;
+            min-width: 4px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #00e5ff, #0077ff);
+            transition: width 0.4s ease;
         }
 
-        .progress-fill::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.22) 46%, rgba(255, 255, 255, 0) 100%);
-            transform: translateX(-120%);
-            animation: progress-sheen 1.9s ease-in-out infinite;
-        }
-
-        .progress-fill::after {
+        /* Glowing head */
+        .kts-progress-fill::after {
             content: "";
             position: absolute;
             top: 50%;
-            right: -7px;
+            right: -6px;
             width: 16px;
             height: 16px;
             border-radius: 50%;
             transform: translateY(-50%);
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(144, 229, 255, 0.92) 36%, rgba(138, 130, 255, 0.86) 75%, rgba(138, 130, 255, 0.08) 100%);
+            background: radial-gradient(circle,
+                rgba(255, 255, 255, 0.95) 0%,
+                rgba(0, 229, 255, 0.5) 50%,
+                transparent 100%);
             box-shadow:
-                0 0 10px rgba(255, 255, 255, 0.55),
-                0 0 22px rgba(57, 222, 242, 0.55),
-                0 0 34px rgba(138, 130, 255, 0.36);
-            animation: progress-head-pulse 1.35s ease-in-out infinite;
+                0 0 8px rgba(255, 255, 255, 0.6),
+                0 0 18px rgba(0, 229, 255, 0.45),
+                0 0 32px rgba(0, 229, 255, 0.15);
+            animation: kts-pulse 1.4s ease-in-out infinite;
         }
 
-        .progress-tooltip {
-            position: relative;
+        @keyframes kts-pulse {
+            0%, 100% { transform: translateY(-50%) scale(0.85); opacity: 0.75; }
+            50%      { transform: translateY(-50%) scale(1.15); opacity: 1; }
+        }
+
+        /* --- Terminal --- */
+        .kts-terminal {
+            width: 100%;
+            border: 1px solid rgba(0, 229, 255, 0.18);
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.35);
+            flex: 1;
+            min-height: 0;
             display: flex;
+            flex-direction: column;
+        }
+
+        .kts-terminal-header {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
+            padding: 7px 12px;
+            background: rgba(0, 229, 255, 0.04);
+            border-bottom: 1px solid rgba(0, 229, 255, 0.1);
+            font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.68rem;
+            color: rgba(0, 229, 255, 0.45);
+            flex-shrink: 0;
         }
 
-        .progress-tooltip-trigger {
-            width: 22px;
-            height: 22px;
-            padding: 0;
-            border-radius: 999px;
-            border: 1px solid rgba(137, 167, 221, 0.42);
-            background: rgba(17, 29, 52, 0.82);
-            color: #b9c8db;
-            font: inherit;
-            font-size: 0.78rem;
-            font-weight: 700;
-            line-height: 1;
-            cursor: default;
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.05),
-                0 10px 20px rgba(4, 10, 22, 0.18);
+        .kts-terminal-header-label {
+            font-weight: 600;
         }
 
-        .progress-tooltip-trigger:focus-visible {
-            outline: 2px solid rgba(126, 193, 255, 0.75);
-            outline-offset: 2px;
+        .kts-terminal-header-version {
+            opacity: 0.55;
         }
 
-        .progress-callout {
-            position: relative;
-            position: absolute;
-            right: calc(100% + 12px);
-            top: 50%;
-            min-width: 180px;
-            max-width: 240px;
-            padding: 12px 14px;
-            border-radius: 14px;
-            background: rgba(19, 32, 59, 0.94);
-            border: 1px solid rgba(133, 162, 214, 0.24);
-            color: #b7c8dd;
-            font-size: 0.8rem;
-            line-height: 1.45;
-            text-align: left;
-            white-space: normal;
-            word-wrap: break-word;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            box-shadow:
-                0 14px 30px rgba(4, 10, 22, 0.26),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            transform: translateY(-50%) translateX(6px);
-            transition:
-                opacity 120ms ease,
-                transform 140ms ease,
-                visibility 0s linear 140ms;
+        .kts-terminal-body {
+            padding: 10px 12px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.75rem;
+            line-height: 1.65;
+            color: #00e5ff;
+            flex: 1;
+            min-height: 0;
         }
 
-        .progress-callout::before {
-            content: "";
-            position: absolute;
-            top: 50%;
-            right: -7px;
-            width: 12px;
-            height: 12px;
-            border-top: 1px solid rgba(133, 162, 214, 0.24);
-            border-right: 1px solid rgba(133, 162, 214, 0.24);
-            background: rgba(19, 32, 59, 0.94);
-            transform: translateY(-50%) rotate(45deg);
+        /* Custom scrollbar */
+        .kts-terminal-body::-webkit-scrollbar {
+            width: 4px;
+        }
+        .kts-terminal-body::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .kts-terminal-body::-webkit-scrollbar-thumb {
+            background: rgba(0, 229, 255, 0.18);
+            border-radius: 2px;
         }
 
-        .progress-tooltip:hover .progress-callout,
-        .progress-tooltip:focus-within .progress-callout,
-        .progress-callout:hover {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-            transform: translateY(-50%) translateX(0);
-            transition-delay: 0s;
+        /* Terminal line segments */
+        .kts-terminal-line {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .kts-terminal-line .kts-ts {
+            color: rgba(0, 229, 255, 0.35);
+        }
+        .kts-terminal-line .kts-tag {
+            color: #00e5ff;
+            font-weight: 600;
+        }
+        .kts-terminal-line .kts-msg {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .kts-terminal-line .kts-ok {
+            color: #4ade80;
+            font-weight: 600;
+        }
+        .kts-terminal-line .kts-name {
+            color: #ffcc00;
         }
 
-        .status-text {
+        /* Blinking cursor */
+        .kts-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 1em;
+            background: #00e5ff;
+            vertical-align: text-bottom;
+            margin-left: 1px;
+            animation: kts-blink 0.7s step-end infinite;
+        }
+        @keyframes kts-blink {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0; }
+        }
+
+        /* --- Footer --- */
+        .kts-footer {
             margin-top: 14px;
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-
-        .footer-note {
-            position: relative;
-            z-index: 1;
             text-align: center;
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.22);
+            flex-shrink: 0;
         }
 
-        .footer-note {
-            margin-top: 18px;
-            color: var(--text-muted);
-            font-size: 0.9rem;
+        /* --- Failure Mode --- */
+        html[data-mode="failure"] .kts-progress-fill {
+            background: linear-gradient(90deg, #f97316, #ef4444);
         }
-
-        html[data-mode="failure"] .progress-fill {
-            background: linear-gradient(90deg, #f97316 0%, #ef4444 100%);
+        html[data-mode="failure"] .kts-progress-fill::after {
+            background: radial-gradient(circle,
+                rgba(255, 245, 240, 0.95) 0%,
+                rgba(249, 115, 22, 0.5) 50%,
+                transparent 100%);
             box-shadow:
-                0 0 18px rgba(249, 115, 22, 0.34),
-                0 0 28px rgba(239, 68, 68, 0.28);
+                0 0 8px rgba(255, 245, 240, 0.5),
+                0 0 18px rgba(249, 115, 22, 0.45);
+        }
+        html[data-mode="failure"] .kts-subtitle {
+            color: #f97316;
+            text-shadow: 0 0 10px rgba(249, 115, 22, 0.35);
+        }
+        html[data-mode="failure"] .kts-terminal {
+            border-color: rgba(249, 115, 22, 0.22);
+        }
+        html[data-mode="failure"] .kts-terminal-header {
+            background: rgba(249, 115, 22, 0.04);
+            border-bottom-color: rgba(249, 115, 22, 0.1);
+            color: rgba(249, 115, 22, 0.45);
         }
 
-        html[data-mode="failure"] .progress-fill::after {
-            background: radial-gradient(circle, rgba(255, 245, 240, 0.95) 0%, rgba(253, 186, 116, 0.92) 40%, rgba(239, 68, 68, 0.82) 76%, rgba(239, 68, 68, 0.08) 100%);
-            box-shadow:
-                0 0 10px rgba(255, 245, 240, 0.48),
-                0 0 22px rgba(249, 115, 22, 0.46),
-                0 0 32px rgba(239, 68, 68, 0.3);
+        /* --- Reduced Motion --- */
+        @media (prefers-reduced-motion: reduce) {
+            .kts-progress-fill { transition: none; }
+            .kts-progress-fill::after { animation: none; }
+            .kts-cursor { animation: none; opacity: 1; }
         }
 
-        html[data-mode="failure"] .progress-fill::before {
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 237, 213, 0.2) 46%, rgba(255, 255, 255, 0) 100%);
-        }
-
-        html[data-mode="failure"] .status-heading strong,
-        html[data-mode="failure"] h1 {
-            color: #fff4f1;
-        }
-
-        html[data-mode="failure"] .status-panel {
-            border-color: rgba(248, 113, 113, 0.2);
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.05),
-                0 18px 40px rgba(28, 7, 7, 0.35);
-        }
-
-        @keyframes progress-gradient-shift {
-            0% {
-                background-position: 0% 50%;
-            }
-            100% {
-                background-position: 180% 50%;
-            }
-        }
-
-        @keyframes progress-sheen {
-            0% {
-                transform: translateX(-120%);
-            }
-            100% {
-                transform: translateX(130%);
-            }
-        }
-
-        @keyframes progress-head-pulse {
-            0%,
-            100% {
-                transform: translateY(-50%) scale(0.96);
-                box-shadow:
-                    0 0 8px rgba(255, 255, 255, 0.45),
-                    0 0 18px rgba(57, 222, 242, 0.4),
-                    0 0 28px rgba(138, 130, 255, 0.26);
-            }
-            50% {
-                transform: translateY(-50%) scale(1.08);
-                box-shadow:
-                    0 0 12px rgba(255, 255, 255, 0.62),
-                    0 0 24px rgba(57, 222, 242, 0.58),
-                    0 0 36px rgba(138, 130, 255, 0.38);
-            }
-        }
-
-        @media (max-width: 760px) {
-            body {
-                padding: 18px;
-            }
-
-            .card {
-                padding: 28px 22px 18px;
-            }
-
-            .brand-logo {
-                width: 58px;
-                height: 58px;
-            }
-
-            .brand-logo-fallback {
-                width: 58px;
-                height: 58px;
-                font-size: 1.35rem;
-            }
-
-            .brand-lockup {
-                gap: 10px;
-            }
-
-            .brand-mark-shell {
-                width: 58px;
-                height: 58px;
-            }
-
-            .brand-wordmark {
-                width: min(260px, 48vw);
-            }
-
-            .brand-wordmark-fallback-title {
-                font-size: 2.3rem;
-            }
-
-            .brand-wordmark-fallback-subtitle {
-                font-size: 0.8rem;
-            }
-
-            .subtitle {
-                font-size: 0.98rem;
-            }
-
-            .status-panel {
-                margin-top: 24px;
-                padding: 20px 18px 18px;
-                border-radius: 18px;
-            }
-
-            .progress-row {
-                grid-template-columns: 1fr;
-                gap: 12px;
-            }
-
-            .progress-tooltip {
-                justify-self: end;
-            }
-
-            .progress-callout::before {
-                top: 50%;
-                right: -7px;
-                transform: translateY(-50%) rotate(45deg);
-            }
-
-            .progress-callout {
-                right: calc(100% + 10px);
-                max-width: min(230px, calc(100vw - 90px));
-            }
+        /* --- Debug Mode Banner --- */
+        .kts-debug-banner {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(255, 204, 0, 0.15);
+            border: 1px solid rgba(255, 204, 0, 0.3);
+            color: #ffcc00;
+            font-family: 'Consolas', monospace;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+            z-index: 999;
         }
     </style>
 </head>
 <body>
-    <main class="card">
-        <div class="brand">
-            <div class="brand-lockup" aria-label="Kurash Tournament Suite">
-                <div class="brand-mark-shell">
-                    <img
-                        id="brandLogo"
-                        class="brand-logo"
-                        src="./startup-assets/kts-icon.png"
-                        alt="Kurash Tournament Suite logo"
-                    />
-                    <div id="brandLogoFallback" class="brand-logo-fallback" hidden>KTS</div>
-                </div>
-                <div class="brand-copy">
-                    <img
-                        id="brandWordmark"
-                        class="brand-wordmark"
-                        src="./startup-assets/kurash-wordmark.png"
-                        alt="Kurash Tournament Suite wordmark"
-                    />
-                    <div id="brandWordmarkFallback" class="brand-wordmark-fallback" hidden>
-                        <span class="brand-wordmark-fallback-title">Kurash</span>
-                        <span class="brand-wordmark-fallback-subtitle">Tournament Suite</span>
-                    </div>
-                </div>
-            </div>
+
+    <!-- Logo: real image with CSS fallback -->
+    <img
+        id="brandLogo"
+        class="kts-logo"
+        src="./startup-assets/kts-icon.png"
+        alt="Kurash Tournament Suite"
+    />
+    <div id="brandLogoFallback" class="kts-logo-fallback" hidden>KTS</div>
+
+    <!-- Wordmark: hidden, kept for API element ID contract -->
+    <img id="brandWordmark" src="./startup-assets/kurash-wordmark.png" alt="" hidden />
+    <div id="brandWordmarkFallback" hidden></div>
+
+    <!-- Title -->
+    <h1 id="startupHeading" class="kts-heading">KURASH TOURNAMENT SUITE</h1>
+
+    <!-- Subtitle -->
+    <div id="startupSubtitle" class="kts-subtitle">STARTING CONTROLLER</div>
+
+    <!-- Progress Bar -->
+    <div
+        id="startupProgress"
+        class="kts-progress-track"
+        role="progressbar"
+        aria-label="Application startup progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="8"
+        aria-valuetext="Boot in progress"
+    >
+        <div id="startupProgressFill" class="kts-progress-fill"></div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="kts-terminal">
+        <div class="kts-terminal-header">
+            <span id="startupStatusLabel" class="kts-terminal-header-label">system_boot.log</span>
+            <span class="kts-terminal-header-version">v1.0.0</span>
         </div>
+        <div id="startupStatusText" class="kts-terminal-body">
+            <span class="kts-cursor"></span>
+        </div>
+    </div>
 
-        <section class="hero" aria-labelledby="startupHeading">
-            <h1 id="startupHeading">STARTING CONTROLLER</h1>
-            <p id="startupSubtitle" class="subtitle">Preparing local services. The controller will open automatically when ready.</p>
-        </section>
+    <!-- Footer -->
+    <div id="startupFooterNote" class="kts-footer">
+        First launch after install may take a little longer.
+    </div>
 
-        <section class="status-panel" aria-live="polite" aria-labelledby="startupStatusLabel">
-            <div class="status-heading">
-                <span>STATUS:</span>
-                <strong id="startupStatusLabel">BOOT IN PROGRESS</strong>
-            </div>
-            <div class="progress-row">
-                <div
-                    id="startupProgress"
-                    class="progress-track"
-                    data-mode="determinate"
-                    role="progressbar"
-                    aria-label="Application startup progress"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                    aria-valuenow="8"
-                    aria-valuetext="Boot in progress"
-                >
-                    <div id="startupProgressFill" class="progress-fill"></div>
-                </div>
-                <div class="progress-tooltip">
-                    <button
-                        id="startupHelperTrigger"
-                        class="progress-tooltip-trigger"
-                        type="button"
-                        aria-label="Startup note"
-                        aria-describedby="startupHelperNote"
-                    >i</button>
-                    <div id="startupHelperNote" class="progress-callout">Repeated launches will refocus this window.</div>
-                </div>
-            </div>
-            <p id="startupStatusText" class="status-text">Preparing runtime services for controller launch.</p>
-        </section>
+    <!-- Helper note (hidden, used by API) -->
+    <div id="startupHelperNote" hidden>Repeated launches will refocus this window.</div>
 
-        <p id="startupFooterNote" class="footer-note">First launch after install may take a little longer.</p>
-    </main>
+    <!-- Debug mode banner (hidden unless ?debug) -->
+    <div id="ktsDebugBanner" class="kts-debug-banner" hidden>DEBUG — 3s per line</div>
 
     <script>
-        (function () {
-            const root = document.documentElement;
-            const elements = {
-                brandLogo: document.getElementById('brandLogo'),
-                brandLogoFallback: document.getElementById('brandLogoFallback'),
-                brandWordmark: document.getElementById('brandWordmark'),
-                brandWordmarkFallback: document.getElementById('brandWordmarkFallback'),
-                heading: document.getElementById('startupHeading'),
-                subtitle: document.getElementById('startupSubtitle'),
-                statusLabel: document.getElementById('startupStatusLabel'),
-                statusText: document.getElementById('startupStatusText'),
-                helperNote: document.getElementById('startupHelperNote'),
-                footerNote: document.getElementById('startupFooterNote'),
-                progressTrack: document.getElementById('startupProgress'),
-                progressFill: document.getElementById('startupProgressFill'),
-            };
+    (function () {
+        'use strict';
 
-            function showElement(element, visible) {
-                if (!element) {
-                    return;
-                }
+        var root = document.documentElement;
+        var terminalBody = document.getElementById('startupStatusText');
+        var progressFill = document.getElementById('startupProgressFill');
+        var progressTrack = document.getElementById('startupProgress');
 
-                element.hidden = !visible;
-            }
+        /* ----------------------------------------------------------
+           Element map — every key that setText() can target
+           ---------------------------------------------------------- */
+        var elements = {
+            brandLogo:          document.getElementById('brandLogo'),
+            brandLogoFallback:  document.getElementById('brandLogoFallback'),
+            brandWordmark:      document.getElementById('brandWordmark'),
+            brandWordmarkFallback: document.getElementById('brandWordmarkFallback'),
+            heading:            document.getElementById('startupHeading'),
+            subtitle:           document.getElementById('startupSubtitle'),
+            statusLabel:        document.getElementById('startupStatusLabel'),
+            statusText:         terminalBody,
+            helperNote:         document.getElementById('startupHelperNote'),
+            footerNote:         document.getElementById('startupFooterNote'),
+            progressTrack:      progressTrack,
+            progressFill:       progressFill,
+        };
 
-            function bindImageFallback(imageKey, fallbackKey) {
-                const image = elements[imageKey];
-                const fallback = elements[fallbackKey];
-                if (!image || !fallback) {
-                    return;
-                }
+        /* ----------------------------------------------------------
+           Image fallback: if the real logo fails to load, show the
+           CSS fallback and hide the <img>.  If it loads, hide the
+           fallback and keep the <img> visible.
+           ---------------------------------------------------------- */
+        function bindImageFallback(imgKey, fbKey) {
+            var img = elements[imgKey];
+            var fb  = elements[fbKey];
+            if (!img || !fb) return;
 
-                const hideFallback = function () {
-                    showElement(image, true);
-                    showElement(fallback, false);
-                };
+            var showImg = function () { img.hidden = false; fb.hidden = true; };
+            var showFb  = function () { img.hidden = true;  fb.hidden = false; };
 
-                const revealFallback = function () {
-                    showElement(image, false);
-                    showElement(fallback, true);
-                };
+            img.addEventListener('load', showImg);
+            img.addEventListener('error', showFb);
 
-                image.addEventListener('load', hideFallback);
-                image.addEventListener('error', revealFallback);
+            // Already cached?
+            if (img.complete && img.naturalWidth > 0) { showImg(); }
+            else if (img.complete)                    { showFb(); }
+        }
 
-                if (image.complete && typeof image.naturalWidth === 'number') {
-                    if (image.naturalWidth > 0) {
-                        hideFallback();
-                        return;
-                    }
+        /* ----------------------------------------------------------
+           Low-level helpers
+           ---------------------------------------------------------- */
+        function setText(key, value) {
+            if (!elements[key] || typeof value !== 'string') return;
+            var v = value.trim();
+            if (!v) return;
+            elements[key].textContent = v;
+        }
 
-                    revealFallback();
-                    return;
-                }
+        function setMode(mode) {
+            root.dataset.mode = mode === 'failure' ? 'failure' : 'booting';
+        }
 
-                hideFallback();
-            }
+        function setProgress(value) {
+            var n = Number(value);
+            if (!Number.isFinite(n)) { resetProgress(); return; }
+            var c = Math.max(0, Math.min(100, n));
+            // width accounts for the 16px glowing head overlapping the track edge
+            progressFill.style.width = c <= 0 ? '0px' : 'calc(' + c + '% - 4px)';
+            progressTrack.setAttribute('aria-valuenow', String(Math.round(c)));
+            progressTrack.setAttribute('aria-valuetext', Math.round(c) + '% complete');
+        }
 
-            function setText(key, value) {
-                if (!elements[key] || typeof value !== 'string') {
-                    return;
-                }
-
-                const nextValue = value.trim();
-                if (!nextValue) {
-                    return;
-                }
-
-                elements[key].textContent = nextValue;
-            }
-
-            function setMode(mode) {
-                root.dataset.mode = mode === 'failure' ? 'failure' : 'booting';
-            }
-
-            function setProgress(value) {
-                const numericValue = Number(value);
-                if (!Number.isFinite(numericValue)) {
-                    resetProgress();
-                    return;
-                }
-
-                const clamped = Math.max(0, Math.min(100, numericValue));
-                elements.progressFill.style.width = clamped <= 0 ? '0px' : ('calc(' + clamped + '% - 4px)');
-                elements.progressTrack.setAttribute('aria-valuenow', String(Math.round(clamped)));
-                elements.progressTrack.setAttribute('aria-valuetext', Math.round(clamped) + '% complete');
-            }
-
-            function resetProgress() {
-                setProgress(8);
-                elements.progressTrack.setAttribute('aria-valuetext', elements.statusLabel.textContent || 'Boot in progress');
-            }
-
-            window.KTSStartupScreen = {
-                applyState(nextState) {
-                    if (!nextState || typeof nextState !== 'object') {
-                        return;
-                    }
-
-                    if (typeof nextState.mode === 'string') {
-                        setMode(nextState.mode);
-                    }
-                    if (typeof nextState.heading === 'string') {
-                        setText('heading', nextState.heading);
-                    }
-                    if (typeof nextState.subtitle === 'string') {
-                        setText('subtitle', nextState.subtitle);
-                    }
-                    if (typeof nextState.statusLabel === 'string') {
-                        this.setStatusLabel(nextState.statusLabel);
-                    }
-                    if (typeof nextState.statusText === 'string') {
-                        setText('statusText', nextState.statusText);
-                    }
-                    if (typeof nextState.helperNote === 'string') {
-                        setText('helperNote', nextState.helperNote);
-                    }
-                    if (typeof nextState.footerNote === 'string') {
-                        setText('footerNote', nextState.footerNote);
-                    }
-                    if (Object.prototype.hasOwnProperty.call(nextState, 'progress')) {
-                        setProgress(nextState.progress);
-                    }
-                },
-                setMode,
-                setHeading(value) {
-                    setText('heading', value);
-                },
-                setSubtitle(value) {
-                    setText('subtitle', value);
-                },
-                setStatusLabel(value) {
-                    setText('statusLabel', value);
-                    const nextValue = typeof value === 'string' ? value.trim() : '';
-                    elements.progressTrack.setAttribute('aria-valuetext', nextValue || 'Boot in progress');
-                },
-                setStatusText(value) {
-                    setText('statusText', value);
-                },
-                setHelperNote(value) {
-                    setText('helperNote', value);
-                },
-                setFooterNote(value) {
-                    setText('footerNote', value);
-                },
-                setProgress,
-                resetProgress,
-            };
-
-            setMode('booting');
-            bindImageFallback('brandLogo', 'brandLogoFallback');
-            bindImageFallback('brandWordmark', 'brandWordmarkFallback');
+        function resetProgress() {
             setProgress(8);
-        })();
+            var lbl = elements.statusLabel ? elements.statusLabel.textContent : '';
+            progressTrack.setAttribute('aria-valuetext', lbl || 'Boot in progress');
+        }
+
+        /* ----------------------------------------------------------
+           Boot-log typing animation
+           ---------------------------------------------------------- */
+        var bootLines = [
+            { tag: 'DB',     msg: 'Establishing local database socket...',               st: 'ok' },
+            { tag: 'KTS',    msg: 'Developed by ',          name: 'Jhon Carlo Trinilla', st: 'perfect' },
+            { tag: 'WARN',   msg: 'Bypassing logic loop processing...',                  st: 'resolved' },
+            { tag: 'Event Host', msg: 'Developed by ',      name: 'Asheleyt Jan Rubi',   st: 'ok' },
+            { tag: 'NET',    msg: 'WebSocket relay initialized...',                      st: 'connected' },
+            { tag: 'Kurash Website', msg: 'Developed by ',   name: 'Kian Santos',        st: 'loaded' },
+            { tag: 'PALVAN', msg: 'Tournament engine by ',  name: 'Brian Llamas',        st: 'online' },
+            { tag: 'BOOT',   msg: 'KTS v1.0.0 ready. Launching controller...',           st: 'ok' },
+        ];
+
+        var bootIdx = 0;
+        var bootActive = true;
+        var debugMode = /[?&]debug\b/.test(window.location.search);
+
+        function ts() {
+            var d = new Date();
+            return String(d.getHours()).padStart(2,'0') + ':' +
+                   String(d.getMinutes()).padStart(2,'0') + ':' +
+                   String(d.getSeconds()).padStart(2,'0');
+        }
+
+        function lineHTML(l) {
+            var h = '<span class="kts-ts">[' + ts() + ']</span> ' +
+                    '<span class="kts-tag">[' + l.tag + ']</span> ' +
+                    '<span class="kts-msg">' + l.msg + '</span>';
+            if (l.name) h += '<span class="kts-name">' + l.name + '</span>';
+            var s = l.st;
+            if (s === 'ok')       h += ' <span class="kts-ok">OK</span>';
+            if (s === 'resolved') h += ' <span class="kts-ok">Resolved.</span>';
+            if (s === 'perfect')  h += '<span class="kts-ok">...Perfect.</span>';
+            if (s === 'connected')h += ' <span class="kts-ok">Connected.</span>';
+            if (s === 'loaded')   h += ' <span class="kts-ok">Loaded.</span>';
+            if (s === 'online')   h += ' <span class="kts-ok">Online.</span>';
+            return h;
+        }
+
+        function appendLine(html) {
+            var div = document.createElement('div');
+            div.className = 'kts-terminal-line';
+            div.innerHTML = html;
+            var cursor = terminalBody.querySelector('.kts-cursor');
+            if (cursor) terminalBody.insertBefore(div, cursor);
+            else        terminalBody.appendChild(div);
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        function typeNext() {
+            if (!bootActive || bootIdx >= bootLines.length) {
+                var cur = terminalBody.querySelector('.kts-cursor');
+                if (cur) cur.remove();
+                return;
+            }
+            var line = bootLines[bootIdx++];
+            appendLine(lineHTML(line));
+
+            // Progress mirrors the terminal — 8 % baseline, +82 % spread across lines
+            setProgress(8 + Math.round((bootIdx / bootLines.length) * 82));
+
+            var delay = debugMode ? 3000 : (300 + Math.floor(Math.random() * 800));
+            setTimeout(typeNext, delay);
+        }
+
+        function startBoot() {
+            bootActive = true;
+            bootIdx = 0;
+            setTimeout(typeNext, 400);
+        }
+
+        /* ----------------------------------------------------------
+           KTSStartupScreen API  (exact contract for index.js)
+           ---------------------------------------------------------- */
+        window.KTSStartupScreen = {
+            applyState: function (s) {
+                if (!s || typeof s !== 'object') return;
+                if (typeof s.mode       === 'string') setMode(s.mode);
+                if (typeof s.heading    === 'string') setText('heading', s.heading);
+                if (typeof s.subtitle   === 'string') setText('subtitle', s.subtitle);
+                if (typeof s.statusLabel=== 'string') this.setStatusLabel(s.statusLabel);
+                if (typeof s.statusText === 'string') setText('statusText', s.statusText);
+                if (typeof s.helperNote === 'string') setText('helperNote', s.helperNote);
+                if (typeof s.footerNote === 'string') setText('footerNote', s.footerNote);
+                if (Object.prototype.hasOwnProperty.call(s, 'progress')) setProgress(s.progress);
+                // Real boot stage — append a formatted line to the terminal
+                if (s.logLine && typeof s.logLine === 'object') {
+                    appendLine(lineHTML(s.logLine));
+                }
+            },
+            setMode:          setMode,
+            setHeading:       function (v) { setText('heading', v); },
+            setSubtitle:      function (v) { setText('subtitle', v); },
+            setStatusLabel:   function (v) {
+                setText('statusLabel', v);
+                var t = typeof v === 'string' ? v.trim() : '';
+                progressTrack.setAttribute('aria-valuetext', t || 'Boot in progress');
+            },
+            setStatusText:    function (v) { setText('statusText', v); },
+            setHelperNote:    function (v) { setText('helperNote', v); },
+            setFooterNote:    function (v) { setText('footerNote', v); },
+            setProgress:      setProgress,
+            resetProgress:    resetProgress,
+        };
+
+        /* ----------------------------------------------------------
+           Init
+           ---------------------------------------------------------- */
+        setMode('booting');
+        bindImageFallback('brandLogo', 'brandLogoFallback');
+        setProgress(8);
+        if (debugMode) document.getElementById('ktsDebugBanner').hidden = false;
+        startBoot();
+    })();
     </script>
 </body>
 </html>

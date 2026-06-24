@@ -197,6 +197,21 @@ function getCurrentRuntimeDescriptor() {
   };
 }
 
+const STARTUP_STAGE_TAGS = Object.freeze({
+  'resolve packaged/runtime paths':       { tag: 'SYS',  status: 'ok' },
+  'wait for packaged payload extraction': { tag: 'SYS',  status: 'ok' },
+  'verify required binaries exist':       { tag: 'CORE', status: 'ok' },
+  'run PHP preflight':                    { tag: 'PHP',  status: 'ok' },
+  'ensure writable runtime directories exist': { tag: 'SYS', status: 'ok' },
+  'initialize DB data if first run':      { tag: 'DB',   status: 'ok' },
+  'start MariaDB':                        { tag: 'DB',   status: 'ok' },
+  'wait for real DB readiness':           { tag: 'DB',   status: 'connected' },
+  'start Laravel HTTP server':            { tag: 'WEB',  status: 'ok' },
+  'wait for Laravel health endpoint':     { tag: 'WEB',  status: 'ok' },
+  'start Reverb':                         { tag: 'NET',  status: 'ok' },
+  'mark app ready':                       { tag: 'BOOT', status: 'ok' },
+});
+
 function buildStartupStagePatch(stageName, status = 'in_progress') {
   const stageIndex = STARTUP_STAGE_SEQUENCE.indexOf(stageName);
   if (stageIndex === -1) {
@@ -207,11 +222,19 @@ function buildStartupStagePatch(stageName, status = 'in_progress') {
   const completedProgress = Math.round(((stageIndex + 1) / totalStages) * 100);
   const activeProgress = Math.max(STARTUP_VIEW_DEFAULTS.progress, Math.min(99, Math.round((stageIndex / totalStages) * 100) + 8));
 
+  const description = STARTUP_STAGE_DESCRIPTIONS[stageName] || 'Preparing runtime services...';
+  const stageTag = STARTUP_STAGE_TAGS[stageName] || { tag: 'SYS', status: 'ok' };
+
   return {
     mode: status === 'failed' ? 'failure' : 'booting',
     statusLabel: stageName === 'mark app ready' && status !== 'failed' ? 'FINALIZING STARTUP' : 'BOOT IN PROGRESS',
-    statusText: STARTUP_STAGE_DESCRIPTIONS[stageName] || 'Preparing runtime services for controller launch.',
+    statusText: description,
     progress: status === 'success' ? completedProgress : activeProgress,
+    logLine: {
+      tag: stageTag.tag,
+      msg: description,
+      status: status === 'failed' ? 'failed' : stageTag.status,
+    },
   };
 }
 
@@ -278,10 +301,10 @@ function createStartupWindow() {
 
   const win = new BrowserWindow({
     title: 'Kurash Tournament Suite',
-    width: 920,
-    height: 560,
-    minWidth: 760,
-    minHeight: 440,
+    width: 640,
+    height: 460,
+    minWidth: 520,
+    minHeight: 380,
     show: false,
     frame: false,
     autoHideMenuBar: true,
@@ -289,7 +312,7 @@ function createStartupWindow() {
     fullscreenable: false,
     maximizable: false,
     resizable: false,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#05080c',
     paintWhenInitiallyHidden: true,
     icon: KTS_ICON_PATH,
     webPreferences: {
