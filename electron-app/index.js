@@ -84,7 +84,7 @@ const STARTUP_VIEW_DEFAULTS = Object.freeze({
   heading: 'STARTING CONTROLLER',
   subtitle: 'Preparing local services. The controller will open automatically when ready.',
   statusLabel: 'BOOT IN PROGRESS',
-  statusText: 'Preparing runtime services for controller launch.',
+  // statusText omitted — terminal body is append-only via logLine lines.
   helperNote: 'Repeated launches will refocus this window.',
   footerNote: 'First launch after install may take a little longer.',
   progress: 8,
@@ -228,7 +228,8 @@ function buildStartupStagePatch(stageName, status = 'in_progress') {
   return {
     mode: status === 'failed' ? 'failure' : 'booting',
     statusLabel: stageName === 'mark app ready' && status !== 'failed' ? 'FINALIZING STARTUP' : 'BOOT IN PROGRESS',
-    statusText: description,
+    // statusText intentionally omitted — terminal body is append-only via logLine.
+    // Sending statusText would call setText() which wipes all previous terminal lines.
     progress: status === 'success' ? completedProgress : activeProgress,
     logLine: {
       tag: stageTag.tag,
@@ -994,8 +995,8 @@ async function ensureBootSequence() {
 
       mergeStartupViewState({
         statusLabel: 'OPENING CONTROLLER',
-        statusText: 'Launching the controller interface.',
         progress: 100,
+        logLine: { tag: 'BOOT', msg: 'Launching the controller interface.', status: 'ok' },
       });
 
       await createWindows(runtime.localBackendBaseUrl, attemptId);

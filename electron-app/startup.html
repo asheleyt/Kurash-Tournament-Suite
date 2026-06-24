@@ -222,6 +222,10 @@
             color: #4ade80;
             font-weight: 600;
         }
+        .kts-terminal-line .kts-failed {
+            color: #ef4444;
+            font-weight: 600;
+        }
         .kts-terminal-line .kts-name {
             color: #ffcc00;
         }
@@ -474,6 +478,7 @@
             if (s === 'connected')h += ' <span class="kts-ok">Connected.</span>';
             if (s === 'loaded')   h += ' <span class="kts-ok">Loaded.</span>';
             if (s === 'online')   h += ' <span class="kts-ok">Online.</span>';
+            if (s === 'failed')   h += ' <span class="kts-failed">FAILED</span>';
             return h;
         }
 
