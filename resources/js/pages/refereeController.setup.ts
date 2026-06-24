@@ -1633,6 +1633,7 @@ async function handlePlayerMedic(player: 'player1' | 'player2') {
         return;
     }
 
+    if (gameState.isMedicMode) return;
     if (gameState[player].medicClicks >= 2) return;
     saveHistory();
     gameState.savedGameTime = gameState.time;
@@ -1755,11 +1756,13 @@ async function handlePenaltyClick(
             opponent.penaltyK = 1;
             // Intentionally do NOT set gameState.winner here; referee must press Winner manually
         } else {
+            // Undo G: Always clear the K penalty
+            opponent.penaltyK = 0;
+
+            // Revert winner only if 2 YO condition is also NOT met
             if (gameState.winner === opponentName) {
-                // Only clear if 2 YO condition is also NOT met
                 if (getTotalScore(opponent, 'yo') < 2) {
                     gameState.winner = null;
-                    opponent.penaltyK = 0;
                     await broadcastWinnerState();
                 }
             }

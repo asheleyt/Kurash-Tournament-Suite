@@ -3232,7 +3232,8 @@
                                 <button
                                     @click="handlePlayerMedic('player2')"
                                     :disabled="
-                                            gameState.player2.medicClicks >= 2
+                                            gameState.player2.medicClicks >= 2 ||
+                                            (gameState.isMedicMode && gameState.timerPlayer !== 'player2')
                                         "
                                     class="relative flex h-8 flex-1 items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-600 to-purple-700 font-bold text-white shadow-lg transition-all hover:from-purple-500 hover:to-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
@@ -3443,7 +3444,8 @@
                                 <button
                                     @click="handlePlayerMedic('player1')"
                                     :disabled="
-                                            gameState.player1.medicClicks >= 2
+                                            gameState.player1.medicClicks >= 2 ||
+                                            (gameState.isMedicMode && gameState.timerPlayer !== 'player1')
                                         "
                                     class="relative flex h-8 flex-1 items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-600 to-purple-700 font-bold text-white shadow-lg transition-all hover:from-purple-500 hover:to-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
                                 >

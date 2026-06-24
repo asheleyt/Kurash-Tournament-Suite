@@ -81,3 +81,11 @@ portable/bin/mariadb/xampp/logs/
 .codex-http-serve-probe/
 .codex_temp/
 review_packages/
+
+# Local tooling
+.playwright-mcp/
+opencode.json
+
+# Working files
+Agent-hand-off
+typecheck.log
