@@ -2790,13 +2790,20 @@
                                     </button>
                                 </DialogTrigger>
                                 <DialogContent
-                                    class="border-gray-700 bg-[#1e293b]"
+                                    class="border-slate-700 bg-[#111827] text-white"
                                 >
                                     <DialogHeader>
-                                        <DialogTitle class="text-white"
-                                            >Reset Timer?</DialogTitle
+                                        <DialogTitle class="flex items-center gap-3 text-white"
+                                            >
+                                            <span
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/10 text-amber-200"
+                                            >
+                                                <RotateCcwIcon class="h-5 w-5" />
+                                            </span>
+                                            Reset Timer?
+                                        </DialogTitle
                                         >
-                                        <DialogDescription class="text-gray-400"
+                                        <DialogDescription class="text-slate-400"
                                             >Reset the timer to its default
                                             duration.</DialogDescription
                                         >
@@ -3134,13 +3141,20 @@
                                     </button>
                                 </DialogTrigger>
                                 <DialogContent
-                                    class="border-gray-700 bg-[#1e293b]"
+                                    class="border-slate-700 bg-[#111827] text-white"
                                 >
                                     <DialogHeader>
-                                        <DialogTitle class="text-white"
-                                            >Reset Match?</DialogTitle
+                                        <DialogTitle class="flex items-center gap-3 text-white"
+                                            >
+                                            <span
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-400/25 bg-red-500/10 text-red-200"
+                                            >
+                                                <RotateCcwIcon class="h-5 w-5" />
+                                            </span>
+                                            Reset Match?
+                                        </DialogTitle
                                         >
-                                        <DialogDescription class="text-gray-400"
+                                        <DialogDescription class="text-slate-400"
                                             >Reset the ENTIRE match state. This
                                             cannot be undone.</DialogDescription
                                         >
@@ -3181,7 +3195,7 @@
                         >
                             <!-- Flag -->
                             <div
-                                class="h-10 w-16 shrink-0 overflow-hidden rounded border border-white/10 bg-gray-800 shadow-md"
+                                class="h-10 w-16 shrink-0 overflow-hidden rounded border border-white/10 bg-gray-800 shadow-md flex items-center justify-center"
                             >
                                 <img
                                     v-if="
@@ -3202,6 +3216,11 @@
                                             )
                                         "
                                 />
+                                <span
+                                    v-else
+                                    class="text-gray-500 text-xs font-bold"
+                                    >N/A</span
+                                >
                             </div>
 
                             <!-- Name -->
@@ -3414,7 +3433,7 @@
 
                             <!-- Flag -->
                             <div
-                                class="h-10 w-16 shrink-0 overflow-hidden rounded border border-white/10 bg-gray-800 shadow-md"
+                                class="h-10 w-16 shrink-0 overflow-hidden rounded border border-white/10 bg-gray-800 shadow-md flex items-center justify-center"
                             >
                                 <img
                                     v-if="
@@ -3435,6 +3454,11 @@
                                             )
                                         "
                                 />
+                                <span
+                                    v-else
+                                    class="text-gray-500 text-xs font-bold"
+                                    >N/A</span
+                                >
                             </div>
                         </div>
 

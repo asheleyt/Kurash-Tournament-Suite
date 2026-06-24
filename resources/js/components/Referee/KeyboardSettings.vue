@@ -147,25 +147,34 @@
 
     <!-- Reset Confirmation Dialog -->
     <Dialog v-model:open="isResetDialogOpen">
-      <DialogContent class="bg-[#1e293b] border-gray-700 sm:max-w-md">
+      <DialogContent class="bg-[#111827] border-slate-700 text-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle class="text-white flex items-center gap-2">
-            <ShieldAlert class="w-5 h-5 text-amber-500" />
+          <DialogTitle class="text-white flex items-center gap-3">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/10 text-amber-200">
+              <ShieldAlert class="w-5 h-5" />
+            </span>
             Reset Shortcuts?
           </DialogTitle>
-          <DialogDescription class="text-gray-400 pt-2">
+          <DialogDescription class="text-slate-400 pt-2">
             Are you sure you want to reset all keyboard shortcuts to their default values? This action cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter class="gap-2 sm:gap-0">
           <DialogClose as-child>
-            <Button variant="outline" class="bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white">
+            <button
+              variant="outline"
+              class="inline-flex h-9 items-center justify-center rounded-lg bg-slate-800/80 px-4 text-sm font-semibold text-slate-100 transition-colors select-none hover:bg-slate-700/90 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-none"
+            >
               Cancel
-            </Button>
+            </button>
           </DialogClose>
-          <Button @click="executeReset" variant="destructive" class="bg-red-600 hover:bg-red-700 text-white">
+          <button
+            @click="executeReset"
+            variant="destructive"
+            class="inline-flex h-9 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-semibold text-white transition-colors select-none hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none"
+          >
             Yes, Reset Defaults
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -183,7 +192,6 @@ import {
 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import type { KeyBinding, ShortcutAction } from '@/composables/useKeyboardShortcuts'
-import { Button } from '../ui/button'
 import {
   Dialog,
   DialogContent,

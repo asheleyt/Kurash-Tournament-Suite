@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Upload, CheckCircle2, XCircle } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   show: boolean

@@ -63,15 +63,15 @@
                   <img
                     src="/images/breaktime.png"
                     alt="Break Time"
-                    class="sb-pop__icon w-40 h-40 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-96 lg:h-96 object-contain"
+                    class="sb-pop__icon w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] object-contain"
                   />
                 </div>
 
-                <div class="sb-pop__headline text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400">
+                <div class="sb-pop__headline text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400">
                   BREAK TIME
                 </div>
 
-                <div v-if="time > 0" class="sb-pop__timer text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-mono font-bold tracking-widest mt-1"
+                <div v-if="time > 0" class="sb-pop__timer text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-mono font-bold tracking-widest mt-1"
                      :class="isRunning ? 'text-green-400 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'">
                   <span class="inline-flex items-baseline justify-center">
                     <span class="tabular-nums">{{ timeParts.mm }}</span>
@@ -121,15 +121,15 @@
                 <img
                   src="/images/medic.png"
                   alt="Medic"
-                  class="sb-pop__icon w-40 h-40 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-96 lg:h-96 object-contain"
+                  class="sb-pop__icon w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] object-contain"
                 />
               </div>
 
-              <div class="sb-pop__headline text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400 drop-shadow-[0_0_18px_rgba(250,204,21,0.55)]">
+              <div class="sb-pop__headline text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400 drop-shadow-[0_0_18px_rgba(250,204,21,0.55)]">
                 MEDIC
               </div>
 
-              <div class="sb-pop__timer text-[4rem] sm:text-[6rem] md:text-[8rem] lg:text-[10rem] xl:text-[12rem] font-bold tabular-nums leading-none mt-1"
+              <div class="sb-pop__timer text-[5rem] sm:text-[8rem] md:text-[10rem] lg:text-[14rem] xl:text-[16rem] font-bold tabular-nums leading-none mt-1"
                    :class="isRunning ? 'text-green-400' : 'text-red-500'">
                 <span class="inline-flex items-baseline justify-center">
                   <span class="tabular-nums">{{ timeParts.mm }}</span>
@@ -177,11 +177,11 @@
                   <img
                     src="/images/jazo.png"
                     alt="Jazo"
-                    class="sb-pop__icon w-40 h-40 sm:w-56 sm:h-56 md:w-72 md:h-72 lg:w-96 lg:h-96 object-contain"
+                    class="sb-pop__icon w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] object-contain"
                   />
                 </div>
 
-                <div class="sb-pop__headline text-4xl sm:text-6xl md:text-7xl lg:text-9xl font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-500">
+                <div class="sb-pop__headline text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-500">
                   JAZO
                 </div>
               </div>
@@ -406,7 +406,7 @@
         <!-- Row 1: Penalties -->
         <div class="flex items-center justify-center pb-2">
           <div class="flex items-center gap-2 sm:gap-3">
-            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-yellow-400 font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
+            <span class="inline-flex items-center justify-center bg-yellow-400 border border-yellow-300 rounded-xl px-4 py-2 text-black font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
             <div class="flex gap-2">
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
@@ -545,7 +545,9 @@
                 alt=""
               />
             </div>
-            <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center"></div>
+            <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center">
+              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">N/A</span>
+            </div>
           </div>
         </div>
       </div>
@@ -554,7 +556,7 @@
       <div class="grid grid-cols-5 gap-2 shrink-0">
         <div class="flex items-center justify-center py-2">
           <div class="flex items-center gap-2 sm:gap-3">
-            <span class="inline-flex items-center justify-center bg-[#2a3142] border border-white/10 rounded-xl px-4 py-2 text-yellow-400 font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
+            <span class="inline-flex items-center justify-center bg-yellow-400 border border-yellow-300 rounded-xl px-4 py-2 text-black font-black text-[15px] sm:text-xl tracking-[0.2em] drop-shadow-[0_0_14px_rgba(250,204,21,0.55)] leading-none">MEDIC</span>
             <div class="flex gap-2">
               <div
                 class="w-12 h-12 sm:w-14 sm:h-14 border-4 rounded-lg transition-all duration-300"
@@ -674,7 +676,9 @@
                 alt=""
               />
             </div>
-            <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center"></div>
+            <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center">
+              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">N/A</span>
+            </div>
           </div>
         </div>
 
@@ -2112,18 +2116,18 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 15rem;
-    height: 15rem;
+    width: 18rem;
+    height: 18rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 5.8rem;
+    font-size: 6.5rem;
     line-height: 1;
   }
 
   .sb-fit-card--break .sb-pop__timer {
-    font-size: 5.4rem;
+    font-size: 6rem;
     margin-top: 0;
   }
 
@@ -2171,17 +2175,17 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 11rem;
-    height: 11rem;
+    width: 14rem;
+    height: 14rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 4rem;
+    font-size: 5rem;
     line-height: 1;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 5.2rem;
+    font-size: 6rem;
     margin-top: 0;
   }
 }
@@ -2224,16 +2228,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 11.75rem;
-    height: 11.75rem;
+    width: 13rem;
+    height: 13rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 4.3rem;
+    font-size: 4.8rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 5.5rem;
+    font-size: 6rem;
   }
 }
 
@@ -2262,17 +2266,17 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 12rem;
-    height: 12rem;
+    width: 14rem;
+    height: 14rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 4.7rem;
+    font-size: 5.2rem;
   }
 
   .sb-fit-card--break .sb-pop__timer {
-    font-size: 4.5rem;
+    font-size: 5rem;
   }
 
   .sb-fit-card--winner .winner-pop__title {
@@ -2298,16 +2302,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 9.5rem;
-    height: 9.5rem;
+    width: 11rem;
+    height: 11rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 3.5rem;
+    font-size: 4rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 4.7rem;
+    font-size: 5.2rem;
   }
 }
 

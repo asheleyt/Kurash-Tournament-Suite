@@ -15,12 +15,7 @@
 <script setup lang="ts" src="./refereeController.setup.ts"></script>
 
 <script lang="ts">
-import RefereeDisplayManagementPanel from '@/components/Referee/RefereeDisplayManagementPanel.vue';
-import RefereeConnectionPanel from '@/components/Referee/RefereeConnectionPanel.vue';
-import RefereeFallbackRecoveryPanel from '@/components/Referee/RefereeFallbackRecoveryPanel.vue';
-import KeyboardSettings from '@/components/Referee/KeyboardSettings.vue';
-import PenaltyButton from '@/components/Referee/PenaltyButton.vue';
-import ScoreButton from '@/components/Referee/ScoreButton.vue';
+import { Clock, Timer, RefreshCw, Upload, CheckCircle2, XCircle, User, Hash, Flag, Search, Power } from 'lucide-vue-next';
 import ChevronDownIcon from '@/components/Referee/Icons/ChevronDownIcon.vue';
 import CoffeeIcon from '@/components/Referee/Icons/CoffeeIcon.vue';
 import CrossIcon from '@/components/Referee/Icons/CrossIcon.vue';
@@ -30,7 +25,12 @@ import RotateCcwIcon from '@/components/Referee/Icons/RotateCcwIcon.vue';
 import SettingsIcon from '@/components/Referee/Icons/SettingsIcon.vue';
 import TrophyIconSimple from '@/components/Referee/Icons/TrophyIconSimple.vue';
 import Undo2Icon from '@/components/Referee/Icons/Undo2Icon.vue';
-import { Clock, Timer, RefreshCw, Upload, CheckCircle2, XCircle, User, Hash, Flag, Search, Power } from 'lucide-vue-next';
+import KeyboardSettings from '@/components/Referee/KeyboardSettings.vue';
+import PenaltyButton from '@/components/Referee/PenaltyButton.vue';
+import RefereeConnectionPanel from '@/components/Referee/RefereeConnectionPanel.vue';
+import RefereeDisplayManagementPanel from '@/components/Referee/RefereeDisplayManagementPanel.vue';
+import RefereeFallbackRecoveryPanel from '@/components/Referee/RefereeFallbackRecoveryPanel.vue';
+import ScoreButton from '@/components/Referee/ScoreButton.vue';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
