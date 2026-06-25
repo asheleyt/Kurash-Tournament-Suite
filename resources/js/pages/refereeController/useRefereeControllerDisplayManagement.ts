@@ -51,6 +51,7 @@ type UseRefereeControllerDisplayManagementOptions = {
     toggleRingMatchOrderPanel: () => void;
     getRingMatchOrderProjectionKey: () => string;
     getSyncConfigurationReady: () => boolean;
+    hasManualQueueItems: () => boolean;
     getIsRingMatchOrderPanelExpanded: () => boolean;
     getRingMatchOrderProjectionRecord: () => RingMatchOrderProjectionRecord | null;
     getRingMatchOrderProjectionLastAttemptAt: () => number | null;
@@ -215,6 +216,7 @@ export function useRefereeControllerDisplayManagement(
         handleSuccessfulLaunch: closeMatchSettingsAfterSuccessfulLaunch,
         getRingMatchOrderProjectionKey: options.getRingMatchOrderProjectionKey,
         getSyncConfigurationReady: options.getSyncConfigurationReady,
+        hasManualQueueItems: options.hasManualQueueItems,
     });
 
     const ringMatchOrderProjectionFreshnessState = computed<

@@ -18,6 +18,7 @@ interface UseRefereeDisplayManagementOptions {
   handleSuccessfulLaunch: (nextState: ElectronDisplayState | null) => void
   getRingMatchOrderProjectionKey: () => string
   getSyncConfigurationReady: () => boolean
+  hasManualQueueItems: () => boolean
 }
 
 function createDefaultDisplayState(): ElectronDisplayState {
@@ -799,8 +800,11 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return
     }
 
-    if (!options.getSyncConfigurationReady() || !options.getRingMatchOrderProjectionKey()) {
-      const message = 'Configure Event Host, recovery tournament, and recovery gilam first so Gilam Match Order can follow the correct Event Host projection.'
+    // Allow launch without Event Host/tournament when manual queue has items.
+    // The manual queue provides its own projection data locally.
+    const hasSyncConfig = options.getSyncConfigurationReady() && options.getRingMatchOrderProjectionKey()
+    if (!hasSyncConfig && !options.hasManualQueueItems()) {
+      const message = 'Configure Event Host, recovery tournament, and recovery gilam first — or add bouts to the manual queue so Gilam Match Order has data to display.'
       displayErrorMessage.value = message
       options.showBanner(message, 'error', 4500)
       return

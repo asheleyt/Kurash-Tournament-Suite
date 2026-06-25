@@ -69,7 +69,7 @@ function getRingMatchOrderProjectionSlotLabel(
     role: RingDisplayRole,
     index: number,
 ) {
-    if (role === 'ON_MAT') return 'On Mat';
+    if (role === 'ON_MAT') return 'On Gilam';
     if (role === 'ON_DECK') return 'Next';
     return `Queue ${Math.max(1, index - 1)}`;
 }

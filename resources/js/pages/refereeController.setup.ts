@@ -564,6 +564,117 @@ function persistManualMatchId() {
     } catch {}
 }
 
+// ── Manual Match Queue ──────────────────────────────────────────────────
+// Persistent queue of manual bouts that can feed into the Gilam (ring match order) display.
+// Auto-fallback: Event Host is authoritative when active; manual queue fills the gap.
+
+interface ManualQueueItem {
+    id: string;
+    matchId: string;
+    bracketCategory: string;
+    gender: 'male' | 'female' | '' | 'N/A';
+    category: string;
+    player1: { name: string; clubCode: string; country: string; flag: string };
+    player2: { name: string; clubCode: string; country: string; flag: string };
+    createdAt: number;
+}
+
+const MANUAL_QUEUE_STORAGE_KEY = 'kurash:manual-match-queue:v1';
+const MANUAL_QUEUE_ACTIVE_ID_KEY = 'kurash:manual-active-item:v1';
+const MANUAL_QUEUE_OVERRIDE_ID_KEY = 'kurash:manual-override-item:v1';
+const MANUAL_QUEUE_COMPLETED_IDS_KEY = 'kurash:manual-completed-ids:v1';
+
+const manualQueue = ref<ManualQueueItem[]>([]);
+const activeManualItemId = ref<string | null>(null);
+const manualOverrideItemId = ref<string | null>(null);
+// Tracks which queue items have been explicitly completed (winner declared + cleared).
+// Items are only marked DONE when they appear in this set — NOT by positional logic.
+const completedManualItemIds = ref<Set<string>>(new Set());
+let manualQueueCounter = 0;
+
+function persistManualQueue() {
+    try {
+        localStorage.setItem(MANUAL_QUEUE_STORAGE_KEY, JSON.stringify(manualQueue.value));
+    } catch {}
+}
+function loadManualQueue(): ManualQueueItem[] {
+    try {
+        const raw = localStorage.getItem(MANUAL_QUEUE_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+function persistActiveManualItemId() {
+    try {
+        if (activeManualItemId.value) localStorage.setItem(MANUAL_QUEUE_ACTIVE_ID_KEY, activeManualItemId.value);
+        else localStorage.removeItem(MANUAL_QUEUE_ACTIVE_ID_KEY);
+    } catch {}
+}
+function loadActiveManualItemId(): string | null {
+    try {
+        return localStorage.getItem(MANUAL_QUEUE_ACTIVE_ID_KEY) || null;
+    } catch {
+        return null;
+    }
+}
+function persistManualOverrideItemId() {
+    try {
+        if (manualOverrideItemId.value) localStorage.setItem(MANUAL_QUEUE_OVERRIDE_ID_KEY, manualOverrideItemId.value);
+        else localStorage.removeItem(MANUAL_QUEUE_OVERRIDE_ID_KEY);
+    } catch {}
+}
+function loadManualOverrideItemId(): string | null {
+    try {
+        return localStorage.getItem(MANUAL_QUEUE_OVERRIDE_ID_KEY) || null;
+    } catch {
+        return null;
+    }
+}
+function persistCompletedManualItemIds() {
+    try {
+        const arr = Array.from(completedManualItemIds.value);
+        if (arr.length > 0) localStorage.setItem(MANUAL_QUEUE_COMPLETED_IDS_KEY, JSON.stringify(arr));
+        else localStorage.removeItem(MANUAL_QUEUE_COMPLETED_IDS_KEY);
+    } catch {}
+}
+function loadCompletedManualItemIds(): Set<string> {
+    try {
+        const raw = localStorage.getItem(MANUAL_QUEUE_COMPLETED_IDS_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? new Set(parsed) : new Set();
+    } catch {
+        return new Set();
+    }
+}
+function markManualItemCompleted(id: string) {
+    completedManualItemIds.value.add(id);
+    completedManualItemIds.value = new Set(completedManualItemIds.value);
+    persistCompletedManualItemIds();
+}
+function clearCompletedManualItemIds() {
+    completedManualItemIds.value = new Set();
+    persistCompletedManualItemIds();
+}
+
+function getManualItemStatus(item: ManualQueueItem): 'active' | 'queued' | 'completed' {
+    if (item.id === activeManualItemId.value) return 'active';
+    if (completedManualItemIds.value.has(item.id)) return 'completed';
+    return 'queued';
+}
+
+// Derived state for auto-fallback source selection
+const eventHostHasData = computed(() => matchesList.value.length > 0);
+const manualOverrideActive = computed(() => manualOverrideItemId.value !== null);
+const activeGilamSource = computed<'event_host' | 'manual'>(() => {
+    if (manualOverrideActive.value) return 'manual';
+    if (eventHostHasData.value) return 'event_host';
+    return manualQueue.value.length > 0 ? 'manual' : 'event_host';
+});
+
 // Temporary Settings for manual input (applied only when Update Scoreboard is confirmed)
 const tempSettings = reactive({
     matchId: '' as string,
@@ -914,21 +1025,22 @@ const {
     displayManagementPanelActions,
     isRingMatchOrderLive,
     shouldAutoExpandRingMatchOrderPanel,
-} = useRefereeControllerDisplayManagement({
-    showBanner,
-    isSettingsOpen,
-    publishLocalScoreboardState,
-    buildFullLocalScoreboardState,
-    broadcastAll,
-    toggleRingMatchOrderPanel,
-    getRingMatchOrderProjectionKey: () => ringMatchOrderProjectionKey.value,
-    getSyncConfigurationReady: () => syncConfigurationReady.value,
-    getIsRingMatchOrderPanelExpanded: () => isRingMatchOrderPanelExpanded.value,
-    getRingMatchOrderProjectionRecord: () =>
-        ringMatchOrderProjectionRecord.value,
-    getRingMatchOrderProjectionLastAttemptAt: () =>
-        ringMatchOrderProjectionLastAttemptAt.value,
-});
+    } = useRefereeControllerDisplayManagement({
+        showBanner,
+        isSettingsOpen,
+        publishLocalScoreboardState,
+        buildFullLocalScoreboardState,
+        broadcastAll,
+        toggleRingMatchOrderPanel,
+        getRingMatchOrderProjectionKey: () => ringMatchOrderProjectionKey.value,
+        getSyncConfigurationReady: () => syncConfigurationReady.value,
+        hasManualQueueItems: () => manualQueue.value.length > 0,
+        getIsRingMatchOrderPanelExpanded: () => isRingMatchOrderPanelExpanded.value,
+        getRingMatchOrderProjectionRecord: () =>
+            ringMatchOrderProjectionRecord.value,
+        getRingMatchOrderProjectionLastAttemptAt: () =>
+            ringMatchOrderProjectionLastAttemptAt.value,
+    });
 
 watch(flagSearchQuery1, (val) => {
     const next = (val || '').toUpperCase();
@@ -1478,12 +1590,23 @@ async function confirmResetAll() {
     clearResultSubmitGateState();
     showFinishModal.value = false;
     showLegacyFinishBanner.value = false;
+
+    // Mark the current manual bout as completed before advancing
+    if (activeManualItemId.value) {
+        markManualItemCompleted(activeManualItemId.value);
+    }
+
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
     currentLoadedRollbackSequence.value = null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
+
+    // Advance manual queue if a manual bout was active
+    if (activeManualItemId.value) {
+        advanceManualQueue();
+    }
 
     await broadcastAll();
 }
@@ -1491,12 +1614,23 @@ async function confirmResetAll() {
 async function clearCompletedBoutToWaitingState(message: string) {
     resetLiveBoutState();
     clearResultSubmitGateState();
+
+    // Mark the current manual bout as completed before advancing
+    if (activeManualItemId.value) {
+        markManualItemCompleted(activeManualItemId.value);
+    }
+
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
     currentLoadedRollbackSequence.value = null;
     manualMatchId.value = '';
     persistManualMatchId();
     syncTempSettings();
+
+    // Advance manual queue if a manual bout was active
+    if (activeManualItemId.value) {
+        advanceManualQueue();
+    }
 
     await broadcastAll();
     showBanner(message, 'info', 6500);
@@ -1508,53 +1642,83 @@ function handleGenderLocal(gender: 'male' | 'female') {
 }
 
 async function applyMatchSettings() {
-    // Close UI immediately, then do the heavier work.
+    // Close the confirmation modal only — keep settings panel open
+    // so the user can queue another bout without reopening it.
     showConfirmationModal.value = false;
-    isSettingsOpen.value = false;
 
     await nextTick();
 
     saveHistory();
 
-    // Transfer temporary settings to gameState
-    gameState.bracketCategory = (tempSettings.bracketCategory || '')
-        .toString()
-        .trim();
-    gameState.gender = tempSettings.gender;
-    gameState.category = tempSettings.category;
-    gameState.player1.name = tempSettings.player1.name;
-    gameState.player1.clubCode = tempSettings.player1.clubCode;
-    gameState.player1.country = tempSettings.player1.country;
-    gameState.player1.flag = tempSettings.player1.flag;
-    gameState.player2.name = tempSettings.player2.name;
-    gameState.player2.clubCode = tempSettings.player2.clubCode;
-    gameState.player2.country = tempSettings.player2.country;
-    gameState.player2.flag = tempSettings.player2.flag;
+    // Determine if this item will become the active (ON GILAM) item.
+    // Only the first item or an explicit push should update the controller state,
+    // so the scoreboard always shows the bout that matches the ON GILAM indicator.
+    const willBecomeActive = !activeManualItemId.value;
 
-    // Set player weights from match category
-    gameState.player1.weight = gameState.category;
-    gameState.player2.weight = gameState.category;
+    if (willBecomeActive) {
+        // Transfer temporary settings to gameState for the active bout
+        gameState.bracketCategory = (tempSettings.bracketCategory || '')
+            .toString()
+            .trim();
+        gameState.gender = tempSettings.gender;
+        gameState.category = tempSettings.category;
+        gameState.player1.name = tempSettings.player1.name;
+        gameState.player1.clubCode = tempSettings.player1.clubCode;
+        gameState.player1.country = tempSettings.player1.country;
+        gameState.player1.flag = tempSettings.player1.flag;
+        gameState.player2.name = tempSettings.player2.name;
+        gameState.player2.clubCode = tempSettings.player2.clubCode;
+        gameState.player2.country = tempSettings.player2.country;
+        gameState.player2.flag = tempSettings.player2.flag;
 
-    // If gender changed, reset timer to default for that gender
-    if (gameState.gender === 'male') {
-        gameState.time = 240;
-        gameState.initialDuration = 240;
-    } else if (gameState.gender === 'female') {
-        gameState.time = 180;
-        gameState.initialDuration = 180;
+        // Set player weights from match category
+        gameState.player1.weight = gameState.category;
+        gameState.player2.weight = gameState.category;
+
+        // If gender changed, reset timer to default for that gender
+        if (gameState.gender === 'male') {
+            gameState.time = 240;
+            gameState.initialDuration = 240;
+        } else if (gameState.gender === 'female') {
+            gameState.time = 180;
+            gameState.initialDuration = 180;
+        }
+
+        // Reset states
+        gameState.isRunning = false;
+        gameState.isMedicMode = false;
+        gameState.isBreakMode = false;
+        gameState.isJazo = false;
+        gameState.savedGameTime = null;
+        gameState.timerPlayer = null;
     }
-
-    // Reset states
-    gameState.isRunning = false;
-    gameState.isMedicMode = false;
-    gameState.isBreakMode = false;
-    gameState.isJazo = false;
-    gameState.savedGameTime = null;
-    gameState.timerPlayer = null;
 
     if (!currentMatchId.value) {
         manualMatchId.value = (tempSettings.matchId || '').toString().trim();
         persistManualMatchId();
+
+        // Add to manual queue
+        const newItem: ManualQueueItem = {
+            id: `manual_${Date.now()}_${manualQueueCounter++}`,
+            matchId: tempSettings.matchId,
+            bracketCategory: tempSettings.bracketCategory,
+            gender: tempSettings.gender,
+            category: tempSettings.category,
+            player1: { ...tempSettings.player1 },
+            player2: { ...tempSettings.player2 },
+            createdAt: Date.now(),
+        };
+        manualQueue.value.push(newItem);
+        persistManualQueue();
+
+        // First item becomes active automatically
+        if (!activeManualItemId.value) {
+            activeManualItemId.value = newItem.id;
+            persistActiveManualItemId();
+        }
+
+        // Auto-publish if manual source is active (Event Host is empty)
+        evaluateSourceAndPublish();
     }
 
     // Kick off broadcasting without blocking the UI.
@@ -1579,6 +1743,300 @@ function handleUpdateMatchClick() {
 
     // If all valid, show confirmation modal
     showConfirmationModal.value = true;
+}
+
+// ── Manual Queue → Gilam Functions ──────────────────────────────────────
+
+function buildManualParticipant(
+    item: ManualQueueItem,
+    side: 'player1' | 'player2',
+) {
+    const p = item[side];
+    return {
+        name: p.name || null,
+        club: p.clubCode || null,
+        club_code: (p.clubCode || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 4) || null,
+        country_code: p.country || null,
+        club_logo_url: null,
+    };
+}
+
+function publishManualQueueToGilam() {
+    const activeId = manualOverrideItemId.value || activeManualItemId.value;
+    const activeIndex = activeId
+        ? manualQueue.value.findIndex(i => i.id === activeId)
+        : -1;
+
+    const ringText = (selectedRing.value || '').toString().trim();
+
+    // Gilam display slot assignment (user's desired flow):
+    // Slot 0: On Gilam  — the active item currently being fought
+    // Slot 1: Next      — the first queued (non-completed, non-active) item
+    // Slot 2+: Queue 1, Queue 2, etc.
+
+    const projectionItems: Array<Record<string, unknown>> = [];
+
+    function buildProjection(item: ManualQueueItem, label: string, slotRole: string, slotIndex: number) {
+        const plain = JSON.parse(JSON.stringify(toRaw(item))) as ManualQueueItem;
+        const p1 = buildManualParticipant(plain, 'player1');
+        const p2 = buildManualParticipant(plain, 'player2');
+        return {
+            ...plain,
+            player_one: p1,
+            player_two: p2,
+            player_one_club_logo_url: null,
+            player_two_club_logo_url: null,
+            player_one_club_code: p1.club_code,
+            player_two_club_code: p2.club_code,
+            player_one_country_code: p1.country_code,
+            player_two_country_code: p2.country_code,
+            player_one_club: p1.club,
+            player_two_club: p2.club,
+            role: label,
+            slot_role: slotRole,
+            slotRole,
+            slot_label: label,
+            slotLabel: label,
+            position_label: label,
+            positionLabel: label,
+            slot_index: slotIndex,
+            source: 'manual_queue',
+            source_mode: 'manual',
+            queue_version: null,
+            generated_at: Date.now(),
+        };
+    }
+
+    // 1) Active item → "On Gilam" (slot 0)
+    if (activeIndex >= 0) {
+        const activeItem = manualQueue.value[activeIndex];
+        projectionItems.push(buildProjection(activeItem, 'On Gilam', 'ON_MAT', 0));
+    }
+
+    // 2) Queued items (non-completed, non-active) → "Next", "Queue 1", "Queue 2", etc.
+    const queuedItems = manualQueue.value.filter(
+        (item, idx) => idx !== activeIndex && !completedManualItemIds.value.has(item.id),
+    );
+
+    for (let i = 0; i < queuedItems.length; i++) {
+        const label = i === 0 ? 'Next' : `Queue ${i}`;
+        const slotRole = i === 0 ? 'ON_DECK' : 'IN_QUEUE';
+        projectionItems.push(buildProjection(queuedItems[i], label, slotRole, projectionItems.length));
+    }
+
+    const items = projectionItems;
+
+    const key = `manual|local|${ringText || 'default'}`;
+    const meta: RingMatchOrderProjectionMeta = {
+        key,
+        adminBaseNormalized: 'local',
+        tournamentId: null,
+        tournamentName: 'Manual Queue',
+        ring: ringText || 'default',
+        snapshotId: null,
+        updatedAt: Date.now(),
+    };
+
+    // Deep-clone entire payload to strip all Vue reactive proxies (postMessage can't clone them)
+    const payload = JSON.parse(JSON.stringify({
+        success: true,
+        items,
+        source: 'manual_queue',
+    }));
+
+    const record = createRingMatchOrderProjectionRecord(
+        key,
+        payload,
+        meta,
+        { lastSuccessAt: Date.now(), lastAttemptAt: Date.now(), lastError: null },
+    );
+
+    publishRingMatchOrderProjectionRecord(record);
+}
+
+function evaluateSourceAndPublish() {
+    // Always publish manual queue data — including empty state
+    // so Clear All propagates to the Gilam display.
+    publishManualQueueToGilam();
+}
+
+function pushManualItemToGilam(id: string) {
+    const item = manualQueue.value.find(i => i.id === id);
+    if (!item) return;
+
+    // Set override for Gilam display projection
+    manualOverrideItemId.value = id;
+    persistManualOverrideItemId();
+
+    // Move the active pointer so the ON GILAM badge tracks the pushed item
+    activeManualItemId.value = id;
+    persistActiveManualItemId();
+
+    // Clear completed status for the pushed item (it's being re-activated)
+    if (completedManualItemIds.value.has(id)) {
+        completedManualItemIds.value.delete(id);
+        completedManualItemIds.value = new Set(completedManualItemIds.value);
+        persistCompletedManualItemIds();
+    }
+
+    // Always sync manualMatchId — set it from the item or clear it
+    manualMatchId.value = (item.matchId || '').toString().trim();
+    persistManualMatchId();
+
+    // Reset scores first, then apply the pushed item's match data so the
+    // active scoreboard view reflects the same bout shown on the Gilam display.
+    Object.assign(gameState.player1, createInitialPlayerScore());
+    Object.assign(gameState.player2, createInitialPlayerScore());
+
+    gameState.bracketCategory = (item.bracketCategory || '').toString().trim();
+    gameState.gender = item.gender;
+    gameState.category = item.category;
+    gameState.player1.name = item.player1.name;
+    gameState.player1.clubCode = item.player1.clubCode;
+    gameState.player1.country = item.player1.country;
+    gameState.player1.flag = item.player1.flag;
+    gameState.player1.weight = item.category;
+    gameState.player2.name = item.player2.name;
+    gameState.player2.clubCode = item.player2.clubCode;
+    gameState.player2.country = item.player2.country;
+    gameState.player2.flag = item.player2.flag;
+    gameState.player2.weight = item.category;
+    gameState.winner = null;
+
+    // Reset timer for the pushed bout's gender
+    if (item.gender === 'male') {
+        gameState.time = 240;
+        gameState.initialDuration = 240;
+    } else if (item.gender === 'female') {
+        gameState.time = 180;
+        gameState.initialDuration = 180;
+    } else {
+        gameState.time = 0;
+        gameState.initialDuration = 0;
+    }
+    gameState.isRunning = false;
+    gameState.isMedicMode = false;
+    gameState.isBreakMode = false;
+    gameState.isJazo = false;
+    gameState.savedGameTime = null;
+    gameState.timerPlayer = null;
+
+    // Publish updated queue to Gilam display and broadcast scoreboard state
+    publishManualQueueToGilam();
+    void broadcastAll().catch((e) => {
+        console.error('Broadcast failed during manual push:', e);
+    });
+}
+
+function clearManualOverride() {
+    manualOverrideItemId.value = null;
+    persistManualOverrideItemId();
+    evaluateSourceAndPublish();
+}
+
+function advanceManualQueue() {
+    const currentIndex = manualQueue.value.findIndex(i => i.id === activeManualItemId.value);
+    if (currentIndex === -1 || currentIndex >= manualQueue.value.length - 1) {
+        activeManualItemId.value = null;
+    } else {
+        activeManualItemId.value = manualQueue.value[currentIndex + 1].id;
+    }
+    persistActiveManualItemId();
+
+    // Override only clears when the pushed bout is completed
+    if (manualOverrideItemId.value) {
+        manualOverrideItemId.value = null;
+        persistManualOverrideItemId();
+    }
+
+    // Auto-next: apply the next queued item's data to the controller
+    if (activeManualItemId.value) {
+        const nextItem = manualQueue.value.find(i => i.id === activeManualItemId.value);
+        if (nextItem) {
+            // Reset scores first, then apply the next item's data
+            Object.assign(gameState.player1, createInitialPlayerScore());
+            Object.assign(gameState.player2, createInitialPlayerScore());
+
+            gameState.bracketCategory = (nextItem.bracketCategory || '').toString().trim();
+            gameState.gender = nextItem.gender;
+            gameState.category = nextItem.category;
+            gameState.player1.name = nextItem.player1.name;
+            gameState.player1.clubCode = nextItem.player1.clubCode;
+            gameState.player1.country = nextItem.player1.country;
+            gameState.player1.flag = nextItem.player1.flag;
+            gameState.player1.weight = nextItem.category;
+            gameState.player2.name = nextItem.player2.name;
+            gameState.player2.clubCode = nextItem.player2.clubCode;
+            gameState.player2.country = nextItem.player2.country;
+            gameState.player2.flag = nextItem.player2.flag;
+            gameState.player2.weight = nextItem.category;
+
+            // Sync match ID
+            manualMatchId.value = (nextItem.matchId || '').toString().trim();
+            persistManualMatchId();
+
+            // Set timer based on gender
+            if (nextItem.gender === 'male') {
+                gameState.time = 240;
+                gameState.initialDuration = 240;
+            } else if (nextItem.gender === 'female') {
+                gameState.time = 180;
+                gameState.initialDuration = 180;
+            } else {
+                gameState.time = 0;
+                gameState.initialDuration = 0;
+            }
+            gameState.winner = null;
+            gameState.isRunning = false;
+            gameState.isMedicMode = false;
+            gameState.isBreakMode = false;
+            gameState.isJazo = false;
+            gameState.savedGameTime = null;
+            gameState.timerPlayer = null;
+        }
+    }
+
+    evaluateSourceAndPublish();
+}
+
+function removeManualQueueItem(id: string) {
+    const wasActive = activeManualItemId.value === id;
+    manualQueue.value = manualQueue.value.filter(i => i.id !== id);
+    // Clean up completed status for removed item
+    if (completedManualItemIds.value.has(id)) {
+        completedManualItemIds.value.delete(id);
+        completedManualItemIds.value = new Set(completedManualItemIds.value);
+        persistCompletedManualItemIds();
+    }
+    persistManualQueue();
+
+    if (wasActive) {
+        activeManualItemId.value = manualQueue.value.length > 0 ? manualQueue.value[0].id : null;
+        persistActiveManualItemId();
+    }
+
+    if (manualOverrideItemId.value === id) {
+        manualOverrideItemId.value = null;
+        persistManualOverrideItemId();
+    }
+
+    evaluateSourceAndPublish();
+}
+
+function clearManualQueue() {
+    manualQueue.value = [];
+    activeManualItemId.value = null;
+    manualOverrideItemId.value = null;
+    clearCompletedManualItemIds();
+    persistManualQueue();
+    persistActiveManualItemId();
+    persistManualOverrideItemId();
+    evaluateSourceAndPublish();
+
+    // Also broadcast cleared state to the scoreboard
+    void broadcastAll().catch((e) => {
+        console.error('Broadcast failed during clear manual queue:', e);
+    });
 }
 
 async function handleJazoToggle() {
@@ -2154,6 +2612,7 @@ const {
     ringMatchOrderProjectionRecord,
     ringMatchOrderProjectionLastAttemptAt,
     publishRingMatchOrderProjectionConfig,
+    publishRingMatchOrderProjectionRecord,
     publishRingMatchOrderProjectionPayload,
     getRingDisplayBatchRemote,
     pickAutoLoadQueueItem,
@@ -2175,6 +2634,7 @@ const {
     hasKnownDeviceCredentials: () => hasKnownDeviceCredentials.value,
     hasAssignedSetup: () => hasAssignedSetup.value,
     isRingMatchOrderLive: () => isRingMatchOrderLive.value,
+    isManualOverrideActive: () => manualOverrideActive.value,
     canLoadMatch,
     onAuthoritativeQueuePayload: (payload, source) => {
         void handleAuthoritativeQueueMetadataPayload(payload, source);
@@ -4284,7 +4744,7 @@ function getDisplayClassBadgeClass(
 }
 
 function getQueueRoleLabel(role: RingDisplayRole) {
-    if (role === 'ON_MAT') return 'On Mat';
+    if (role === 'ON_MAT') return 'On Gilam';
     if (role === 'ON_DECK') return 'On Deck';
     if (role === 'IN_QUEUE') return 'In Queue';
     return 'Empty';
@@ -6548,6 +7008,13 @@ function startStatusMonitor() {
 
 onMounted(() => {
     refreshElectronAppControlAvailability();
+
+    // Initialize manual queue from localStorage
+    manualQueue.value = loadManualQueue();
+    activeManualItemId.value = loadActiveManualItemId();
+    manualOverrideItemId.value = loadManualOverrideItemId();
+    completedManualItemIds.value = loadCompletedManualItemIds();
+    nextTick(() => evaluateSourceAndPublish());
 
     try {
         const ua = (navigator.userAgent || '').toLowerCase();

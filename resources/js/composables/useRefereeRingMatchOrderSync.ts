@@ -35,6 +35,8 @@ interface UseRefereeRingMatchOrderSyncOptions {
   hasKnownDeviceCredentials: () => boolean
   hasAssignedSetup: () => boolean
   isRingMatchOrderLive: () => boolean
+  /** When true, Event Host polling is suppressed so manual queue can drive the Gilam. */
+  isManualOverrideActive?: () => boolean
   canLoadMatch: (item: any) => boolean
   onAuthoritativeQueuePayload?: (
     payload: Record<string, unknown>,
@@ -108,6 +110,12 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
   let lastPublishedProjectionConfigSignature = serializeRingMatchOrderProjectionMetaMaterial(null)
   let lastPersistedProjectionRecordSignature = serializeRingMatchOrderProjectionRecordMaterial(null)
 
+  // Suppress Event Host projection when a manual override is active
+  const isEventHostProjectionActive = () => {
+    if (options.isManualOverrideActive?.()) return false
+    return options.isRingMatchOrderLive()
+  }
+
   function logRingPerfSummary(summary: RingPerfSummary) {
     logControllerPerfSummary('ring', {
       fetchDurationMs: summary.fetchDurationMs,
@@ -126,11 +134,13 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
     },
   ) {
     try {
-      ringMatchOrderChannel?.postMessage({
+      // Deep-clone to strip Vue reactive proxies before postMessage (DataCloneError fix)
+      const message = JSON.parse(JSON.stringify({
         type,
         meta: payload.meta ?? null,
         entry: payload.entry ?? null,
-      })
+      }))
+      ringMatchOrderChannel?.postMessage(message)
     } catch (error) {
       console.error('Failed to publish Gilam Match Order projection update', error)
     }
@@ -335,7 +345,7 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
       return
     }
 
-    if (!options.isRingMatchOrderLive()) {
+    if (!isEventHostProjectionActive()) {
       logRingPerfSummary({
         fetchDurationMs: 0,
         applyDurationMs: 0,
@@ -449,7 +459,7 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
       return
     }
 
-    if (!options.isRingMatchOrderLive()) {
+    if (!isEventHostProjectionActive()) {
       stopRingMatchOrderProjectionPoller()
       logRingPerfSummary({
         fetchDurationMs: 0,

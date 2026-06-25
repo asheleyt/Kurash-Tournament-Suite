@@ -145,3 +145,26 @@
     -moz-appearance: textfield;
     appearance: textfield;
 }
+
+/* Themed scrollbar for manual queue list — matches country selector style */
+.queue-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56, 189, 248, 0.5) transparent;
+}
+
+.queue-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.queue-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.queue-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.5);
+    border-radius: 3px;
+}
+
+.queue-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(56, 189, 248, 0.7);
+}

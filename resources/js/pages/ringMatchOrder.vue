@@ -595,7 +595,7 @@ function getProjectionParticipant(item: ProjectionCard, side: 'one' | 'two') {
 }
 
 function defaultSlotLabel(index: number) {
-  if (index === 0) return 'On Mat'
+  if (index === 0) return 'On Gilam'
   if (index === 1) return 'Next'
   return `Queue ${index - 1}`
 }
@@ -618,8 +618,9 @@ function getPublicSlotLabel(item: ProjectionCard, index: number) {
   if (!raw) return defaultSlotLabel(index)
 
   const normalized = raw.toLowerCase().replace(/[_-]+/g, ' ').trim()
-  if (/\bon mat\b/.test(normalized) || /\bcurrent\b/.test(normalized) || /\bfeatured\b/.test(normalized)) return 'On Mat'
+  if (/\bon (mat|gilam)\b/.test(normalized) || /\bcurrent\b/.test(normalized) || /\bfeatured\b/.test(normalized)) return 'On Gilam'
   if (/\bon deck\b/.test(normalized) || /\bnext\b/.test(normalized)) return 'Next'
+  if (/\bprevious\b/.test(normalized) || /\bdone\b/.test(normalized) || /\bcompleted\b/.test(normalized)) return 'Previous'
   if (/\bqueue\b/.test(normalized)) return raw.replace(/\s+/g, ' ').trim()
   return raw
 }
@@ -890,11 +891,16 @@ function isCompletedCard(card: BoardCard) {
 }
 
 function isOnMatCard(card: BoardCard) {
-  return card.slotLabel.trim().toLowerCase() === 'on mat'
+  const label = card.slotLabel.trim().toLowerCase()
+  return label === 'on gilam' || label === 'on mat'
 }
 
 function isNextCard(card: BoardCard) {
   return card.slotLabel.trim().toLowerCase() === 'next'
+}
+
+function isPreviousCard(card: BoardCard) {
+  return card.slotLabel.trim().toLowerCase() === 'previous'
 }
 
 function getCardMotionStyle(index: number) {
@@ -927,6 +933,10 @@ function getSlotBadgeClass(card: BoardCard) {
 
   if (isNextCard(card)) {
     return 'ring-order-slot-pill--next'
+  }
+
+  if (isPreviousCard(card)) {
+    return 'ring-order-slot-pill--previous'
   }
 
   return 'ring-order-slot-pill--queue'
@@ -1357,6 +1367,13 @@ onBeforeUnmount(() => {
   border-color: rgba(71, 85, 105, 0.78);
   background: #334155;
   color: #cbd5e1;
+}
+
+.ring-order-slot-pill--previous {
+  border-color: rgba(148, 163, 184, 0.4);
+  background: #475569;
+  color: #94a3b8;
+  opacity: 0.7;
 }
 
 .ring-order-summary {

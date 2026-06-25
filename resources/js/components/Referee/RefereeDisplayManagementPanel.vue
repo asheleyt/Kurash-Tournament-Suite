@@ -1053,8 +1053,8 @@
                             v-if="!model.syncConfigurationReady"
                             class="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
                         >
-                            Set host, tournament, and gilam before live launch.
-                            Preview can still use cached or synthetic content.
+                            No Event Host sync configured. Launch will use local
+                            or manual queue data for the Gilam display.
                         </div>
 
                         <div class="mt-4 grid grid-cols-1 gap-3">
@@ -1554,7 +1554,7 @@
                                             model.isRingMatchOrderLive ||
                                             model.isRingMatchOrderPreviewActive
                                                 ? 'Monitor or stop the current output when you are done.'
-                                                : 'Preview uses cached or synthetic data. Launch starts the live feed.'
+                                                : 'Preview uses cached or synthetic data. Launch starts the live feed — works with or without Event Host.'
                                         }}
                                     </div>
                                     <div class="mt-2 text-xs text-slate-500">
@@ -1592,8 +1592,7 @@
                                                 model.displayActionPending ||
                                                 !model
                                                     .selectedRingMatchOrderDisplayIds
-                                                    .length ||
-                                                !model.syncConfigurationReady
+                                                    .length
                                             "
                                             class="h-12 rounded-2xl bg-cyan-600 px-6 text-sm font-black tracking-[0.18em] text-white uppercase shadow-[0_18px_45px_-28px_rgba(8,145,178,0.95)] transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
                                         >

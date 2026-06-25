@@ -2183,9 +2183,91 @@
                                             class="h-6 w-6 transition-transform duration-500 group-hover:rotate-180"
                                         />
                                         <span class="relative"
-                                            >UPDATE SCOREBOARD</span
+                                            >ADD TO QUEUE</span
                                         >
                                     </button>
+                                </div>
+                            </div>
+
+                            <!-- Manual Match Queue -->
+                            <div class="rounded-2xl border border-white/10 bg-black/40 p-5">
+                                <div class="mb-4 flex items-center justify-between">
+                                    <div class="text-[10px] font-black tracking-widest text-gray-500 uppercase">
+                                        Manual Queue ({{ manualQueue.length }} bouts)
+                                    </div>
+                                    <button
+                                        v-if="manualQueue.length > 0"
+                                        @click="clearManualQueue"
+                                        class="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 uppercase tracking-wide hover:bg-red-500/20"
+                                    >
+                                        Clear All
+                                    </button>
+                                </div>
+
+                                <!-- Empty state -->
+                                <div v-if="manualQueue.length === 0" class="py-6 text-center">
+                                    <div class="text-xs text-gray-600">No bouts in queue. Use the form above to add matches.</div>
+                                </div>
+
+                                <div v-else class="flex flex-col gap-2" :class="manualQueue.length > 5 ? 'max-h-[340px] overflow-y-auto pr-1 queue-scrollbar' : ''">
+                                    <div
+                                        v-for="item in manualQueue"
+                                        :key="item.id"
+                                        v-show="getManualItemStatus(item) !== 'completed'"
+                                        class="flex items-center justify-between rounded-xl border px-4 py-3 transition-all"
+                                        :class="getManualItemStatus(item) === 'active'
+                                            ? 'border-amber-500/40 bg-amber-500/10'
+                                            : getManualItemStatus(item) === 'completed'
+                                                ? 'border-white/5 bg-white/[0.02] opacity-40'
+                                                : 'border-white/10 bg-white/[0.03]'"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <span
+                                                class="rounded-md px-2 py-0.5 text-[10px] font-black tracking-wider uppercase"
+                                                :class="getManualItemStatus(item) === 'active'
+                                                    ? 'bg-amber-500/20 text-amber-400'
+                                                    : getManualItemStatus(item) === 'completed'
+                                                        ? 'bg-white/5 text-gray-600'
+                                                        : 'bg-white/10 text-gray-500'"
+                                            >
+                                                {{ getManualItemStatus(item) === 'active' ? 'ON GILAM' : getManualItemStatus(item) === 'completed' ? 'DONE' : 'QUEUED' }}
+                                            </span>
+                                            <span class="text-sm font-semibold text-white">
+                                                {{ item.player1.name || 'TBD' }} vs {{ item.player2.name || 'TBD' }}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs text-gray-500">
+                                                {{ item.category ? item.category + 'kg' : '' }}
+                                                {{ item.bracketCategory ? '/ ' + item.bracketCategory : '' }}
+                                            </span>
+
+                                            <!-- Push to Gilam button (only for non-active, non-completed items) -->
+                                            <button
+                                                v-if="getManualItemStatus(item) === 'queued'"
+                                                @click="pushManualItemToGilam(item.id)"
+                                                class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-400 uppercase tracking-wide hover:bg-amber-500/20 transition-colors"
+                                            >
+                                                Push
+                                            </button>
+
+                                            <!-- Active override indicator -->
+                                            <span
+                                                v-if="manualOverrideItemId === item.id"
+                                                class="rounded-lg bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-400 uppercase tracking-wide"
+                                            >
+                                                On Gilam
+                                            </span>
+
+                                            <button
+                                                v-if="getManualItemStatus(item) !== 'active'"
+                                                @click="removeManualQueueItem(item.id)"
+                                                class="rounded-lg p-1.5 text-gray-500 hover:bg-white/10 hover:text-red-400 transition-colors"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4470,7 +4552,7 @@
                             @click="applyMatchSettings"
                             class="flex-1 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 py-3 font-bold text-white shadow-lg transition-all hover:from-blue-500 hover:to-indigo-500 active:scale-95"
                         >
-                            Confirm & Apply
+                            Add to Queue
                         </button>
                     </div>
                 </div>
