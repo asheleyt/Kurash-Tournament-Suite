@@ -1,4 +1,4 @@
-export const FLAG_ASSET_VARIANTS = [
+const FLAG_ASSET_VARIANTS = [
   { folder: 'Flag_80x60', width: 80 },
   { folder: 'Flag_256x192', width: 256 },
 ] as const

@@ -21,7 +21,7 @@ export interface RingMatchOrderProjectionRecord {
 
 export const RING_MATCH_ORDER_PROJECTION_CHANNEL = 'kurash:ring-match-order:v1'
 export const RING_MATCH_ORDER_CURRENT_META_STORAGE_KEY = 'kurash:ring-match-order:current'
-export const RING_MATCH_ORDER_CACHE_PREFIX = 'kurash:ring-match-order:cache:'
+const RING_MATCH_ORDER_CACHE_PREFIX = 'kurash:ring-match-order:cache:'
 export const RING_MATCH_ORDER_FRESH_MS = 15_000
 export const RING_MATCH_ORDER_OFFLINE_MS = 60_000
 
@@ -87,7 +87,7 @@ export function createRingMatchOrderProjectionRecord(
   }
 }
 
-export function safeParseRingMatchOrderProjectionRecord(raw: string | null) {
+function safeParseRingMatchOrderProjectionRecord(raw: string | null) {
   if (!raw) return null
 
   try {
