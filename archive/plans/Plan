@@ -1,0 +1,74 @@
+I now have a complete understanding of both bugs. Here's my analysis and plan:
+Analysis
+Bug 1: NEXT item missing Push button
+Root cause: refereeController.template.html:2251
+v-if="getManualItemStatus(item) === 'queued'"
+Push button only renders for queued status. The next item is excluded.
+Why it's needed: A referee may want to skip the NEXT bout and push a different queued bout directly to Gilam. Without a Push button on NEXT, there's no way to do this without first removing the NEXT item.
+Bug 2: Queue never advances — NEXT bout never gets its turn
+Root cause: handleSubmitResult() post-result async block (line 7914-7985).
+Both advancement paths in the async block have the same flaw:
+localFirst path (line 7926-7929):
+if (!advanced) {
+await clearCompletedBoutToWaitingState(...);
+}
+non-localFirst path (line 7971-7974):
+if (!advanced) {
+await clearCompletedBoutToWaitingState(...);
+}
+clearCompletedBoutToWaitingState() is the ONLY function that calls markManualItemCompleted() + advanceManualQueue() in the post-result flow. But it's only called when !advanced (Event Host didn't load the next match). When Event Host does load the next match (advanced = true), clearCompletedBoutToWaitingState() is skipped entirely, and the manual queue item is never marked as completed.
+This means:
+
+- P1 plays, wins → handleSubmitResult → Event Host loads P3 as next → advanced = true → clearCompletedBoutToWaitingState skipped → P1 never marked completed
+- P3 plays, wins → same thing → P3 never marked completed
+- Queue shows P1 as NEXT, P2 as QUEUED, even though they should be DONE
+  The manual queue and Event Host advancement are treated as mutually exclusive, but they need to coexist.
+  Plan
+  Fix 1: Push button on NEXT items
+  File: resources/js/pages/refereeController.template.html:2251
+  Change:
+  v-if="getManualItemStatus(item) === 'queued'"
+  To:
+  v-if="getManualItemStatus(item) === 'queued' || getManualItemStatus(item) === 'next'"
+  Fix 2: Always advance manual queue after result submission
+  File: resources/js/pages/refereeController.setup.ts
+  Change 1 — localFirst path (line 7926-7929):
+  Replace:
+  if (!advanced) {
+  await clearCompletedBoutToWaitingState(
+  getWaitingForNextBoutMessage(matchIdForSync),
+  );
+  }
+  With:
+  if (activeManualItemId.value) {
+  markManualItemCompleted(activeManualItemId.value);
+  advanceManualQueue();
+  } else if (!advanced) {
+  await clearCompletedBoutToWaitingState(
+  getWaitingForNextBoutMessage(matchIdForSync),
+  );
+  }
+  Change 2 — non-localFirst path (line 7971-7974):
+  Replace:
+  if (!advanced) {
+  await clearCompletedBoutToWaitingState(
+  getWaitingForNextBoutMessage(matchIdForSync),
+  );
+  }
+  With:
+  if (activeManualItemId.value) {
+  markManualItemCompleted(activeManualItemId.value);
+  advanceManualQueue();
+  } else if (!advanced) {
+  await clearCompletedBoutToWaitingState(
+  getWaitingForNextBoutMessage(matchIdForSync),
+  );
+  }
+  Rationale: When an active manual item exists, always complete + advance the manual queue regardless of Event Host state. Fall back to clearCompletedBoutToWaitingState only when there's no manual queue (pure Event Host mode). advanceManualQueue() already resets scores, loads next item data, sets timer, and calls evaluateSourceAndPublish().
+  Verification
+- npm run lint → no new errors
+- npm run typecheck → no new errors
+- E2E test: add 6 items, finish matches one by one, verify each item advances correctly through ON GILAM → DONE
+  Risk assessment
+- Low risk for Fix 1: Pure template condition change, no logic impact
+- Medium risk for Fix 2: Changes the post-result flow. The else if (!advanced) fallback preserves existing behavior for pure Event Host mode (no manual queue). For manual queue mode, advanceManualQueue() handles everything clearCompletedBoutToWaitingState() does for manual queue state (scores, data, timer, publish), minus clearing currentMatchId/currentMatchRingNumber/currentLoadedRollbackSequence which are Event Host-specific state and already cleared at line 7909-7912.
