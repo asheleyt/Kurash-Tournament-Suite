@@ -89,3 +89,13 @@ opencode.json
 # Working files
 Agent-hand-off
 typecheck.log
+
+# AI tooling artifacts
+.trae/
+.npm-cache/
+
+# Historical test screenshots
+Test_Images/
+
+# Root-level log files
+/*.log
