@@ -35,30 +35,22 @@
           <article
             v-for="(card, index) in renderedBoardCards"
             :key="card.boardKey"
-            class="ring-order-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.45rem] border px-4 py-3 shadow-[0_24px_90px_-60px_rgba(2,6,23,0.96)]"
+            class="ring-order-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.45rem] border pt-7 px-4 py-3 shadow-[0_24px_90px_-60px_rgba(2,6,23,0.96)]"
             :class="getCardShellClass(card)"
             :style="getCardMotionStyle(index)"
           >
             <div class="ring-order-card-content relative flex h-full min-h-0 flex-col gap-3">
-              <div class="ring-order-card-topline flex min-w-0 items-center justify-between gap-3 px-1">
-                <span class="ring-order-slot-pill-frame">
-                  <Transition :name="prefersReducedMotion ? 'ring-order-pill-reduced' : 'ring-order-pill'">
-                    <span
-                      :key="`${card.boardKey}:${card.slotLabel}`"
-                      class="ring-order-slot-pill rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                      :class="getSlotBadgeClass(card)"
-                    >
-                      {{ card.slotLabel }}
-                    </span>
-                  </Transition>
-                </span>
-                <span
-                  class="ring-order-summary min-w-0 max-w-[55%] truncate text-right text-[10px] font-black uppercase tracking-[0.16em]"
-                  :class="card.summary ? getSummaryClass(card) : 'invisible text-slate-500/60'"
-                >
-                  {{ card.summary || 'Not Available' }}
-                </span>
-              </div>
+              <span class="ring-order-slot-pill-frame absolute left-1/2 top-0 z-10 -translate-x-1/2">
+                <Transition :name="prefersReducedMotion ? 'ring-order-pill-reduced' : 'ring-order-pill'">
+                  <span
+                    :key="`${card.boardKey}:${card.slotLabel}`"
+                    class="ring-order-slot-pill rounded-b-lg border border-t-0 px-5 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    :class="getSlotBadgeClass(card)"
+                  >
+                    {{ card.slotLabel }}
+                  </span>
+                </Transition>
+              </span>
 
               <div class="ring-order-row-grid grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-3 sm:gap-4">
                 <section
@@ -98,9 +90,6 @@
                         <div class="ring-order-name truncate text-white">
                           {{ card.leftName }}
                         </div>
-                        <div v-if="card.leftMeta" class="ring-order-meta mt-1.5 truncate text-emerald-300/64">
-                          {{ card.leftMeta }}
-                        </div>
                       </div>
                     </div>
                   </template>
@@ -116,12 +105,12 @@
                     </span>
                   </template>
                   <template v-else>
-                    <div
-                      class="ring-order-center-orb flex h-11 w-11 items-center justify-center rounded-full border-2 text-[10px] font-black uppercase tracking-[0.18em] shadow-[0_12px_30px_-22px_rgba(2,6,23,0.95)]"
-                      :class="getCenterBadgeClass(card)"
+                    <span
+                      v-if="card.weightLabel"
+                      class="ring-order-weight-label rounded-full border border-white/10 bg-white/5 px-3 py-1 text-center text-[11px] font-black uppercase tracking-[0.14em] text-white/80"
                     >
-                      <span class="ring-order-vs-text">{{ getCenterLabel(card) }}</span>
-                    </div>
+                      {{ card.weightLabel }}
+                    </span>
                   </template>
                 </div>
 
@@ -162,9 +151,6 @@
                         <div class="ring-order-name truncate text-white">
                           {{ card.rightName }}
                         </div>
-                        <div v-if="card.rightMeta" class="ring-order-meta mt-1.5 truncate text-sky-300/64">
-                          {{ card.rightMeta }}
-                        </div>
                       </div>
                     </div>
                   </template>
@@ -202,6 +188,7 @@ type BoardCard = {
   kind: 'match' | 'placeholder'
   slotLabel: string
   summary: string
+  weightLabel: string
   leftName: string
   leftMeta: string
   leftFlagSrc: string
@@ -644,6 +631,10 @@ function getDivisionSummary(item: ProjectionCard) {
   return values.join(' / ')
 }
 
+function getWeightLabel(item: ProjectionCard): string {
+  return readText(item.weight_category, item.weightCategory, item.category) || ''
+}
+
 function getBoardSummary(item: ProjectionCard) {
   const values = compactUnique([
     getDivisionSummary(item),
@@ -667,6 +658,7 @@ function buildMatchCard(item: ProjectionCard, index: number): BoardCard {
     kind: 'match',
     slotLabel: getPublicSlotLabel(item, index),
     summary: getBoardSummary(item),
+    weightLabel: getWeightLabel(item),
     leftName: left.name,
     leftMeta: left.meta,
     leftFlagSrc: left.flagSrc,
@@ -698,6 +690,7 @@ function buildPlaceholderCard(index: number): BoardCard {
     kind: 'placeholder',
     slotLabel: defaultSlotLabel(index),
     summary: '',
+    weightLabel: '',
     leftName: text,
     leftMeta: '',
     leftFlagSrc: '',
@@ -940,10 +933,6 @@ function getSlotBadgeClass(card: BoardCard) {
   }
 
   return 'ring-order-slot-pill--queue'
-}
-
-function getSummaryClass(card: BoardCard) {
-  return isOnMatCard(card) ? 'text-cyan-300' : 'text-slate-500'
 }
 
 function getSidePanelClass(side: 'left' | 'right', card: BoardCard) {
@@ -1222,15 +1211,6 @@ onBeforeUnmount(() => {
   transform-origin: left center;
 }
 
-.ring-order-meta {
-  color: #94a3b8;
-  font-size: clamp(0.58rem, min(0.74vw, 1.18vh), 0.98rem);
-  line-height: 1.2;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
 .ring-order-player-label {
   font-size: clamp(0.46rem, min(0.52vw, 0.84vh), 0.8rem);
   font-weight: 900;
@@ -1330,23 +1310,19 @@ onBeforeUnmount(() => {
   color: #cbd5e1;
 }
 
-.ring-order-card-topline {
-  gap: clamp(0.4rem, 0.7vw, 0.75rem);
-}
-
 .ring-order-slot-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: clamp(5.2rem, 7.2vw, 7.4rem);
-  padding: clamp(0.26rem, 0.45vh, 0.4rem) clamp(0.7rem, 0.95vw, 0.9rem);
-  font-size: clamp(0.5rem, min(0.54vw, 0.88vh), 0.68rem);
+  padding: 4px 20px;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
 }
 
 .ring-order-slot-pill-frame {
   display: inline-grid;
-  align-items: center;
-  min-width: clamp(5.2rem, 7.2vw, 7.4rem);
+  align-items: start;
 }
 
 .ring-order-slot-pill-frame > * {
@@ -1354,19 +1330,27 @@ onBeforeUnmount(() => {
 }
 
 .ring-order-slot-pill--active {
-  border-color: rgba(103, 232, 249, 0.56);
-  background: #06b6d4;
+  border-color: rgba(52, 211, 153, 0.56);
+  background: #10b981;
   color: #ffffff;
   box-shadow:
-    0 0 18px rgba(6, 182, 212, 0.38),
+    0 0 18px rgba(16, 185, 129, 0.38),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-.ring-order-slot-pill--next,
+.ring-order-slot-pill--next {
+  border-color: rgba(245, 158, 11, 0.56);
+  background: #d97706;
+  color: #ffffff;
+  box-shadow:
+    0 0 12px rgba(217, 119, 6, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 .ring-order-slot-pill--queue {
-  border-color: rgba(71, 85, 105, 0.78);
-  background: #334155;
-  color: #cbd5e1;
+  border-color: rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
 }
 
 .ring-order-slot-pill--previous {
@@ -1374,10 +1358,6 @@ onBeforeUnmount(() => {
   background: #475569;
   color: #94a3b8;
   opacity: 0.7;
-}
-
-.ring-order-summary {
-  font-size: clamp(0.48rem, min(0.54vw, 0.88vh), 0.68rem);
 }
 
 .ring-order-board-list {
@@ -1561,12 +1541,9 @@ onBeforeUnmount(() => {
 .ring-order-side-panel,
 .ring-order-side-content,
 .ring-order-name,
-.ring-order-meta,
 .ring-order-player-label,
-.ring-order-summary,
 .ring-order-flag-box,
 .ring-order-code-chip,
-.ring-order-center-orb,
 .ring-order-center-pill,
 .ring-order-slot-pill {
   min-width: 0;
@@ -1752,14 +1729,6 @@ onBeforeUnmount(() => {
   .ring-order-page {
     --ring-center-size: 3.2rem;
     --ring-center-pill-min: 3.35rem;
-  }
-
-  .ring-order-card-topline {
-    gap: 0.35rem;
-  }
-
-  .ring-order-summary {
-    max-width: 42%;
   }
 }
 </style>

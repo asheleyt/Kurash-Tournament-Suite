@@ -660,9 +660,18 @@ function clearCompletedManualItemIds() {
     persistCompletedManualItemIds();
 }
 
-function getManualItemStatus(item: ManualQueueItem): 'active' | 'queued' | 'completed' {
+function getManualItemStatus(item: ManualQueueItem): 'active' | 'next' | 'queued' | 'completed' {
     if (item.id === activeManualItemId.value) return 'active';
     if (completedManualItemIds.value.has(item.id)) return 'completed';
+    // The first queued (non-completed, non-active) item is "Next" to match the Gilam display.
+    const activeId = manualOverrideItemId.value || activeManualItemId.value;
+    const activeIndex = activeId
+        ? manualQueue.value.findIndex(i => i.id === activeId)
+        : -1;
+    const nextQueuedItem = manualQueue.value.find(
+        (q, idx) => idx !== activeIndex && !completedManualItemIds.value.has(q.id),
+    );
+    if (nextQueuedItem && item.id === nextQueuedItem.id) return 'next';
     return 'queued';
 }
 
@@ -2048,7 +2057,9 @@ async function handleJazoToggle() {
 
 async function handleWinnerToggle(player: 'player1' | 'player2') {
     const manualMatchIdText = (manualMatchId.value || '').toString().trim();
-    if (!currentMatchId.value && !manualMatchIdText) {
+    // Manual queue matches don't require a match ID — they are local-only bouts.
+    const isManualMode = activeGilamSource.value === 'manual' || manualQueue.value.length > 0;
+    if (!currentMatchId.value && !manualMatchIdText && !isManualMode) {
         showBanner(
             'Load a match or enter a manual match ID before declaring a winner.',
             'error',
@@ -7912,7 +7923,13 @@ async function handleSubmitResult() {
                                 matchIdForSync,
                             );
                         }
-                        if (!advanced) {
+                        // Always complete and advance the manual queue when a manual bout was active,
+                        // regardless of whether Event Host auto-advanced to the next match.
+                        if (activeManualItemId.value) {
+                            markManualItemCompleted(activeManualItemId.value);
+                            advanceManualQueue();
+                            evaluateSourceAndPublish();
+                        } else if (!advanced) {
                             await clearCompletedBoutToWaitingState(
                                 getWaitingForNextBoutMessage(matchIdForSync),
                             );
@@ -7957,7 +7974,13 @@ async function handleSubmitResult() {
                             );
                         }
                     }
-                    if (!advanced) {
+                    // Always complete and advance the manual queue when a manual bout was active,
+                    // regardless of whether Event Host auto-advanced to the next match.
+                    if (activeManualItemId.value) {
+                        markManualItemCompleted(activeManualItemId.value);
+                        advanceManualQueue();
+                        evaluateSourceAndPublish();
+                    } else if (!advanced) {
                         await clearCompletedBoutToWaitingState(
                             getWaitingForNextBoutMessage(matchIdForSync),
                         );

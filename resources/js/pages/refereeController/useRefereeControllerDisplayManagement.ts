@@ -257,22 +257,39 @@ export function useRefereeControllerDisplayManagement(
         ),
     );
     const ringMatchOrderProjectionStatusSummary = computed(() => {
+        const hasManualQueue = options.hasManualQueueItems();
+
         if (!ringMatchOrderProjectionKey.value) {
+            if (hasManualQueue) {
+                return 'Manual queue is active. Launch Gilam Match Order to display bouts from the queue — no Event Host configuration required.';
+            }
             return 'Pick Event Host, recovery tournament, and recovery gilam first so the controller can track a projection cache key for this role.';
         }
 
         if (!ringMatchOrderProjectionRecord.value?.lastSuccessAt) {
+            if (hasManualQueue) {
+                return `No Event Host projection snapshot yet, but the manual queue is ready. Launch to display manual bouts. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s and offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
+            }
             return `No successful Event Host projection snapshot yet. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s and offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
         }
 
         if (ringMatchOrderProjectionFreshnessState.value === 'fresh') {
+            if (hasManualQueue) {
+                return `Event Host projection is current. The manual queue supplements this data. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s.`;
+            }
             return `Event Host projection snapshot is current. Fresh within ${Math.round(RING_MATCH_ORDER_FRESH_MS / 1000)}s.`;
         }
 
         if (ringMatchOrderProjectionFreshnessState.value === 'stale') {
+            if (hasManualQueue) {
+                return `Showing the last successful Event Host projection snapshot while polling retries. The manual queue supplements this data. Offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
+            }
             return `Showing the last successful Event Host projection snapshot while polling retries. Offline after ${Math.round(RING_MATCH_ORDER_OFFLINE_MS / 1000)}s.`;
         }
 
+        if (hasManualQueue) {
+            return 'Event Host projection polling is offline. The manual queue continues to provide bouts independently until updates resume.';
+        }
         return 'Projection polling is offline. The last successful Event Host snapshot stays visible until updates resume.';
     });
 
