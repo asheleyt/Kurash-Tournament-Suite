@@ -1609,16 +1609,11 @@ async function confirmResetAll() {
     showLegacyFinishBanner.value = false;
 
     if (isManualSource()) {
-        // Manual queue reset — only affect manual queue
-        if (activeManualItemId.value) {
-            markManualItemCompleted(activeManualItemId.value);
-        }
+        // Reset clears scoreboard state only — does NOT complete or advance the queue.
+        // The current manual bout remains active at its current queue position.
         manualMatchId.value = '';
         persistManualMatchId();
         syncTempSettings();
-        if (activeManualItemId.value) {
-            advanceManualQueue();
-        }
     } else {
         // Event Host reset — only affect Event Host state
         currentMatchId.value = null;
@@ -5514,6 +5509,9 @@ watch(
             return;
         }
 
+        // Do not publish Event Host data while Manual Queue owns the controller
+        if (isManualSource()) return;
+
         if (!previousMeta || previousMeta.key !== nextMeta.key) {
             ringMatchOrderProjectionRecord.value = null;
         }
@@ -5540,6 +5538,8 @@ watch(
     ],
     () => {
         stopRingMatchOrderProjectionPoller();
+        // Do not publish Event Host data while Manual Queue owns the controller
+        if (isManualSource()) return;
         if (!ringMatchOrderProjectionMeta.value || !isRingMatchOrderLive.value)
             return;
         publishRingMatchOrderProjectionPayload(
