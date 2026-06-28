@@ -1608,21 +1608,25 @@ async function confirmResetAll() {
     showFinishModal.value = false;
     showLegacyFinishBanner.value = false;
 
-    // Mark the current manual bout as completed before advancing
-    if (activeManualItemId.value) {
-        markManualItemCompleted(activeManualItemId.value);
-    }
-
-    currentMatchId.value = null;
-    currentMatchRingNumber.value = null;
-    currentLoadedRollbackSequence.value = null;
-    manualMatchId.value = '';
-    persistManualMatchId();
-    syncTempSettings();
-
-    // Advance manual queue if a manual bout was active
-    if (activeManualItemId.value) {
-        advanceManualQueue();
+    if (isManualSource()) {
+        // Manual queue reset — only affect manual queue
+        if (activeManualItemId.value) {
+            markManualItemCompleted(activeManualItemId.value);
+        }
+        manualMatchId.value = '';
+        persistManualMatchId();
+        syncTempSettings();
+        if (activeManualItemId.value) {
+            advanceManualQueue();
+        }
+    } else {
+        // Event Host reset — only affect Event Host state
+        currentMatchId.value = null;
+        currentMatchRingNumber.value = null;
+        currentLoadedRollbackSequence.value = null;
+        manualMatchId.value = '';
+        persistManualMatchId();
+        syncTempSettings();
     }
 
     await broadcastAll();
@@ -1632,11 +1636,6 @@ async function clearCompletedBoutToWaitingState(message: string) {
     resetLiveBoutState();
     clearResultSubmitGateState();
 
-    // Mark the current manual bout as completed before advancing
-    if (activeManualItemId.value) {
-        markManualItemCompleted(activeManualItemId.value);
-    }
-
     currentMatchId.value = null;
     currentMatchRingNumber.value = null;
     currentLoadedRollbackSequence.value = null;
@@ -1644,8 +1643,9 @@ async function clearCompletedBoutToWaitingState(message: string) {
     persistManualMatchId();
     syncTempSettings();
 
-    // Advance manual queue if a manual bout was active
-    if (activeManualItemId.value) {
+    // Only advance manual queue if we're in manual source mode
+    if (isManualSource() && activeManualItemId.value) {
+        markManualItemCompleted(activeManualItemId.value);
         advanceManualQueue();
     }
 
