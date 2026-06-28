@@ -7243,6 +7243,8 @@ async function confirmUploadClubLogo() {
 async function handleSubmitResult() {
     try {
         await ensureConfigLoaded();
+        // Capture queue ownership once at entry — state may change during async operations
+        const submissionSource = activeQueueSource.value;
         let resolvedAdminBase = '';
         try {
             const candidate = (adminBase.value || getAPIBase() || '')
@@ -7940,77 +7942,107 @@ async function handleSubmitResult() {
 
             void (async () => {
                 try {
-                    if (localFirstResultFlow) {
-                        let advanced = hasAdvancedPastMatch(matchIdForSync);
-                        const localNextCandidate =
-                            pickLocalAutoLoadQueueItem(matchIdForSync);
-                        if (localNextCandidate) {
-                            advanced = await reconcileAuthoritativeNextMatch(
-                                localNextCandidate,
+                    if (submissionSource === 'event-host') {
+                        // Event Host path — advance Event Host ONLY
+                        if (localFirstResultFlow) {
+                            let advanced = hasAdvancedPastMatch(matchIdForSync);
+                            const localNextCandidate =
+                                pickLocalAutoLoadQueueItem(matchIdForSync);
+                            if (localNextCandidate) {
+                                advanced = await reconcileAuthoritativeNextMatch(
+                                    localNextCandidate,
+                                    matchIdForSync,
+                                );
+                            }
+                            if (!advanced) {
+                                await clearCompletedBoutToWaitingState(
+                                    getWaitingForNextBoutMessage(matchIdForSync),
+                                );
+                            }
+                        } else {
+                            await refreshMatchesAfterResult(
                                 matchIdForSync,
+                                'completed',
+                                {
+                                    baselineQueueVersion: refreshBaselineQueueVersion,
+                                    baselineControllerSnapshot:
+                                        refreshBaselineControllerSnapshot,
+                                },
                             );
+
+                            let advanced = hasAdvancedPastMatch(matchIdForSync);
+                            const refreshedNextCandidate =
+                                pickLocalAutoLoadQueueItem(matchIdForSync);
+                            if (refreshedNextCandidate) {
+                                advanced = await reconcileAuthoritativeNextMatch(
+                                    refreshedNextCandidate,
+                                    matchIdForSync,
+                                );
+                            }
+                            if (
+                                tournamentId &&
+                                (ringNum != null || ringNumber) &&
+                                !advanced
+                            ) {
+                                try {
+                                    advanced = await loadNextMatchAfterResult(
+                                        matchIdForSync,
+                                        tournamentId,
+                                        String(ringNum ?? ringNumber),
+                                    );
+                                } catch (error) {
+                                    console.warn(
+                                        'Auto-load next assigned match failed after result sync',
+                                        error,
+                                    );
+                                }
+                            }
+                            if (!advanced) {
+                                await clearCompletedBoutToWaitingState(
+                                    getWaitingForNextBoutMessage(matchIdForSync),
+                                );
+                            }
                         }
-                        // Always complete and advance the manual queue when a manual bout was active,
-                        // regardless of whether Event Host auto-advanced to the next match.
+                    } else if (submissionSource === 'manual') {
+                        // Manual queue path — advance manual queue ONLY
                         if (activeManualItemId.value) {
                             markManualItemCompleted(activeManualItemId.value);
                             advanceManualQueue();
                             evaluateSourceAndPublish();
-                        } else if (!advanced) {
-                            await clearCompletedBoutToWaitingState(
-                                getWaitingForNextBoutMessage(matchIdForSync),
-                            );
                         }
-                        return;
-                    }
 
-                    await refreshMatchesAfterResult(
-                        matchIdForSync,
-                        'completed',
-                        {
-                            baselineQueueVersion: refreshBaselineQueueVersion,
-                            baselineControllerSnapshot:
-                                refreshBaselineControllerSnapshot,
-                        },
-                    );
+                        // If manual queue is now empty, try Event Host fallback
+                        if (manualQueue.value.length === 0) {
+                            if (
+                                tournamentId &&
+                                (ringNum != null || ringNumber)
+                            ) {
+                                try {
+                                    const fallbackAdvanced =
+                                        await loadNextMatchAfterResult(
+                                            matchIdForSync,
+                                            tournamentId,
+                                            String(ringNum ?? ringNumber),
+                                        );
+                                    if (fallbackAdvanced) {
+                                        setActiveQueueSource('event-host');
+                                    }
+                                } catch (error) {
+                                    console.warn(
+                                        'Event Host fallback after manual queue empty failed',
+                                        error,
+                                    );
+                                }
+                            }
 
-                    let advanced = hasAdvancedPastMatch(matchIdForSync);
-                    const refreshedNextCandidate =
-                        pickLocalAutoLoadQueueItem(matchIdForSync);
-                    if (refreshedNextCandidate) {
-                        advanced = await reconcileAuthoritativeNextMatch(
-                            refreshedNextCandidate,
-                            matchIdForSync,
-                        );
-                    }
-                    if (
-                        tournamentId &&
-                        (ringNum != null || ringNumber) &&
-                        !advanced
-                    ) {
-                        try {
-                            advanced = await loadNextMatchAfterResult(
-                                matchIdForSync,
-                                tournamentId,
-                                String(ringNum ?? ringNumber),
-                            );
-                        } catch (error) {
-                            console.warn(
-                                'Auto-load next assigned match failed after result sync',
-                                error,
-                            );
+                            // If no Event Host match loaded, show waiting state
+                            if (!currentMatchId.value) {
+                                setActiveQueueSource('event-host');
+                                await clearCompletedBoutToWaitingState(
+                                    getWaitingForNextBoutMessage(matchIdForSync),
+                                );
+                            }
                         }
-                    }
-                    // Always complete and advance the manual queue when a manual bout was active,
-                    // regardless of whether Event Host auto-advanced to the next match.
-                    if (activeManualItemId.value) {
-                        markManualItemCompleted(activeManualItemId.value);
-                        advanceManualQueue();
-                        evaluateSourceAndPublish();
-                    } else if (!advanced) {
-                        await clearCompletedBoutToWaitingState(
-                            getWaitingForNextBoutMessage(matchIdForSync),
-                        );
                     }
                 } catch (error) {
                     console.warn(
