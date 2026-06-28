@@ -564,6 +564,21 @@ function persistManualMatchId() {
     } catch {}
 }
 
+// ── Queue Ownership ─────────────────────────────────────────────────────
+// Explicit queue source tracking. Represents controller ownership, NOT data availability.
+// Only set by explicit operator actions — never inferred from queue contents.
+type QueueSource = 'manual' | 'event-host';
+const activeQueueSource = ref<QueueSource>('event-host');
+function isManualSource(): boolean {
+    return activeQueueSource.value === 'manual';
+}
+function isEventHostSource(): boolean {
+    return activeQueueSource.value === 'event-host';
+}
+function setActiveQueueSource(source: QueueSource): void {
+    activeQueueSource.value = source;
+}
+
 // ── Manual Match Queue ──────────────────────────────────────────────────
 // Persistent queue of manual bouts that can feed into the Gilam (ring match order) display.
 // Auto-fallback: Event Host is authoritative when active; manual queue fills the gap.
@@ -661,28 +676,21 @@ function clearCompletedManualItemIds() {
 }
 
 function getManualItemStatus(item: ManualQueueItem): 'active' | 'next' | 'queued' | 'completed' {
-    if (item.id === activeManualItemId.value) return 'active';
     if (completedManualItemIds.value.has(item.id)) return 'completed';
-    // The first queued (non-completed, non-active) item is "Next" to match the Gilam display.
-    const activeId = manualOverrideItemId.value || activeManualItemId.value;
-    const activeIndex = activeId
-        ? manualQueue.value.findIndex(i => i.id === activeId)
-        : -1;
-    const nextQueuedItem = manualQueue.value.find(
-        (q, idx) => idx !== activeIndex && !completedManualItemIds.value.has(q.id),
-    );
-    if (nextQueuedItem && item.id === nextQueuedItem.id) return 'next';
+    // Strict FIFO: derive status from array index.
+    // index 0 => active, index 1 => next, index 2+ => queued
+    const idx = manualQueue.value.findIndex(i => i.id === item.id);
+    if (idx === 0) return 'active';
+    if (idx === 1) return 'next';
     return 'queued';
 }
 
-// Derived state for auto-fallback source selection
-const eventHostHasData = computed(() => matchesList.value.length > 0);
+// Queue source — delegates to the explicit activeQueueSource ref.
+// Represents controller ownership, not data availability.
 const manualOverrideActive = computed(() => manualOverrideItemId.value !== null);
-const activeGilamSource = computed<'event_host' | 'manual'>(() => {
-    if (manualOverrideActive.value) return 'manual';
-    if (eventHostHasData.value) return 'event_host';
-    return manualQueue.value.length > 0 ? 'manual' : 'event_host';
-});
+const activeGilamSource = computed<'event_host' | 'manual'>(() =>
+    isManualSource() ? 'manual' : 'event_host',
+);
 
 // Temporary Settings for manual input (applied only when Update Scoreboard is confirmed)
 const tempSettings = reactive({
@@ -1665,6 +1673,9 @@ async function applyMatchSettings() {
     const willBecomeActive = !activeManualItemId.value;
 
     if (willBecomeActive) {
+        // First manual item — operator is explicitly starting a manual session
+        setActiveQueueSource('manual');
+
         // Transfer temporary settings to gameState for the active bout
         gameState.bracketCategory = (tempSettings.bracketCategory || '')
             .toString()
@@ -1771,17 +1782,11 @@ function buildManualParticipant(
 }
 
 function publishManualQueueToGilam() {
-    const activeId = manualOverrideItemId.value || activeManualItemId.value;
-    const activeIndex = activeId
-        ? manualQueue.value.findIndex(i => i.id === activeId)
-        : -1;
-
     const ringText = (selectedRing.value || '').toString().trim();
 
-    // Gilam display slot assignment (user's desired flow):
-    // Slot 0: On Gilam  — the active item currently being fought
-    // Slot 1: Next      — the first queued (non-completed, non-active) item
-    // Slot 2+: Queue 1, Queue 2, etc.
+    // Strict FIFO: derive display slots from manualQueue[] array order.
+    // index 0 => ON GILAM, index 1 => NEXT, index 2+ => Queue N
+    // Source of truth is the array, not any override pointer.
 
     const projectionItems: Array<Record<string, unknown>> = [];
 
@@ -1816,21 +1821,16 @@ function publishManualQueueToGilam() {
         };
     }
 
-    // 1) Active item → "On Gilam" (slot 0)
-    if (activeIndex >= 0) {
-        const activeItem = manualQueue.value[activeIndex];
-        projectionItems.push(buildProjection(activeItem, 'On Gilam', 'ON_MAT', 0));
+    // Index 0 => ON GILAM (strict FIFO)
+    if (manualQueue.value.length > 0) {
+        projectionItems.push(buildProjection(manualQueue.value[0], 'On Gilam', 'ON_MAT', 0));
     }
 
-    // 2) Queued items (non-completed, non-active) → "Next", "Queue 1", "Queue 2", etc.
-    const queuedItems = manualQueue.value.filter(
-        (item, idx) => idx !== activeIndex && !completedManualItemIds.value.has(item.id),
-    );
-
-    for (let i = 0; i < queuedItems.length; i++) {
-        const label = i === 0 ? 'Next' : `Queue ${i}`;
-        const slotRole = i === 0 ? 'ON_DECK' : 'IN_QUEUE';
-        projectionItems.push(buildProjection(queuedItems[i], label, slotRole, projectionItems.length));
+    // Index 1+ => NEXT, Queue 1, Queue 2, etc.
+    for (let i = 1; i < manualQueue.value.length; i++) {
+        const label = i === 1 ? 'Next' : `Queue ${i - 1}`;
+        const slotRole = i === 1 ? 'ON_DECK' : 'IN_QUEUE';
+        projectionItems.push(buildProjection(manualQueue.value[i], label, slotRole, projectionItems.length));
     }
 
     const items = projectionItems;
@@ -1870,15 +1870,24 @@ function evaluateSourceAndPublish() {
 }
 
 function pushManualItemToGilam(id: string) {
-    const item = manualQueue.value.find(i => i.id === id);
-    if (!item) return;
+    const itemIndex = manualQueue.value.findIndex(i => i.id === id);
+    if (itemIndex < 0) return;
 
-    // Set override for Gilam display projection
+    // Strict FIFO: physically move the item to index 0 in the array.
+    // The array order IS the source of truth.
+    const [item] = manualQueue.value.splice(itemIndex, 1);
+    manualQueue.value.unshift(item);
+    persistManualQueue();
+
+    // Set override for display projection
     manualOverrideItemId.value = id;
     persistManualOverrideItemId();
 
-    // Move the active pointer so the ON GILAM badge tracks the pushed item
-    activeManualItemId.value = id;
+    // Operator explicitly pushed a manual item — claim controller ownership
+    setActiveQueueSource('manual');
+
+    // Active pointer always tracks index 0
+    activeManualItemId.value = manualQueue.value[0].id;
     persistActiveManualItemId();
 
     // Clear completed status for the pushed item (it's being re-activated)
@@ -1944,23 +1953,39 @@ function clearManualOverride() {
 }
 
 function advanceManualQueue() {
-    const currentIndex = manualQueue.value.findIndex(i => i.id === activeManualItemId.value);
-    if (currentIndex === -1 || currentIndex >= manualQueue.value.length - 1) {
-        activeManualItemId.value = null;
-    } else {
-        activeManualItemId.value = manualQueue.value[currentIndex + 1].id;
+    // Strict FIFO: remove the active item from the array.
+    // The new active item is always whatever is now at index 0.
+    const completedId = activeManualItemId.value;
+    if (completedId) {
+        const idx = manualQueue.value.findIndex(i => i.id === completedId);
+        if (idx >= 0) {
+            manualQueue.value.splice(idx, 1);
+            persistManualQueue();
+        }
     }
-    persistActiveManualItemId();
 
-    // Override only clears when the pushed bout is completed
+    // Clear override — the pushed bout has been completed
     if (manualOverrideItemId.value) {
         manualOverrideItemId.value = null;
         persistManualOverrideItemId();
     }
 
-    // Auto-next: apply the next queued item's data to the controller
+    // New active item is always index 0 (strict FIFO)
+    if (manualQueue.value.length > 0) {
+        activeManualItemId.value = manualQueue.value[0].id;
+        // Queue still has items — maintain manual ownership
+        setActiveQueueSource('manual');
+    } else {
+        activeManualItemId.value = null;
+        // Queue empty — do NOT switch source here.
+        // The controller (handleSubmitResult / confirmResetAll) decides
+        // whether to fall back to Event Host.
+    }
+    persistActiveManualItemId();
+
+    // Auto-next: apply the new active item's data to the controller
     if (activeManualItemId.value) {
-        const nextItem = manualQueue.value.find(i => i.id === activeManualItemId.value);
+        const nextItem = manualQueue.value[0];
         if (nextItem) {
             // Reset scores first, then apply the next item's data
             Object.assign(gameState.player1, createInitialPlayerScore());
@@ -2058,7 +2083,7 @@ async function handleJazoToggle() {
 async function handleWinnerToggle(player: 'player1' | 'player2') {
     const manualMatchIdText = (manualMatchId.value || '').toString().trim();
     // Manual queue matches don't require a match ID — they are local-only bouts.
-    const isManualMode = activeGilamSource.value === 'manual' || manualQueue.value.length > 0;
+    const isManualMode = manualQueue.value.length > 0 || isManualSource();
     if (!currentMatchId.value && !manualMatchIdText && !isManualMode) {
         showBanner(
             'Load a match or enter a manual match ID before declaring a winner.',
@@ -6923,6 +6948,8 @@ async function loadMatch(m: any): Promise<boolean> {
         parsed.division,
     );
     currentMatchId.value = getRemoteMatchId(m);
+    // Event Host match loaded — claim controller ownership
+    setActiveQueueSource('event-host');
     currentMatchRingNumber.value =
         firstNonEmptyString(
             m?.ring_number,
