@@ -6959,7 +6959,9 @@ async function loadMatch(m: any): Promise<boolean> {
     currentLoadedRollbackSequence.value = getMatchRollbackSequence(m);
     manualMatchId.value = '';
     persistManualMatchId();
-    syncTempSettings();
+    // Do NOT call syncTempSettings() here — loadMatch() is Event Host only.
+    // syncTempSettings copies gameState → tempSettings, which would populate
+    // the Manual Setup form with Event Host data (Bug 4).
     scheduleFullBroadcast('loading a match');
     return true;
 }
