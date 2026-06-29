@@ -1667,9 +1667,24 @@ async function applyMatchSettings() {
     // so the scoreboard always shows the bout that matches the ON GILAM indicator.
     const willBecomeActive = !activeManualItemId.value;
 
+    // Save Event Host position before Manual Queue takes over
+    if (willBecomeActive && activeQueueSource.value === 'event-host') {
+        eventHostPreManualSnapshot.value = {
+            matchId: currentMatchId.value,
+            ringNumber: currentMatchRingNumber.value,
+            rollbackSequence: currentLoadedRollbackSequence.value,
+        };
+    }
+
     if (willBecomeActive) {
         // First manual item — operator is explicitly starting a manual session
         setActiveQueueSource('manual');
+        // Clear stale Event Host match state so Manual Queue owns match identity.
+        // This prevents matchIdForSync from deriving a stale Event Host ID
+        // and ensures manualMatchId is set correctly by the guard below.
+        currentMatchId.value = null;
+        currentMatchRingNumber.value = null;
+        currentLoadedRollbackSequence.value = null;
 
         // Transfer temporary settings to gameState for the active bout
         gameState.bracketCategory = (tempSettings.bracketCategory || '')
@@ -2069,6 +2084,24 @@ function clearManualQueue() {
     void broadcastAll().catch((e) => {
         console.error('Broadcast failed during clear manual queue:', e);
     });
+
+    // Restore Event Host state from snapshot so the controller resumes
+    // from its previous position instead of scanning from index 0.
+    if (eventHostPreManualSnapshot.value) {
+        const snapshot = eventHostPreManualSnapshot.value;
+        currentMatchId.value = snapshot.matchId;
+        currentMatchRingNumber.value = snapshot.ringNumber;
+        currentLoadedRollbackSequence.value = snapshot.rollbackSequence;
+        eventHostPreManualSnapshot.value = null;
+    }
+    // Transition back to Event Host and trigger auto-load
+    setActiveQueueSource('event-host');
+    if (selectedTournamentId.value && currentMatchRingNumber.value) {
+        void maybeAutoLoadAssignedMatch(
+            selectedTournamentId.value,
+            currentMatchRingNumber.value,
+        );
+    }
 }
 
 async function handleJazoToggle() {
@@ -2764,6 +2797,11 @@ const updatingMatchId = ref<number | string | null>(null);
 const currentMatchId = ref<number | string | null>(null);
 const currentMatchRingNumber = ref<string | null>(null);
 const currentLoadedRollbackSequence = ref<number | null>(null);
+const eventHostPreManualSnapshot = ref<{
+    matchId: number | string | null;
+    ringNumber: string | null;
+    rollbackSequence: number | null;
+} | null>(null);
 const nextUpcomingMatchId = ref<number | string | null>(null);
 const lastSyncAt = ref<number | null>(null);
 const resultSubmitQueueMode = computed<ResultSubmitQueueMode>(() => {
@@ -5516,8 +5554,12 @@ watch(
             return;
         }
 
-        // Do not publish Event Host data while Manual Queue owns the controller
-        if (isManualSource()) return;
+        // While Manual Queue owns the controller, republish manual queue data
+        // under the new ring key instead of blocking all updates.
+        if (isManualSource()) {
+            evaluateSourceAndPublish();
+            return;
+        }
 
         if (!previousMeta || previousMeta.key !== nextMeta.key) {
             ringMatchOrderProjectionRecord.value = null;
@@ -5545,8 +5587,12 @@ watch(
     ],
     () => {
         stopRingMatchOrderProjectionPoller();
-        // Do not publish Event Host data while Manual Queue owns the controller
-        if (isManualSource()) return;
+        // While Manual Queue owns the controller, republish manual queue data
+        // under the new ring key instead of blocking all updates.
+        if (isManualSource()) {
+            evaluateSourceAndPublish();
+            return;
+        }
         if (!ringMatchOrderProjectionMeta.value || !isRingMatchOrderLive.value)
             return;
         publishRingMatchOrderProjectionPayload(
@@ -8063,6 +8109,14 @@ async function handleSubmitResult() {
                                 getWaitingForNextBoutMessage(matchIdForSync),
                             );
                         }
+                    } else if (
+                        submissionSource === 'manual' &&
+                        manualQueue.value.length > 0
+                    ) {
+                        // Manual queue still has items — broadcast updated state
+                        // so the scoreboard reflects the next bout loaded by
+                        // the standalone advancement block.
+                        await broadcastAll();
                     }
                 } catch (error) {
                     console.warn(
