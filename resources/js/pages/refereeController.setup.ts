@@ -1708,33 +1708,34 @@ async function applyMatchSettings() {
         gameState.timerPlayer = null;
     }
 
+    // Only persist manualMatchId when NOT in Event Host context
     if (!currentMatchId.value) {
         manualMatchId.value = (tempSettings.matchId || '').toString().trim();
         persistManualMatchId();
-
-        // Add to manual queue
-        const newItem: ManualQueueItem = {
-            id: `manual_${Date.now()}_${manualQueueCounter++}`,
-            matchId: tempSettings.matchId,
-            bracketCategory: tempSettings.bracketCategory,
-            gender: tempSettings.gender,
-            category: tempSettings.category,
-            player1: { ...tempSettings.player1 },
-            player2: { ...tempSettings.player2 },
-            createdAt: Date.now(),
-        };
-        manualQueue.value.push(newItem);
-        persistManualQueue();
-
-        // First item becomes active automatically
-        if (!activeManualItemId.value) {
-            activeManualItemId.value = newItem.id;
-            persistActiveManualItemId();
-        }
-
-        // Auto-publish if manual source is active (Event Host is empty)
-        evaluateSourceAndPublish();
     }
+
+    // Always push to manual queue — Event Host connection does not affect queue insertion
+    const newItem: ManualQueueItem = {
+        id: `manual_${Date.now()}_${manualQueueCounter++}`,
+        matchId: tempSettings.matchId,
+        bracketCategory: tempSettings.bracketCategory,
+        gender: tempSettings.gender,
+        category: tempSettings.category,
+        player1: { ...tempSettings.player1 },
+        player2: { ...tempSettings.player2 },
+        createdAt: Date.now(),
+    };
+    manualQueue.value.push(newItem);
+    persistManualQueue();
+
+    // First item becomes active automatically
+    if (!activeManualItemId.value) {
+        activeManualItemId.value = newItem.id;
+        persistActiveManualItemId();
+    }
+
+    // Auto-publish if manual source is active
+    evaluateSourceAndPublish();
 
     // Kick off broadcasting without blocking the UI.
     void broadcastAll().catch((e) => {
