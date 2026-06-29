@@ -5071,6 +5071,10 @@ async function maybeAutoLoadAssignedMatch(
 ) {
     if (!hasAssignedSetup.value || !hasAssignedScoreboardTarget.value) return;
     if (gameState.isRunning) return;
+    // Do not auto-load Event Host matches while the Manual Queue owns the controller.
+    // The manual queue has its own progression logic (advanceManualQueue) that runs
+    // independently in handleSubmitResult.
+    if (isManualSource() && manualQueue.value.length > 0) return;
 
     const ringText = (ring || '').toString().trim();
     if (!tournamentId || !ringText) return;
@@ -8100,7 +8104,17 @@ async function handleSubmitResult() {
 
         clearIntervalIfAny();
         gameState.isRunning = false;
-        await confirmResetAll();
+        // If the standalone block already advanced the manual queue, do NOT call
+        // confirmResetAll() — it would wipe the next bout that was just loaded.
+        // Instead, just broadcast the already-correct state.
+        if (
+            submissionSource === 'manual' &&
+            manualQueue.value.length > 0
+        ) {
+            await broadcastAll();
+        } else {
+            await confirmResetAll();
+        }
         showResultToast(
             `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`,
             'success',
