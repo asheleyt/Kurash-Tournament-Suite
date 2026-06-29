@@ -2044,6 +2044,14 @@ function advanceManualQueue() {
     }
 
     evaluateSourceAndPublish();
+
+    // Broadcast updated state to the scoreboard so it reflects the next bout.
+    // This must happen here — not only in callers — because some code paths
+    // (e.g. the sync block in handleSubmitResult) return early and never reach
+    // their own broadcastAll() call.
+    void broadcastAll().catch((e) => {
+        console.error('Broadcast failed during manual queue advancement:', e);
+    });
 }
 
 function removeManualQueueItem(id: string) {
@@ -2831,6 +2839,9 @@ const canFinishCurrentMatch = computed(() => {
 
     const manualMatchIdText = (manualMatchId.value || '').toString().trim();
     if (!currentMatchId.value) {
+        // Manual mode: allow finishing when we have a manual match ID,
+        // regardless of Event Host connection state.
+        if (isManualSource()) return !!manualMatchIdText;
         return !shouldUseAuthoritativeResultGuard() && !!manualMatchIdText;
     }
 
