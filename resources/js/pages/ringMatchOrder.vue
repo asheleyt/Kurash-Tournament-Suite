@@ -35,23 +35,11 @@
           <article
             v-for="(card, index) in renderedBoardCards"
             :key="card.boardKey"
-            class="ring-order-card relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.45rem] border pt-7 px-4 py-3 shadow-[0_24px_90px_-60px_rgba(2,6,23,0.96)]"
+            class="ring-order-card relative flex h-full min-h-0 flex-col overflow-visible rounded-[1.45rem] border pt-7 px-4 py-3 shadow-[0_24px_90px_-60px_rgba(2,6,23,0.96)]"
             :class="getCardShellClass(card)"
             :style="getCardMotionStyle(index)"
           >
             <div class="ring-order-card-content relative flex h-full min-h-0 flex-col gap-3">
-              <span class="ring-order-slot-pill-frame absolute left-1/2 top-0 z-10 -translate-x-1/2">
-                <Transition :name="prefersReducedMotion ? 'ring-order-pill-reduced' : 'ring-order-pill'">
-                  <span
-                    :key="`${card.boardKey}:${card.slotLabel}`"
-                    class="ring-order-slot-pill rounded-b-lg border border-t-0 px-5 py-1 text-[10px] font-black uppercase tracking-[0.22em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    :class="getSlotBadgeClass(card)"
-                  >
-                    {{ card.slotLabel }}
-                  </span>
-                </Transition>
-              </span>
-
               <div class="ring-order-row-grid grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-3 sm:gap-4">
                 <section
                   class="ring-order-side-panel flex min-w-0 rounded-[1.2rem] border p-3 sm:p-4"
@@ -95,7 +83,7 @@
                   </template>
                 </section>
 
-                <div class="flex items-center justify-center">
+                <div class="ring-order-center-badge flex items-center justify-center">
                   <template v-if="card.kind === 'placeholder'">
                     <span
                       class="ring-order-center-pill min-w-[4.4rem] rounded-full border px-3 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.18em] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -106,11 +94,13 @@
                   </template>
                   <template v-else>
                     <span
-                      v-if="card.weightLabel"
-                      class="ring-order-weight-label rounded-full border border-white/10 bg-white/5 px-3 py-1 text-center text-[11px] font-black uppercase tracking-[0.14em] text-white/80"
+                      class="ring-order-shield-badge"
+                      :class="getShieldBadgeClass(card)"
                     >
-                      {{ card.weightLabel }}
+                      <span class="ring-order-shield-label">{{ card.slotLabel }}</span>
+                      <span v-if="card.weightLabel" class="ring-order-shield-weight">{{ card.weightLabel }}</span>
                     </span>
+                    <span class="ring-order-center-vs">VS</span>
                   </template>
                 </div>
 
@@ -892,10 +882,6 @@ function isNextCard(card: BoardCard) {
   return card.slotLabel.trim().toLowerCase() === 'next'
 }
 
-function isPreviousCard(card: BoardCard) {
-  return card.slotLabel.trim().toLowerCase() === 'previous'
-}
-
 function getCardMotionStyle(index: number) {
   const delay = transitionPhase.value === 'advancing' && !prefersReducedMotion.value
     ? Math.min(index, 3) * 50
@@ -915,24 +901,24 @@ function getCardShellClass(card: BoardCard) {
     return 'ring-order-card--on-mat'
   }
 
+  if (isNextCard(card)) {
+    return 'ring-order-card--next'
+  }
+
   if (card.kind === 'placeholder') return 'ring-order-card--placeholder'
   return 'ring-order-card--queued'
 }
 
-function getSlotBadgeClass(card: BoardCard) {
+function getShieldBadgeClass(card: BoardCard) {
   if (isOnMatCard(card)) {
-    return 'ring-order-slot-pill--active'
+    return 'ring-order-shield-badge--active'
   }
 
   if (isNextCard(card)) {
-    return 'ring-order-slot-pill--next'
+    return 'ring-order-shield-badge--next'
   }
 
-  if (isPreviousCard(card)) {
-    return 'ring-order-slot-pill--previous'
-  }
-
-  return 'ring-order-slot-pill--queue'
+  return 'ring-order-shield-badge--queue'
 }
 
 function getSidePanelClass(side: 'left' | 'right', card: BoardCard) {
@@ -1194,21 +1180,21 @@ onBeforeUnmount(() => {
   max-width: 100%;
   padding: 0 10px;
   font-family: "Teko", "Bebas Neue", "Arial Narrow", Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(1.18rem, min(1.86vw, 2.82vh), 2.55rem);
-  font-style: italic;
+  font-size: clamp(1.6rem, min(2.4vw, 3.6vh), 2.8rem);
+  font-style: normal;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  line-height: 0.96;
+  letter-spacing: 0.04em;
+  line-height: 1;
   text-transform: uppercase;
-  transform: skewX(-10deg);
+  transform: none;
 }
 
 .ring-order-text-stack-left .ring-order-name {
-  transform-origin: right center;
+  text-align: right;
 }
 
 .ring-order-text-stack-right .ring-order-name {
-  transform-origin: left center;
+  text-align: left;
 }
 
 .ring-order-player-label {
@@ -1245,7 +1231,6 @@ onBeforeUnmount(() => {
   border-width: 1px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  transform: skewX(-10deg);
 }
 
 .ring-order-flag-box span {
@@ -1253,7 +1238,6 @@ onBeforeUnmount(() => {
   font-weight: 800;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  transform: skewX(10deg);
 }
 
 .ring-order-flag-image {
@@ -1263,7 +1247,6 @@ onBeforeUnmount(() => {
   display: block;
   background: rgba(255, 255, 255, 0.04);
   padding: clamp(0.16rem, 0.24vh, 0.24rem);
-  transform: skewX(10deg) scale(1.08);
 }
 
 .ring-order-flag-box--green {
@@ -1310,56 +1293,6 @@ onBeforeUnmount(() => {
   color: #cbd5e1;
 }
 
-.ring-order-slot-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: clamp(5.2rem, 7.2vw, 7.4rem);
-  padding: 4px 20px;
-  font-size: 0.8rem;
-  letter-spacing: 2px;
-}
-
-.ring-order-slot-pill-frame {
-  display: inline-grid;
-  align-items: start;
-}
-
-.ring-order-slot-pill-frame > * {
-  grid-area: 1 / 1;
-}
-
-.ring-order-slot-pill--active {
-  border-color: rgba(52, 211, 153, 0.56);
-  background: #10b981;
-  color: #ffffff;
-  box-shadow:
-    0 0 18px rgba(16, 185, 129, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-.ring-order-slot-pill--next {
-  border-color: rgba(245, 158, 11, 0.56);
-  background: #d97706;
-  color: #ffffff;
-  box-shadow:
-    0 0 12px rgba(217, 119, 6, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.ring-order-slot-pill--queue {
-  border-color: rgba(244, 63, 94, 0.4);
-  background: rgba(244, 63, 94, 0.2);
-  color: #fda4af;
-}
-
-.ring-order-slot-pill--previous {
-  border-color: rgba(148, 163, 184, 0.4);
-  background: #475569;
-  color: #94a3b8;
-  opacity: 0.7;
-}
-
 .ring-order-board-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1369,6 +1302,8 @@ onBeforeUnmount(() => {
 }
 
 .ring-order-card {
+  height: 120px;
+  min-height: 0;
   padding: var(--ring-card-pad-y) var(--ring-card-pad-x);
   will-change: transform, opacity;
   transition:
@@ -1387,16 +1322,27 @@ onBeforeUnmount(() => {
 }
 
 .ring-order-card--on-mat {
-  border-color: #1e293b;
+  border-color: rgba(0, 230, 118, 0.35);
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(9, 16, 30, 0.98));
   box-shadow:
-    0 0 0 1px rgba(6, 182, 212, 0.24),
-    0 24px 70px -50px rgba(6, 182, 212, 0.72);
+    0 0 0 1px rgba(0, 230, 118, 0.3),
+    0 0 30px rgba(0, 230, 118, 0.15),
+    0 24px 70px -50px rgba(0, 230, 118, 0.5);
+}
+
+.ring-order-card--next {
+  border-color: rgba(255, 152, 0, 0.35);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(9, 16, 30, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(255, 152, 0, 0.3),
+    0 0 30px rgba(255, 152, 0, 0.15),
+    0 24px 70px -50px rgba(255, 152, 0, 0.5);
 }
 
 .ring-order-card--queued {
-  border-color: #1e293b;
+  border-color: rgba(107, 90, 138, 0.18);
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(9, 16, 30, 0.92));
 }
@@ -1500,14 +1446,127 @@ onBeforeUnmount(() => {
   transform: translate(3%, -4%) skewX(-8deg);
 }
 
-.ring-order-center-orb--on-mat,
-.ring-order-center-orb--queued {
-  border-color: rgba(255, 255, 255, 0.24);
-  background: #e11d48;
+.ring-order-center-orb--on-mat {
+  border-color: rgba(0, 230, 118, 0.4);
+  background: linear-gradient(180deg, rgba(0, 230, 118, 0.25), rgba(0, 180, 90, 0.15));
   box-shadow:
-    0 0 24px rgba(225, 29, 72, 0.44),
-    inset 0 6px 14px rgba(255, 255, 255, 0.15),
-    inset 0 -10px 18px rgba(74, 4, 78, 0.28);
+    0 0 20px rgba(0, 230, 118, 0.25),
+    inset 0 6px 14px rgba(255, 255, 255, 0.12),
+    inset 0 -6px 14px rgba(0, 100, 50, 0.2);
+}
+
+.ring-order-center-orb--queued {
+  border-color: rgba(107, 90, 138, 0.3);
+  background: linear-gradient(180deg, rgba(107, 90, 138, 0.2), rgba(80, 65, 110, 0.15));
+  box-shadow:
+    0 0 16px rgba(107, 90, 138, 0.2),
+    inset 0 6px 14px rgba(255, 255, 255, 0.08),
+    inset 0 -6px 14px rgba(60, 45, 85, 0.2);
+}
+
+/* ── Center badge wrapper (hanging shield + VS below) ── */
+
+.ring-order-center-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  z-index: 10;
+}
+
+/* ── Shield badge (hanging center badge for ALL non-placeholder cards) ── */
+
+.ring-order-shield-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: clamp(7rem, 10vw, 9rem);
+  padding: 8px 16px 6px;
+  border-radius: 10px 10px 16px 16px;
+  border: 1px solid;
+  text-align: center;
+  position: relative;
+  top: -8px;
+}
+
+.ring-order-shield-badge::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid;
+}
+
+.ring-order-shield-badge--active {
+  border-color: rgba(0, 230, 118, 0.45);
+  background: linear-gradient(180deg, rgba(0, 230, 118, 0.22), rgba(0, 180, 90, 0.12));
+  box-shadow:
+    0 0 24px rgba(0, 230, 118, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.ring-order-shield-badge--active::before {
+  border-bottom-color: rgba(0, 230, 118, 0.45);
+}
+
+.ring-order-shield-badge--next {
+  border-color: rgba(255, 152, 0, 0.45);
+  background: linear-gradient(180deg, rgba(255, 152, 0, 0.22), rgba(200, 120, 0, 0.12));
+  box-shadow:
+    0 0 20px rgba(255, 152, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.ring-order-shield-badge--next::before {
+  border-bottom-color: rgba(255, 152, 0, 0.45);
+}
+
+.ring-order-shield-badge--queue {
+  border-color: rgba(107, 90, 138, 0.45);
+  background: linear-gradient(180deg, rgba(107, 90, 138, 0.22), rgba(80, 65, 110, 0.12));
+  box-shadow:
+    0 0 20px rgba(107, 90, 138, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.ring-order-shield-badge--queue::before {
+  border-bottom-color: rgba(107, 90, 138, 0.45);
+}
+
+.ring-order-center-vs {
+  font-family: "Teko", "Bebas Neue", "Arial Narrow", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.32rem, 2.7vh, 1.95rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  text-shadow: 0 2px 0 rgba(2, 6, 23, 0.32);
+  line-height: 1;
+}
+
+.ring-order-shield-label {
+  font-family: "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.ring-order-shield-weight {
+  font-family: "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .ring-order-center-orb--queued {
@@ -1544,8 +1603,7 @@ onBeforeUnmount(() => {
 .ring-order-player-label,
 .ring-order-flag-box,
 .ring-order-code-chip,
-.ring-order-center-pill,
-.ring-order-slot-pill {
+.ring-order-center-pill {
   min-width: 0;
 }
 
@@ -1579,29 +1637,6 @@ onBeforeUnmount(() => {
 .ring-order-leave-to {
   opacity: 0;
   transform: translateY(-20px) scale(0.95);
-}
-
-.ring-order-pill-enter-active,
-.ring-order-pill-leave-active {
-  transition:
-    transform 180ms ease,
-    opacity 180ms ease;
-}
-
-.ring-order-pill-enter-from,
-.ring-order-pill-leave-to {
-  opacity: 0;
-  transform: translateY(5px) scale(0.96);
-}
-
-.ring-order-pill-reduced-enter-active,
-.ring-order-pill-reduced-leave-active {
-  transition: opacity 120ms ease;
-}
-
-.ring-order-pill-reduced-enter-from,
-.ring-order-pill-reduced-leave-to {
-  opacity: 0;
 }
 
 .ring-order-reduced-enter-active,
@@ -1653,9 +1688,7 @@ onBeforeUnmount(() => {
   .ring-order-card,
   .ring-order-move,
   .ring-order-enter-active,
-  .ring-order-leave-active,
-  .ring-order-pill-enter-active,
-  .ring-order-pill-leave-active {
+  .ring-order-leave-active {
     transition-duration: 0ms !important;
   }
 
@@ -1705,6 +1738,10 @@ onBeforeUnmount(() => {
   .ring-order-page-title {
     font-size: clamp(2.9rem, 6.8vh, 5.25rem);
     letter-spacing: clamp(0.28em, 1.55vw, 0.62em);
+  }
+
+  .ring-order-card {
+    height: 96px;
   }
 }
 
