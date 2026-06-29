@@ -1709,7 +1709,9 @@ async function applyMatchSettings() {
     }
 
     // Only persist manualMatchId when NOT in Event Host context
-    if (!currentMatchId.value) {
+    // AND this item will become the active (ON GILAM) item.
+    // When items are queued behind an active bout, don't overwrite the active match ID.
+    if (!currentMatchId.value && willBecomeActive) {
         manualMatchId.value = (tempSettings.matchId || '').toString().trim();
         persistManualMatchId();
     }
@@ -7724,6 +7726,16 @@ async function handleSubmitResult() {
                 );
             }
         }
+        // ─── Manual queue advancement (runs before sync block) ────────────────
+        // submissionSource was captured at entry; advance manual queue
+        // BEFORE the sync block so the next item loads into gameState first.
+        // This path is independent of Event Host sync — the queue always advances.
+        if (submissionSource === 'manual' && activeManualItemId.value) {
+            markManualItemCompleted(activeManualItemId.value);
+            advanceManualQueue();
+            evaluateSourceAndPublish();
+        }
+
         if (matchIdForSync) {
             isUpdatingMatches.value = true;
             updatingMatchId.value = matchIdForSync;
@@ -8006,45 +8018,46 @@ async function handleSubmitResult() {
                                 );
                             }
                         }
-                    } else if (submissionSource === 'manual') {
-                        // Manual queue path — advance manual queue ONLY
-                        if (activeManualItemId.value) {
-                            markManualItemCompleted(activeManualItemId.value);
-                            advanceManualQueue();
-                            evaluateSourceAndPublish();
-                        }
-
-                        // If manual queue is now empty, try Event Host fallback
-                        if (manualQueue.value.length === 0) {
-                            if (
-                                tournamentId &&
-                                (ringNum != null || ringNumber)
-                            ) {
-                                try {
-                                    const fallbackAdvanced =
-                                        await loadNextMatchAfterResult(
-                                            matchIdForSync,
-                                            tournamentId,
-                                            String(ringNum ?? ringNumber),
-                                        );
-                                    if (fallbackAdvanced) {
-                                        setActiveQueueSource('event-host');
-                                    }
-                                } catch (error) {
-                                    console.warn(
-                                        'Event Host fallback after manual queue empty failed',
-                                        error,
+                    } else if (
+                        submissionSource === 'manual' &&
+                        manualQueue.value.length === 0
+                    ) {
+                        // Manual queue exhausted — determine next action based on Event Host state
+                        if (currentMatchId.value) {
+                            // Event Host already has a match loaded — switch back to it
+                            setActiveQueueSource('event-host');
+                            await clearCompletedBoutToWaitingState(
+                                getWaitingForNextBoutMessage(matchIdForSync),
+                            );
+                        } else if (
+                            tournamentId &&
+                            (ringNum != null || ringNumber)
+                        ) {
+                            // No Event Host match loaded — try to load next from Event Host
+                            try {
+                                const fallbackAdvanced =
+                                    await loadNextMatchAfterResult(
+                                        matchIdForSync,
+                                        tournamentId,
+                                        String(ringNum ?? ringNumber),
                                     );
+                                if (fallbackAdvanced) {
+                                    setActiveQueueSource('event-host');
                                 }
-                            }
-
-                            // If no Event Host match loaded, show waiting state
-                            if (!currentMatchId.value) {
-                                setActiveQueueSource('event-host');
-                                await clearCompletedBoutToWaitingState(
-                                    getWaitingForNextBoutMessage(matchIdForSync),
+                            } catch (error) {
+                                console.warn(
+                                    'Event Host fallback after manual queue empty failed',
+                                    error,
                                 );
                             }
+                        }
+
+                        // Final fallback: if nothing loaded and not manual, show waiting state
+                        if (!currentMatchId.value && !isManualSource()) {
+                            setActiveQueueSource('event-host');
+                            await clearCompletedBoutToWaitingState(
+                                getWaitingForNextBoutMessage(matchIdForSync),
+                            );
                         }
                     }
                 } catch (error) {
