@@ -2227,14 +2227,20 @@
                                             <span
                                                 class="rounded-b-lg rounded-t-none border border-t-0 px-5 py-1 text-[10px] font-black tracking-wider uppercase"
                                                 :class="getManualItemStatus(item) === 'active'
-                                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                                    ? (activeQueueSource === 'event-host'
+                                                        ? 'bg-amber-500/20 text-amber-400'
+                                                        : 'bg-emerald-500/20 text-emerald-400')
                                                     : getManualItemStatus(item) === 'next'
                                                         ? 'bg-amber-500/20 text-amber-400'
                                                         : getManualItemStatus(item) === 'completed'
                                                             ? 'bg-white/5 text-gray-600'
                                                             : 'bg-rose-400/15 text-rose-300'"
                                             >
-                                                {{ getManualItemStatus(item) === 'active' ? 'ON GILAM' : getManualItemStatus(item) === 'next' ? 'NEXT' : getManualItemStatus(item) === 'completed' ? 'DONE' : 'QUEUED' }}
+                                                {{ getManualItemStatus(item) === 'active'
+                                                    ? (activeQueueSource === 'event-host' ? 'ON HOLD' : 'ON GILAM')
+                                                    : getManualItemStatus(item) === 'next' ? 'NEXT'
+                                                    : getManualItemStatus(item) === 'completed' ? 'DONE'
+                                                    : 'QUEUED' }}
                                             </span>
                                             <span class="text-sm font-semibold text-white">
                                                 {{ item.player1.name || 'TBD' }} vs {{ item.player2.name || 'TBD' }}
@@ -2246,13 +2252,15 @@
                                                 {{ item.bracketCategory ? '/ ' + item.bracketCategory : '' }}
                                             </span>
 
-                                            <!-- Push to Gilam button (only for non-active, non-completed items) -->
+                                            <!-- Push / Activate button -->
                                             <button
-                                                v-if="getManualItemStatus(item) === 'queued' || getManualItemStatus(item) === 'next'"
+                                                v-if="getManualItemStatus(item) === 'queued'
+                                                   || getManualItemStatus(item) === 'next'
+                                                   || (getManualItemStatus(item) === 'active' && activeQueueSource === 'event-host')"
                                                 @click="pushManualItemToGilam(item.id)"
                                                 class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-400 uppercase tracking-wide hover:bg-amber-500/20 transition-colors"
                                             >
-                                                Push
+                                                {{ getManualItemStatus(item) === 'active' ? 'Activate' : 'Push' }}
                                             </button>
 
                                             <!-- Active override indicator -->
@@ -2260,7 +2268,7 @@
                                                 v-if="manualOverrideItemId === item.id"
                                                 class="rounded-lg bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-400 uppercase tracking-wide"
                                             >
-                                                On Gilam
+                                                {{ activeQueueSource === 'event-host' ? 'On Hold' : 'On Gilam' }}
                                             </span>
 
                                             <button

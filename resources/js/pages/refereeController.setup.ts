@@ -577,6 +577,21 @@ function isEventHostSource(): boolean {
 }
 function setActiveQueueSource(source: QueueSource): void {
     activeQueueSource.value = source;
+    persistActiveQueueSource();
+}
+
+const ACTIVE_QUEUE_SOURCE_STORAGE_KEY = 'kurash:active-queue-source:v1';
+function persistActiveQueueSource() {
+    try {
+        localStorage.setItem(ACTIVE_QUEUE_SOURCE_STORAGE_KEY, activeQueueSource.value);
+    } catch {}
+}
+function loadActiveQueueSource(): QueueSource {
+    try {
+        const raw = localStorage.getItem(ACTIVE_QUEUE_SOURCE_STORAGE_KEY);
+        if (raw === 'manual' || raw === 'event-host') return raw;
+    } catch {}
+    return 'event-host';
 }
 
 // ── Manual Match Queue ──────────────────────────────────────────────────
@@ -1334,6 +1349,12 @@ const formattedBracketCategory = computed(() => {
 });
 
 const matchIdLabel = computed(() => {
+    // Manual Queue owns the controller — always derive from manualMatchId
+    // to prevent stale Event Host IDs from leaking into the display.
+    if (isManualSource()) {
+        const mid = (manualMatchId.value || '').toString().trim();
+        return mid ? mid : 'N/A';
+    }
     const id = currentMatchId.value;
     if (id) return String(id);
     const mid = (manualMatchId.value || '').toString().trim();
@@ -1662,76 +1683,9 @@ async function applyMatchSettings() {
 
     saveHistory();
 
-    // Determine if this item will become the active (ON GILAM) item.
-    // Only the first item or an explicit push should update the controller state,
-    // so the scoreboard always shows the bout that matches the ON GILAM indicator.
-    const willBecomeActive = !activeManualItemId.value;
+    // Manual Queue is a staging area until the operator clicks "Activate."
+    // Ownership stays with Event Host; items appear as "On Hold" on Gilam.
 
-    // Save Event Host position before Manual Queue takes over
-    if (willBecomeActive && activeQueueSource.value === 'event-host') {
-        eventHostPreManualSnapshot.value = {
-            matchId: currentMatchId.value,
-            ringNumber: currentMatchRingNumber.value,
-            rollbackSequence: currentLoadedRollbackSequence.value,
-        };
-    }
-
-    if (willBecomeActive) {
-        // First manual item — operator is explicitly starting a manual session
-        setActiveQueueSource('manual');
-        // Clear stale Event Host match state so Manual Queue owns match identity.
-        // This prevents matchIdForSync from deriving a stale Event Host ID
-        // and ensures manualMatchId is set correctly by the guard below.
-        currentMatchId.value = null;
-        currentMatchRingNumber.value = null;
-        currentLoadedRollbackSequence.value = null;
-
-        // Transfer temporary settings to gameState for the active bout
-        gameState.bracketCategory = (tempSettings.bracketCategory || '')
-            .toString()
-            .trim();
-        gameState.gender = tempSettings.gender;
-        gameState.category = tempSettings.category;
-        gameState.player1.name = tempSettings.player1.name;
-        gameState.player1.clubCode = tempSettings.player1.clubCode;
-        gameState.player1.country = tempSettings.player1.country;
-        gameState.player1.flag = tempSettings.player1.flag;
-        gameState.player2.name = tempSettings.player2.name;
-        gameState.player2.clubCode = tempSettings.player2.clubCode;
-        gameState.player2.country = tempSettings.player2.country;
-        gameState.player2.flag = tempSettings.player2.flag;
-
-        // Set player weights from match category
-        gameState.player1.weight = gameState.category;
-        gameState.player2.weight = gameState.category;
-
-        // If gender changed, reset timer to default for that gender
-        if (gameState.gender === 'male') {
-            gameState.time = 240;
-            gameState.initialDuration = 240;
-        } else if (gameState.gender === 'female') {
-            gameState.time = 180;
-            gameState.initialDuration = 180;
-        }
-
-        // Reset states
-        gameState.isRunning = false;
-        gameState.isMedicMode = false;
-        gameState.isBreakMode = false;
-        gameState.isJazo = false;
-        gameState.savedGameTime = null;
-        gameState.timerPlayer = null;
-    }
-
-    // Only persist manualMatchId when NOT in Event Host context
-    // AND this item will become the active (ON GILAM) item.
-    // When items are queued behind an active bout, don't overwrite the active match ID.
-    if (!currentMatchId.value && willBecomeActive) {
-        manualMatchId.value = (tempSettings.matchId || '').toString().trim();
-        persistManualMatchId();
-    }
-
-    // Always push to manual queue — Event Host connection does not affect queue insertion
     const newItem: ManualQueueItem = {
         id: `manual_${Date.now()}_${manualQueueCounter++}`,
         matchId: tempSettings.matchId,
@@ -1745,13 +1699,7 @@ async function applyMatchSettings() {
     manualQueue.value.push(newItem);
     persistManualQueue();
 
-    // First item becomes active automatically
-    if (!activeManualItemId.value) {
-        activeManualItemId.value = newItem.id;
-        persistActiveManualItemId();
-    }
-
-    // Auto-publish if manual source is active
+    // Publish to Gilam — items labeled "On Hold" while Event Host owns
     evaluateSourceAndPublish();
 
     // Kick off broadcasting without blocking the UI.
@@ -1834,9 +1782,15 @@ function publishManualQueueToGilam() {
         };
     }
 
-    // Index 0 => ON GILAM (strict FIFO)
+    // Index 0 => ON GILAM when Manual Queue owns controller, ON HOLD otherwise
     if (manualQueue.value.length > 0) {
-        projectionItems.push(buildProjection(manualQueue.value[0], 'On Gilam', 'ON_MAT', 0));
+        const isHeld = activeQueueSource.value !== 'manual';
+        projectionItems.push(buildProjection(
+            manualQueue.value[0],
+            isHeld ? 'On Hold' : 'On Gilam',
+            isHeld ? 'ON_HOLD' : 'ON_MAT',
+            0,
+        ));
     }
 
     // Index 1+ => NEXT, Queue 1, Queue 2, etc.
@@ -1896,7 +1850,20 @@ function pushManualItemToGilam(id: string) {
     manualOverrideItemId.value = id;
     persistManualOverrideItemId();
 
-    // Operator explicitly pushed a manual item — claim controller ownership
+    // Operator explicitly activated a manual item — claim controller ownership.
+    // Snapshot Event Host state before switching so it can be restored when the
+    // manual queue is exhausted (handleSubmitResult / clearManualQueue).
+    if (activeQueueSource.value === 'event-host') {
+        eventHostPreManualSnapshot.value = {
+            matchId: currentMatchId.value,
+            ringNumber: currentMatchRingNumber.value,
+            rollbackSequence: currentLoadedRollbackSequence.value,
+        };
+        currentMatchId.value = null;
+        currentMatchRingNumber.value = null;
+        currentLoadedRollbackSequence.value = null;
+    }
+
     setActiveQueueSource('manual');
 
     // Active pointer always tracks index 0
@@ -2078,6 +2045,18 @@ function removeManualQueueItem(id: string) {
     evaluateSourceAndPublish();
 }
 
+// Restore Event Host match position from the snapshot saved when Manual Queue
+// took over. Returns true if a snapshot existed and was restored.
+function restoreEventHostFromSnapshot(): boolean {
+    if (!eventHostPreManualSnapshot.value) return false;
+    const snapshot = eventHostPreManualSnapshot.value;
+    currentMatchId.value = snapshot.matchId;
+    currentMatchRingNumber.value = snapshot.ringNumber;
+    currentLoadedRollbackSequence.value = snapshot.rollbackSequence;
+    eventHostPreManualSnapshot.value = null;
+    return true;
+}
+
 function clearManualQueue() {
     manualQueue.value = [];
     activeManualItemId.value = null;
@@ -2086,30 +2065,47 @@ function clearManualQueue() {
     persistManualQueue();
     persistActiveManualItemId();
     persistManualOverrideItemId();
-    evaluateSourceAndPublish();
-
-    // Also broadcast cleared state to the scoreboard
-    void broadcastAll().catch((e) => {
-        console.error('Broadcast failed during clear manual queue:', e);
-    });
 
     // Restore Event Host state from snapshot so the controller resumes
     // from its previous position instead of scanning from index 0.
-    if (eventHostPreManualSnapshot.value) {
-        const snapshot = eventHostPreManualSnapshot.value;
-        currentMatchId.value = snapshot.matchId;
-        currentMatchRingNumber.value = snapshot.ringNumber;
-        currentLoadedRollbackSequence.value = snapshot.rollbackSequence;
-        eventHostPreManualSnapshot.value = null;
+    const restored = restoreEventHostFromSnapshot();
+
+    // If no snapshot exists (queue was staged but never activated),
+    // clear stale match state so auto-load can fetch a fresh Event Host match.
+    if (!restored) {
+        currentMatchId.value = null;
+        currentMatchRingNumber.value = null;
+        currentLoadedRollbackSequence.value = null;
     }
-    // Transition back to Event Host and trigger auto-load
+
+    // Transition back to Event Host and publish cleared Gilam state
     setActiveQueueSource('event-host');
-    if (selectedTournamentId.value && currentMatchRingNumber.value) {
-        void maybeAutoLoadAssignedMatch(
-            selectedTournamentId.value,
-            currentMatchRingNumber.value,
-        );
+    evaluateSourceAndPublish();
+
+    // Trigger auto-load of Event Host match; broadcastAll runs after load completes
+    // so the scoreboard receives the correct Event Host data.
+    // Use force:true because restoreEventHostFromSnapshot() sets currentMatchId
+    // but does NOT reload gameState — we need loadMatch() to actually run.
+    if (selectedTournamentId.value) {
+        const ring = currentMatchRingNumber.value || selectedRing.value || '';
+        if (ring) {
+            void maybeAutoLoadAssignedMatch(
+                selectedTournamentId.value,
+                ring,
+                { force: true },
+            ).then(() => {
+                void broadcastAll().catch((e) => {
+                    console.error('Broadcast failed after clear manual queue auto-load:', e);
+                });
+            });
+            return;
+        }
     }
+
+    // Fallback: no auto-load possible, broadcast current state
+    void broadcastAll().catch((e) => {
+        console.error('Broadcast failed during clear manual queue:', e);
+    });
 }
 
 async function handleJazoToggle() {
@@ -5409,6 +5405,25 @@ watch(normalizedControllerAdminBase, (nextHost, previousHost) => {
     }
 });
 
+// Reset Manual Queue ownership indicators when pairing transitions to 'unpaired'
+// (e.g. Forget Pairing, token_invalid, device_mismatch). This ensures the Manual
+// Queue badge and override indicator reflect the correct ownership state.
+watch(
+    pairingState,
+    (newState, previousState) => {
+        if (newState === 'unpaired' && previousState !== 'unpaired') {
+            if (manualOverrideItemId.value) {
+                manualOverrideItemId.value = null;
+                persistManualOverrideItemId();
+            }
+            if (activeQueueSource.value === 'manual') {
+                setActiveQueueSource('event-host');
+            }
+            evaluateSourceAndPublish();
+        }
+    },
+);
+
 watch(liveSnapshotContextKey, (nextContextKey, previousContextKey) => {
     if (nextContextKey === previousContextKey) return;
     resetLiveSnapshotBaselines();
@@ -5565,9 +5580,9 @@ watch(
             return;
         }
 
-        // While Manual Queue owns the controller, republish manual queue data
-        // under the new ring key instead of blocking all updates.
-        if (isManualSource()) {
+        // While Manual Queue owns the controller (or items are staged),
+        // republish manual queue data instead of Event Host projection.
+        if (isManualSource() || manualQueue.value.length > 0) {
             evaluateSourceAndPublish();
             return;
         }
@@ -5598,9 +5613,9 @@ watch(
     ],
     () => {
         stopRingMatchOrderProjectionPoller();
-        // While Manual Queue owns the controller, republish manual queue data
-        // under the new ring key instead of blocking all updates.
-        if (isManualSource()) {
+        // While Manual Queue owns the controller (or items are staged),
+        // republish manual queue data instead of Event Host projection.
+        if (isManualSource() || manualQueue.value.length > 0) {
             evaluateSourceAndPublish();
             return;
         }
@@ -7014,6 +7029,9 @@ async function loadMatch(m: any): Promise<boolean> {
     currentMatchId.value = getRemoteMatchId(m);
     // Event Host match loaded — claim controller ownership
     setActiveQueueSource('event-host');
+    // Clear stale Manual Queue snapshot — the operator is explicitly loading
+    // a new Event Host match, so the previous snapshot is no longer valid.
+    eventHostPreManualSnapshot.value = null;
     currentMatchRingNumber.value =
         firstNonEmptyString(
             m?.ring_number,
@@ -7118,6 +7136,14 @@ onMounted(() => {
     activeManualItemId.value = loadActiveManualItemId();
     manualOverrideItemId.value = loadManualOverrideItemId();
     completedManualItemIds.value = loadCompletedManualItemIds();
+    // Restore queue ownership with consistency guard — if the queue was
+    // emptied before close, default to Event Host regardless of saved state.
+    const restoredSource = loadActiveQueueSource();
+    if (restoredSource === 'manual' && manualQueue.value.length === 0) {
+        activeQueueSource.value = 'event-host';
+    } else {
+        activeQueueSource.value = restoredSource;
+    }
     nextTick(() => evaluateSourceAndPublish());
 
     try {
@@ -8169,6 +8195,19 @@ async function handleSubmitResult() {
 
         clearIntervalIfAny();
         gameState.isRunning = false;
+        // If the Manual Queue is exhausted, restore Event Host from snapshot
+        // before falling through to confirmResetAll(). This ensures the
+        // controller resumes from the saved position instead of index 0.
+        if (submissionSource === 'manual' && manualQueue.value.length === 0) {
+            restoreEventHostFromSnapshot();
+            setActiveQueueSource('event-host');
+            if (selectedTournamentId.value && currentMatchRingNumber.value) {
+                void maybeAutoLoadAssignedMatch(
+                    selectedTournamentId.value,
+                    currentMatchRingNumber.value,
+                );
+            }
+        }
         // If the standalone block already advanced the manual queue, do NOT call
         // confirmResetAll() — it would wipe the next bout that was just loaded.
         // Instead, just broadcast the already-correct state.
