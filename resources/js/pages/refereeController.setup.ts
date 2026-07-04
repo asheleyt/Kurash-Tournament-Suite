@@ -1630,11 +1630,39 @@ async function confirmResetAll() {
     showLegacyFinishBanner.value = false;
 
     if (isManualSource()) {
-        // Reset clears scoreboard state only — does NOT complete or advance the queue.
-        // The current manual bout remains active at its current queue position.
+        // Nuclear reset: clear both scoreboard AND queue, restore Event Host if available
+        manualQueue.value = [];
+        activeManualItemId.value = null;
+        manualOverrideItemId.value = null;
+        clearCompletedManualItemIds();
+        persistManualQueue();
+        persistActiveManualItemId();
+        persistManualOverrideItemId();
         manualMatchId.value = '';
         persistManualMatchId();
+
+        // Restore Event Host state from snapshot
+        const restored = restoreEventHostFromSnapshot();
+        if (!restored) {
+            currentMatchId.value = null;
+            currentMatchRingNumber.value = null;
+            currentLoadedRollbackSequence.value = null;
+        }
+        setActiveQueueSource('event-host');
         syncTempSettings();
+        evaluateSourceAndPublish();
+
+        // Attempt auto-load of Event Host match if available
+        if (selectedTournamentId.value && currentMatchRingNumber.value) {
+            void maybeAutoLoadAssignedMatch(
+                selectedTournamentId.value,
+                currentMatchRingNumber.value,
+                { force: true },
+            ).then(() => {
+                void broadcastAll().catch(() => {});
+            });
+            return;
+        }
     } else {
         // Event Host reset — only affect Event Host state
         currentMatchId.value = null;
@@ -2058,6 +2086,10 @@ function restoreEventHostFromSnapshot(): boolean {
 }
 
 function clearManualQueue() {
+    // Clear scoreboard first so stale manual match data is not visible
+    resetLiveBoutState();
+    clearResultSubmitGateState();
+
     manualQueue.value = [];
     activeManualItemId.value = null;
     manualOverrideItemId.value = null;
@@ -3418,6 +3450,7 @@ const {
     getRemoteMatchId,
     getEffectiveStatus,
     isMatchIdEqual,
+    isManualSource,
     persistSelectedRing,
     showBanner,
     getSyncFallbackReasonLabel: () => syncFallbackReasonLabel.value,

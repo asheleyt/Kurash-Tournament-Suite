@@ -124,6 +124,7 @@ interface UseRefereeQueueSyncOptions {
   getRemoteMatchId: (match: any) => number | string | null
   getEffectiveStatus: (match: any) => string
   isMatchIdEqual: (match: any, id: number | string | null) => boolean
+  isManualSource?: () => boolean
   persistSelectedRing: () => void
   showBanner: (message: string, type?: BannerType, timeout?: number) => void
   getSyncFallbackReasonLabel: () => string
@@ -420,6 +421,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
   ) {
     const allowCompletedOverrideRemoval =
       reconcileOptions.sourceMode === 'queue_api' && !reconcileOptions.isDegraded
+      && !options.isManualSource?.()
 
     options.localResultOverrides.value = reconcileLocalStatusOverridesInMemory({
       overrides: options.localResultOverrides.value,

@@ -371,6 +371,17 @@ export function useRefereeRingMatchOrderSync(options: UseRefereeRingMatchOrderSy
         shouldLogPerfSummary = false
         return
       }
+      // Discard stale responses that arrived after source switched away from Event Host
+      if (!isEventHostProjectionActive()) {
+        logRingPerfSummary({
+          fetchDurationMs: nowPerfMs() - fetchStartedAt,
+          applyDurationMs: 0,
+          storage: 'skip',
+          broadcast: 'skip',
+          skip: 'not_live',
+        })
+        return
+      }
       void options.onAuthoritativeQueuePayload?.(payload, 'display_batch')
 
       const applyStartedAt = nowPerfMs()
