@@ -23,7 +23,7 @@ import {
     type RingMatchOrderProjectionRecord,
 } from '@/composables/useRingMatchOrderProjection';
 
-type BannerType = 'success' | 'error' | 'info';
+type BannerType = 'success' | 'error' | 'info' | 'warning';
 
 type ShowBanner = (
     message: string,

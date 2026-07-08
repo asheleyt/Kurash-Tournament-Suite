@@ -1,0 +1,71 @@
+---
+name: UI-Trustworthiness-WorkPackage-Medium
+version: 1.0
+status: Approved
+priority: Medium
+---
+
+# Work Package — Medium Priority
+
+## Objective
+
+Complete the remaining UI Trust improvements by improving degraded-state messaging and warning consistency.
+
+---
+
+# Task 1 — User-Friendly Degraded State Tooltips
+
+## Goal
+
+Replace internal `queueDegradedReason` values with operator-friendly tooltips.
+
+### Requirements
+
+- Do not expose internal reason codes.
+- Explain the operator impact in plain language.
+- Provide the next action only when necessary.
+- Keep tooltips brief and helpful.
+- Do not repeat information already visible in the UI.
+- Preserve raw reason codes for logs or diagnostics only.
+
+---
+
+# Task 2 — Display Management Warning Standardization
+
+## Goal
+
+Apply the established Warning standard to `useRefereeDisplayManagement.ts`.
+
+### Requirements
+
+Ensure warning messages use the existing UI Trust standards:
+
+- Warning tone
+- Amber styling
+- Warning icon
+- Standard timeout
+- Consistent wording
+
+Do not introduce new warning behaviors or severity levels.
+
+---
+
+# Validation
+
+Before closing this work package:
+
+- Run the full 57-test regression suite.
+- Add E2E tests only if tooltip or warning behavior changes.
+- Verify no raw degradation codes are visible to referees.
+- Verify warning styling is consistent with the rest of the application.
+
+---
+
+# Success Criteria
+
+This work package is complete when:
+
+- Every degraded-state tooltip is written for operators.
+- No internal degradation codes are exposed in the UI.
+- Display Management follows the same warning standards as the rest of the application.
+- All regression tests pass with no new issues introduced.

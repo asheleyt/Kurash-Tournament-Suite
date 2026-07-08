@@ -1,0 +1,13 @@
+# Test artifacts — regenerated on each run
+test-results/
+reports/html/
+reports/json/
+reports/junit/
+reports/screenshots/
+reports/traces/
+reports/videos/
+node_modules/
+
+# Keep structure and summary
+!reports/summary.md
+!.gitkeep

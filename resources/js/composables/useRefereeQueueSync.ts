@@ -23,7 +23,7 @@ import {
 } from '@/composables/refereeQueueStorage'
 import type { RingQueueSource } from '@/composables/useRingDisplayQueue'
 
-type BannerType = 'success' | 'error' | 'info'
+type BannerType = 'success' | 'error' | 'info' | 'warning'
 type ReadRef<T> = Readonly<Ref<T>>
 type QueuePerfSkipReason = 'none' | 'unchanged_fingerprint' | 'offline' | 'legacy_fallback' | 'error'
 
@@ -863,12 +863,12 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
 
     options.isDbSyncing.value = true
     try {
-      options.showBanner('Saving match list to local DB...', 'info', 3000)
+      options.showBanner('Saving match list...', 'info', 3000)
       await syncTournamentRemote(id)
       options.dbSyncedTournaments.value = { ...options.dbSyncedTournaments.value, [id]: true }
-      options.showBanner('Saved match list to kurash_db', 'success', 2200)
+      options.showBanner('Match list saved successfully.', 'success', 2200)
     } catch (error: any) {
-      options.showBanner(error?.message || 'Failed to save match list to local DB.', 'error', 6500)
+      options.showBanner('Failed to save match list. Please check the Event Host connection.', 'error', 6500)
     } finally {
       options.isDbSyncing.value = false
       const queued = queuedDbSyncTournamentId
@@ -909,7 +909,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
         const fallbackRes = await fetch(fallbackUrl.toString(), { headers: options.headers() })
         const fallbackBody = await fallbackRes.text()
         if (!fallbackRes.ok) {
-          options.reportFetchFailure('Ring queue', fallbackUrl.toString(), fallbackRes.status, fallbackBody, { notify: true })
+          options.reportFetchFailure('Gilam queue', fallbackUrl.toString(), fallbackRes.status, fallbackBody, { notify: true })
           throw new Error(
             `Queue failed: ${fallbackRes.status}. ${options.safeApiErrorMessage(fallbackRes.status, fallbackBody)}`,
           )
@@ -933,7 +933,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
         return fallbackJson
       }
 
-      const contextLabel = useControllerAssignment ? 'Controller assigned queue' : 'Ring queue'
+      const contextLabel = useControllerAssignment ? 'Controller assigned queue' : 'Gilam queue'
       options.reportFetchFailure(contextLabel, url.toString(), res.status, body, { notify: true })
       const error = new Error(`Queue failed: ${res.status}. ${options.safeApiErrorMessage(res.status, body)}`) as Error & {
         controllerAssignmentBlocked?: boolean
@@ -1196,11 +1196,6 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
         } else {
           nextOnline = await options.heartbeatKnownDeviceSession()
         }
-      }
-
-      if (!nextOnline && options.syncHasServer.value) {
-        const data = await heartbeat()
-        nextOnline = data?.status === 'ok'
       }
 
       options.isOnline.value = nextOnline
@@ -1774,7 +1769,7 @@ export function useRefereeQueueSync(options: UseRefereeQueueSyncOptions) {
       queuePerfSummary.storage = 'skip'
       console.error('GET scoreboard-data failed', error)
       const message = error instanceof Error ? error.message : 'Failed to load matches for this ring'
-      options.showBanner(`Sync: ${message}.`, 'error', 6500)
+      options.showBanner('Failed to sync the match list. Please check the Event Host connection.', 'error', 6500)
       try {
         const cached = readQueueCacheFromStorage(options.getStorage(), selectionSnapshotScopeKey())
         if (cached) {

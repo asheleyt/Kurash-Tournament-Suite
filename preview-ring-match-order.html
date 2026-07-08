@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GILAM 1 — Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ══════════════════════════════════════════════════════════
+       DESIGN TOKENS
+       ══════════════════════════════════════════════════════════ */
+    :root {
+      /* ── Status Color Tokens ── */
+      --green-accent: #21FF88;
+      --green-dark: #0D7A4A;
+      --green-mid: #17C964;
+      --amber-accent: #F5A623;
+      --amber-dark: #B96A00;
+      --magenta-accent: #E91E8C;
+      --magenta-dark: #7E0F48;
+
+      /* ── Center Card Tokens ── */
+      --card-active-bg: rgba(13, 40, 32, 0.92);
+      --card-active-border: rgba(33, 255, 136, 0.5);
+      --card-next-bg: rgba(40, 30, 10, 0.92);
+      --card-next-border: rgba(245, 166, 35, 0.5);
+      --card-queue-bg: rgba(40, 12, 30, 0.92);
+      --card-queue-border: rgba(233, 30, 140, 0.4);
+
+      /* ── Row Border Tokens ── */
+      --row-active-border: rgba(33, 255, 136, 0.45);
+      --row-active-glow: 0 0 12px rgba(33, 255, 136, 0.12);
+      --row-next-border: rgba(245, 166, 35, 0.45);
+      --row-queue-border: rgba(100, 30, 60, 0.25);
+
+      /* ── Side Panel Tokens ── */
+      --panel-left-top: #0C2A22;
+      --panel-left-mid: #113830;
+      --panel-left-bot: #0E3028;
+      --panel-right-top: #0F1E3A;
+      --panel-right-mid: #142649;
+      --panel-right-bot: #111F40;
+
+      /* ── Edge Accent Tokens ── */
+      --edge-left-color: #21FF88;
+      --edge-right-color: #3F8CFF;
+      --edge-width: 5px;
+
+      /* ── Center Card Sizing ── */
+      --center-card-width: 130px;
+      --center-card-radius: 10px;
+
+      /* ── Typography Tokens ── */
+      --text-weight-size: 24px;
+      --text-round-size: 10px;
+      --text-status-size: 8px;
+      --text-player-size: 32px;
+
+      /* ── Spacing Tokens ── */
+      --player-flag-gap: 10px;
+      --player-country-gap: 16px;
+      --card-gap: 8px;
+
+      /* ── Page ── */
+      --page-bg: linear-gradient(180deg, #0B1221 0%, #0D1526 50%, #0B1221 100%);
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--page-bg);
+      color: #fff;
+      font-family: 'Montserrat', system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.5rem;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       HEADER
+       ══════════════════════════════════════════════════════════ */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 0.4rem 0 0.2rem;
+    }
+
+    .title {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      font-size: clamp(2rem, 4vh, 3.2rem);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.35em;
+      color: #fff;
+      text-shadow: 0 18px 45px rgba(2, 6, 23, 0.64);
+    }
+
+    .live-pill {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid rgba(34, 197, 94, 0.58);
+      border-radius: 9999px;
+      background: rgba(34, 197, 94, 0.92);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.25);
+    }
+
+    .live-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 0 12px rgba(34,197,94,0.5);
+      animation: pulse 1500ms ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.78); }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       BOARD
+       ══════════════════════════════════════════════════════════ */
+    .board {
+      display: flex;
+      flex-direction: column;
+      gap: var(--card-gap);
+      position: relative;
+      padding-top: 1px;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       ROW — 3-column grid: player | center card | player
+       ══════════════════════════════════════════════════════════ */
+    .row {
+      display: grid;
+      grid-template-columns: 1fr var(--center-card-width) 1fr;
+      align-items: stretch;
+      min-height: 118px;
+      border-radius: 1.4rem;
+      border: 1.5px solid rgba(255,255,255,0.04);
+      position: relative;
+      z-index: 2;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(10, 16, 30, 0.98), rgba(8, 12, 24, 0.98));
+    }
+
+    /* ── Edge accents — always visible, on every row ── */
+    .row::before,
+    .row::after {
+      content: '';
+      position: absolute;
+      top: 16px;
+      bottom: 16px;
+      width: var(--edge-width);
+      border-radius: 3px;
+      z-index: 20;
+    }
+
+    .row::before {
+      left: 0;
+      background: var(--edge-left-color);
+      box-shadow: 0 0 6px rgba(33, 255, 136, 0.35);
+    }
+
+    .row::after {
+      right: 0;
+      background: var(--edge-right-color);
+      box-shadow: 0 0 6px rgba(63, 140, 255, 0.35);
+    }
+
+    /* ── Row states ── */
+    .row--on-gilam {
+      border: 1.5px solid var(--row-active-border);
+      box-shadow: var(--row-active-glow);
+    }
+
+    .row--next {
+      border: 1.5px solid var(--row-next-border);
+      box-shadow: none;
+    }
+
+    .row--queue {
+      border: 1px solid var(--row-queue-border);
+      box-shadow: none;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SIDE PANELS — matte finish, primary visual focus
+       ══════════════════════════════════════════════════════════ */
+    .side {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      padding: 0.4rem 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .side--left {
+      justify-content: flex-end;
+      background: linear-gradient(135deg, var(--panel-left-top) 0%, var(--panel-left-mid) 50%, var(--panel-left-bot) 100%);
+    }
+
+    .side--right {
+      justify-content: flex-start;
+      background: linear-gradient(225deg, var(--panel-right-top) 0%, var(--panel-right-mid) 50%, var(--panel-right-bot) 100%);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       FLAG STACK
+       ══════════════════════════════════════════════════════════ */
+    .flag-stack {
+      display: flex;
+      align-items: center;
+      gap: var(--player-flag-gap);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .side--left .flag-stack  { margin-right: var(--player-country-gap); }
+    .side--right .flag-stack { margin-left: var(--player-country-gap); }
+
+    .flag-box {
+      width: clamp(3.4rem, 4.5vw, 4.8rem);
+      height: clamp(3rem, 3.8vw, 4rem);
+      border-radius: 0.7rem;
+      border: 1px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.84);
+    }
+
+    .flag-box--green { border-color: rgba(6, 78, 59, 0.72); }
+    .flag-box--blue  { border-color: rgba(30, 64, 175, 0.72); }
+
+    .flag-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 0.2rem;
+    }
+
+    .code-chip {
+      min-width: 1.8rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      border: 1px solid;
+      text-align: center;
+      font-size: 0.55rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      line-height: 1;
+      text-transform: uppercase;
+      background: rgba(15, 23, 42, 0.6);
+      color: #cbd5e1;
+      position: relative;
+      z-index: 1;
+    }
+
+    .code-chip--green { border-color: rgba(6, 78, 59, 0.72); }
+    .code-chip--blue  { border-color: rgba(30, 64, 175, 0.72); }
+
+    /* ══════════════════════════════════════════════════════════
+       PLAYER NAME
+       ══════════════════════════════════════════════════════════ */
+    .name {
+      font-family: 'Teko', system-ui, sans-serif;
+      font-size: var(--text-player-size);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #fff;
+      white-space: nowrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .side--left .name  { text-align: right; }
+    .side--right .name { text-align: left; }
+
+    /* ══════════════════════════════════════════════════════════
+       CENTER STATUS CARD — compact broadcast-style info card
+       ══════════════════════════════════════════════════════════ */
+    .center-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      width: var(--center-card-width);
+      padding: 10px 8px 12px;
+      border-radius: var(--center-card-radius);
+      border: 1.5px solid;
+      text-align: center;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    }
+
+    /* ── Card states ── */
+    .center-card--active {
+      background: linear-gradient(180deg, var(--card-active-bg), rgba(8, 30, 20, 0.95));
+      border-color: var(--card-active-border);
+    }
+
+    .center-card--next {
+      background: linear-gradient(180deg, var(--card-next-bg), rgba(30, 20, 5, 0.95));
+      border-color: var(--card-next-border);
+    }
+
+    .center-card--queue {
+      background: linear-gradient(180deg, var(--card-queue-bg), rgba(30, 8, 22, 0.95));
+      border-color: var(--card-queue-border);
+    }
+
+    /* ── Card typography ── */
+    .center-card-weight {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      font-size: var(--text-weight-size);
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: #fff;
+      line-height: 1.1;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .center-card-round {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      font-size: var(--text-round-size);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      line-height: 1.3;
+    }
+
+    /* Round text colors match status */
+    .center-card--active .center-card-round { color: var(--green-accent); }
+    .center-card--next .center-card-round   { color: var(--amber-accent); }
+    .center-card--queue .center-card-round  { color: var(--magenta-accent); }
+
+    /* ── Status pill inside card ── */
+    .center-card-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 4px;
+      min-width: 92%;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 9999px;
+      font-family: 'Montserrat', system-ui, sans-serif;
+      font-size: var(--text-status-size);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      line-height: 1;
+      color: #fff;
+    }
+
+    .center-card-status--active {
+      background: var(--green-mid);
+      box-shadow: 0 0 8px rgba(33, 255, 136, 0.3);
+    }
+
+    .center-card-status--next {
+      background: var(--amber-accent);
+      box-shadow: 0 0 8px rgba(245, 166, 35, 0.3);
+    }
+
+    .center-card-status--queue {
+      background: var(--magenta-accent);
+      box-shadow: 0 0 8px rgba(233, 30, 140, 0.3);
+    }
+
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════════ */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem 0 0.2rem;
+    }
+
+    .footer-text {
+      font-family: 'Montserrat', system-ui, sans-serif;
+      font-size: 0.55rem;
+      font-weight: 500;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.18);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESPONSIVE
+       ══════════════════════════════════════════════════════════ */
+    @media (max-height: 900px) {
+      :root {
+        --center-card-width: 110px;
+        --center-card-radius: 8px;
+        --text-weight-size: 20px;
+        --text-round-size: 8px;
+        --text-status-size: 7px;
+        --text-player-size: 26px;
+        --card-gap: 5px;
+      }
+
+      .row { min-height: 96px; }
+      .title { font-size: clamp(1.4rem, 3vh, 2.2rem); letter-spacing: 0.2em; }
+      .flag-box { width: clamp(2.8rem, 3.5vw, 3.5rem); height: clamp(2.4rem, 3vw, 3rem); }
+      .center-card-status { font-size: 7px; height: 16px; }
+      .center-card { padding: 8px 6px 10px; }
+    }
+
+    @media (max-width: 1280px) {
+      :root {
+        --center-card-width: 118px;
+        --text-player-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="title">GILAM 1</h1>
+      <span class="live-pill">
+        <span class="live-dot"></span>
+        LIVE
+      </span>
+    </header>
+
+    <!-- Board -->
+    <main class="board">
+
+      <!-- Row 1: ON GILAM -->
+      <div class="row row--on-gilam">
+        <div class="side side--left">
+          <div class="flag-stack">
+            <div class="flag-box flag-box--green">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+            <span class="code-chip code-chip--green">PHI</span>
+          </div>
+          <span class="name">AL LLAMAS</span>
+        </div>
+
+        <div class="center-card center-card--active">
+          <span class="center-card-weight">-55 KG</span>
+          <span class="center-card-round">1/8 FINAL</span>
+          <span class="center-card-status center-card-status--active">
+            <span class="status-dot"></span>
+            ON GILAM
+          </span>
+        </div>
+
+        <div class="side side--right">
+          <span class="name">NICK LIGERO</span>
+          <div class="flag-stack">
+            <span class="code-chip code-chip--blue">PHI</span>
+            <div class="flag-box flag-box--blue">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: NEXT -->
+      <div class="row row--next">
+        <div class="side side--left">
+          <div class="flag-stack">
+            <div class="flag-box flag-box--green">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+            <span class="code-chip code-chip--green">PHI</span>
+          </div>
+          <span class="name">JACK ESCARPE</span>
+        </div>
+
+        <div class="center-card center-card--next">
+          <span class="center-card-weight">-55 KG</span>
+          <span class="center-card-round">1/8 FINAL</span>
+          <span class="center-card-status center-card-status--next">
+            <span class="status-dot"></span>
+            NEXT
+          </span>
+        </div>
+
+        <div class="side side--right">
+          <span class="name">RYAN BENAVIDEZ</span>
+          <div class="flag-stack">
+            <span class="code-chip code-chip--blue">PHI</span>
+            <div class="flag-box flag-box--blue">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: QUEUE 1 -->
+      <div class="row row--queue">
+        <div class="side side--left">
+          <div class="flag-stack">
+            <div class="flag-box flag-box--green">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+            <span class="code-chip code-chip--green">PHI</span>
+          </div>
+          <span class="name">RYAN DONOR</span>
+        </div>
+
+        <div class="center-card center-card--queue">
+          <span class="center-card-weight">-55 KG</span>
+          <span class="center-card-round">1/8 FINAL</span>
+          <span class="center-card-status center-card-status--queue">
+            <span class="status-dot"></span>
+            QUEUE 1
+          </span>
+        </div>
+
+        <div class="side side--right">
+          <span class="name">RENZO CAZEÑAS</span>
+          <div class="flag-stack">
+            <span class="code-chip code-chip--blue">PHI</span>
+            <div class="flag-box flag-box--blue">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: QUEUE 2 -->
+      <div class="row row--queue">
+        <div class="side side--left">
+          <div class="flag-stack">
+            <div class="flag-box flag-box--green">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+            <span class="code-chip code-chip--green">PHI</span>
+          </div>
+          <span class="name">CZAR BAYAS</span>
+        </div>
+
+        <div class="center-card center-card--queue">
+          <span class="center-card-weight">-55 KG</span>
+          <span class="center-card-round">1/8 FINAL</span>
+          <span class="center-card-status center-card-status--queue">
+            <span class="status-dot"></span>
+            QUEUE 2
+          </span>
+        </div>
+
+        <div class="side side--right">
+          <span class="name">NIKO ONG</span>
+          <div class="flag-stack">
+            <span class="code-chip code-chip--blue">PHI</span>
+            <div class="flag-box flag-box--blue">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 5: QUEUE 3 -->
+      <div class="row row--queue">
+        <div class="side side--left">
+          <div class="flag-stack">
+            <div class="flag-box flag-box--green">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+            <span class="code-chip code-chip--green">PHI</span>
+          </div>
+          <span class="name">CHARMEA QUELLINO</span>
+        </div>
+
+        <div class="center-card center-card--queue">
+          <span class="center-card-weight">-55 KG</span>
+          <span class="center-card-round">1/8 FINAL</span>
+          <span class="center-card-status center-card-status--queue">
+            <span class="status-dot"></span>
+            QUEUE 3
+          </span>
+        </div>
+
+        <div class="side side--right">
+          <span class="name">MYRINA LADJAHASAN</span>
+          <div class="flag-stack">
+            <span class="code-chip code-chip--blue">PHI</span>
+            <div class="flag-box flag-box--blue">
+              <img class="flag-img" src="https://flagcdn.com/w320/ph.png" alt="PHI flag">
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-text">KURASH TOURNAMENT SUITE</span>
+    </footer>
+  </div>
+</body>
+</html>

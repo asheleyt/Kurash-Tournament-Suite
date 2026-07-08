@@ -193,7 +193,7 @@ export function useRefereeControllerSyncPanels(
                 toneClass = 'border-blue-400/30 bg-blue-500/10 text-blue-200';
             else if (contentType === 'ring_display')
                 toneClass =
-                    'border-yellow-400/30 bg-yellow-500/10 text-yellow-100';
+                    'border-amber-400/30 bg-amber-500/10 text-amber-100';
 
             return {
                 key: slot,
@@ -272,7 +272,7 @@ export function useRefereeControllerSyncPanels(
     );
     const liveRecoveryBannerMessage = computed(() =>
         snapshotMode.value === 'recovering'
-            ? 'The controller is exiting fallback and refreshing the current Event Host live queue for this gilam.'
+            ? 'The controller is exiting fallback and refreshing the current Event Host live queue for this Gilam.'
             : 'The Event Host is reachable and this controller has an assignment. Exit fallback to restore the live queue snapshot now.',
     );
     const syncRecoveryActionLabel = computed(() => {
@@ -321,23 +321,27 @@ export function useRefereeControllerSyncPanels(
     const syncFallbackReasonLabel = computed(() => {
         switch ((options.queueDegradedReason.value || '').toString()) {
             case 'local_cache':
-                return 'Using the last saved Event Host queue snapshot on this controller.';
+                return 'Using saved match data. Live updates will resume shortly.';
             case 'cached_queue':
-                return 'Showing the saved Event Host queue snapshot while live updates catch up.';
+                return 'Using saved match data. Live updates will resume shortly.';
             case 'offline_cache':
-                return 'The Event Host is offline, so the controller is using its saved queue snapshot.';
+                return 'Connection unavailable. Using saved match data.';
             case 'queue_api_unavailable':
-                return 'The live ring queue could not be loaded, so the controller fell back to its local tournament copy.';
+                return 'Could not load live match list. Using saved match data.';
             case 'offline_legacy_adapter':
-                return 'The Event Host is offline, so the controller is showing the local tournament copy.';
+                return 'Connection unavailable. Using saved match data.';
             case 'ring_number_mismatch_filtered':
-                return 'Some queue items were assigned to another gilam and were filtered out for safety.';
+                return 'Some matches belong to a different Gilam and are hidden.';
             case 'fallback':
-                return 'Live updates are temporarily unavailable, so the controller switched to a safer fallback snapshot source.';
+                return 'Live updates temporarily unavailable. Using saved match data.';
+            case 'controller_assignment_unavailable':
+                return 'This controller is not yet assigned to a Gilam.';
+            case 'controller_assigned_queue_failed':
+                return 'Could not load the match list for this Gilam.';
             default:
                 return options.queueIsDegraded.value
-                    ? 'Live snapshots are available with warnings. Review diagnostics if something looks unexpected.'
-                    : 'Live snapshot and fallback behavior are operating normally.';
+                    ? 'Live updates available with warnings. Check the connection if something looks wrong.'
+                    : 'Live updates are operating normally.';
         }
     });
     const currentConnectionWarningLabel = computed(() => {
@@ -465,10 +469,10 @@ export function useRefereeControllerSyncPanels(
             options.queueSourceMode.value === 'cached_queue' ||
             options.queueSourceMode.value === 'offline_cache'
         ) {
-            return 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300';
+            return 'bg-amber-500/20 border-amber-500/40 text-amber-300';
         }
         if (options.queueSourceMode.value === 'legacy_adapter')
-            return 'bg-slate-500/20 border-slate-400/40 text-slate-200';
+            return 'bg-amber-500/20 border-amber-500/40 text-amber-300';
         return 'bg-white/5 border-white/10 text-slate-300';
     });
     const showSyncAttentionNotice = computed(
@@ -570,8 +574,8 @@ export function useRefereeControllerSyncPanels(
                     : 'The Event Host connection is up, but snapshots are using a fallback path.',
                 message: currentConnectionWarningLabel.value,
                 badgeClass:
-                    'border-yellow-400/30 bg-yellow-500/10 text-yellow-100',
-                dotClass: 'bg-yellow-300',
+                    'border-amber-400/30 bg-amber-500/10 text-amber-200',
+                dotClass: 'bg-amber-300',
             };
         }
 

@@ -93,14 +93,14 @@
                     </span>
                   </template>
                   <template v-else>
-                    <span
-                      class="ring-order-shield-badge"
-                      :class="getShieldBadgeClass(card)"
-                    >
-                      <span class="ring-order-shield-label">{{ card.slotLabel }}</span>
-                      <span v-if="card.weightLabel" class="ring-order-shield-weight">{{ card.weightLabel }}</span>
-                    </span>
-                    <span class="ring-order-center-vs">VS</span>
+                    <div class="ring-order-center-card" :class="getCenterCardClass(card)">
+                      <span v-if="card.weightLabel" class="ring-order-center-weight">{{ card.weightLabel }}</span>
+                      <span v-if="card.roundLabel" class="ring-order-center-round">{{ card.roundLabel }}</span>
+                      <span class="ring-order-center-status" :class="getCenterStatusClass(card)">
+                        <span class="ring-order-status-dot"></span>
+                        {{ card.slotLabel }}
+                      </span>
+                    </div>
                   </template>
                 </div>
 
@@ -179,6 +179,7 @@ type BoardCard = {
   slotLabel: string
   summary: string
   weightLabel: string
+  roundLabel: string
   leftName: string
   leftMeta: string
   leftFlagSrc: string
@@ -613,16 +614,21 @@ function getSlotMeta(item: ProjectionCard) {
   )
 }
 
+function getBracketWeightCategory(item: ProjectionCard) {
+  const bracket = item.bracket && typeof item.bracket === 'object' ? item.bracket as Record<string, unknown> : null
+  return bracket ? readText(bracket.weight_category, bracket.weightCategory, bracket.category) : ''
+}
+
 function getDivisionSummary(item: ProjectionCard) {
   const values = compactUnique([
     readText(item.age_category, item.ageCategory, item.age),
-    readText(item.weight_category, item.weightCategory, item.category),
+    readText(item.weight_category, item.weightCategory, item.category) || getBracketWeightCategory(item),
   ])
   return values.join(' / ')
 }
 
 function getWeightLabel(item: ProjectionCard): string {
-  return readText(item.weight_category, item.weightCategory, item.category) || ''
+  return readText(item.weight_category, item.weightCategory, item.category) || getBracketWeightCategory(item) || ''
 }
 
 function getBoardSummary(item: ProjectionCard) {
@@ -649,6 +655,7 @@ function buildMatchCard(item: ProjectionCard, index: number): BoardCard {
     slotLabel: getPublicSlotLabel(item, index),
     summary: getBoardSummary(item),
     weightLabel: getWeightLabel(item),
+    roundLabel: getSlotMeta(item),
     leftName: left.name,
     leftMeta: left.meta,
     leftFlagSrc: left.flagSrc,
@@ -681,6 +688,7 @@ function buildPlaceholderCard(index: number): BoardCard {
     slotLabel: defaultSlotLabel(index),
     summary: '',
     weightLabel: '',
+    roundLabel: '',
     leftName: text,
     leftMeta: '',
     leftFlagSrc: '',
@@ -909,16 +917,16 @@ function getCardShellClass(card: BoardCard) {
   return 'ring-order-card--queued'
 }
 
-function getShieldBadgeClass(card: BoardCard) {
-  if (isOnMatCard(card)) {
-    return 'ring-order-shield-badge--active'
-  }
+function getCenterCardClass(card: BoardCard) {
+  if (isOnMatCard(card)) return 'ring-order-center-card--active'
+  if (isNextCard(card)) return 'ring-order-center-card--next'
+  return 'ring-order-center-card--queue'
+}
 
-  if (isNextCard(card)) {
-    return 'ring-order-shield-badge--next'
-  }
-
-  return 'ring-order-shield-badge--queue'
+function getCenterStatusClass(card: BoardCard) {
+  if (isOnMatCard(card)) return 'ring-order-center-status--active'
+  if (isNextCard(card)) return 'ring-order-center-status--next'
+  return 'ring-order-center-status--queue'
 }
 
 function getSidePanelClass(side: 'left' | 'right', card: BoardCard) {
@@ -1089,6 +1097,14 @@ onBeforeUnmount(() => {
   --ring-center-size: clamp(4.4rem, 7.4vh, 5.8rem);
   --ring-center-pill-min: clamp(4rem, min(6.4vw, 7.8vh), 4.9rem);
   --ring-card-stagger: 0ms;
+  /* ── Center Card Tokens ── */
+  --ring-center-card-width: clamp(7rem, 11vw, 9.5rem);
+  --ring-center-card-radius: 10px;
+  --ring-center-card-pad: clamp(6px, 1vh, 10px);
+  --ring-center-weight-size: clamp(1.1rem, 2.2vh, 1.55rem);
+  --ring-center-round-size: clamp(0.5rem, 1vh, 0.7rem);
+  --ring-center-status-height: clamp(14px, 2vh, 20px);
+  --ring-center-status-size: clamp(0.4rem, 0.8vh, 0.55rem);
   background:
     radial-gradient(circle at 16% 10%, rgba(6, 182, 212, 0.12), transparent 30rem),
     radial-gradient(circle at 86% 12%, rgba(225, 29, 72, 0.1), transparent 28rem),
@@ -1322,13 +1338,13 @@ onBeforeUnmount(() => {
 }
 
 .ring-order-card--on-mat {
-  border-color: rgba(0, 230, 118, 0.35);
+  border-color: rgba(33, 255, 136, 0.45);
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(9, 16, 30, 0.98));
   box-shadow:
-    0 0 0 1px rgba(0, 230, 118, 0.3),
-    0 0 30px rgba(0, 230, 118, 0.15),
-    0 24px 70px -50px rgba(0, 230, 118, 0.5);
+    0 0 0 1px rgba(33, 255, 136, 0.3),
+    0 0 18px rgba(33, 255, 136, 0.08),
+    0 12px 40px -30px rgba(33, 255, 136, 0.35);
 }
 
 .ring-order-card--next {
@@ -1337,8 +1353,8 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(9, 16, 30, 0.98));
   box-shadow:
     0 0 0 1px rgba(255, 152, 0, 0.3),
-    0 0 30px rgba(255, 152, 0, 0.15),
-    0 24px 70px -50px rgba(255, 152, 0, 0.5);
+    0 0 18px rgba(255, 152, 0, 0.08),
+    0 12px 40px -30px rgba(255, 152, 0, 0.35);
 }
 
 .ring-order-card--queued {
@@ -1368,19 +1384,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.ring-order-side-panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.17), transparent 36%, transparent 100%);
-  opacity: 0.22;
-}
-
 .ring-order-side-panel--green {
   border-color: rgba(5, 150, 105, 0.46);
   background:
-    linear-gradient(90deg, rgba(6, 78, 59, 0.95) 0%, rgba(16, 185, 129, 0.82) 100%);
+    linear-gradient(135deg, #0C2A22 0%, #113830 50%, #0E3028 100%);
   box-shadow:
     0 16px 42px -34px rgba(5, 150, 105, 0.84),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -1389,7 +1396,7 @@ onBeforeUnmount(() => {
 .ring-order-side-panel--blue {
   border-color: rgba(37, 99, 235, 0.48);
   background:
-    linear-gradient(270deg, rgba(30, 64, 175, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+    linear-gradient(225deg, #0F1E3A 0%, #142649 50%, #111F40 100%);
   box-shadow:
     0 16px 42px -34px rgba(37, 99, 235, 0.86),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -1425,45 +1432,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.16em;
 }
 
-.ring-order-center-orb {
-  width: var(--ring-center-size);
-  height: var(--ring-center-size);
-  color: #ffffff;
-  font-size: clamp(1.32rem, 2.7vh, 1.95rem);
-  font-style: italic;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-shadow: 0 2px 0 rgba(2, 6, 23, 0.32);
-  will-change: transform, opacity;
-}
-
-.ring-order-card--on-mat .ring-order-center-orb {
-  animation: ringVsPop 200ms ease-out both;
-}
-
-.ring-order-vs-text {
-  display: inline-block;
-  transform: translate(3%, -4%) skewX(-8deg);
-}
-
-.ring-order-center-orb--on-mat {
-  border-color: rgba(0, 230, 118, 0.4);
-  background: linear-gradient(180deg, rgba(0, 230, 118, 0.25), rgba(0, 180, 90, 0.15));
-  box-shadow:
-    0 0 20px rgba(0, 230, 118, 0.25),
-    inset 0 6px 14px rgba(255, 255, 255, 0.12),
-    inset 0 -6px 14px rgba(0, 100, 50, 0.2);
-}
-
-.ring-order-center-orb--queued {
-  border-color: rgba(107, 90, 138, 0.3);
-  background: linear-gradient(180deg, rgba(107, 90, 138, 0.2), rgba(80, 65, 110, 0.15));
-  box-shadow:
-    0 0 16px rgba(107, 90, 138, 0.2),
-    inset 0 6px 14px rgba(255, 255, 255, 0.08),
-    inset 0 -6px 14px rgba(60, 45, 85, 0.2);
-}
-
 /* ── Center badge wrapper (hanging shield + VS below) ── */
 
 .ring-order-center-badge {
@@ -1475,120 +1443,103 @@ onBeforeUnmount(() => {
   z-index: 10;
 }
 
-/* ── Shield badge (hanging center badge for ALL non-placeholder cards) ── */
-
-.ring-order-shield-badge {
+/* ══════════════════════════════════════════════════════════
+   CENTER STATUS CARD — compact broadcast-style info card
+   ══════════════════════════════════════════════════════════ */
+.ring-order-center-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  min-width: clamp(7rem, 10vw, 9rem);
-  padding: 8px 16px 6px;
-  border-radius: 10px 10px 16px 16px;
-  border: 1px solid;
+  gap: 2px;
+  width: var(--ring-center-card-width);
+  padding: var(--ring-center-card-pad) 8px;
+  border-radius: var(--ring-center-card-radius);
+  border: 1.5px solid;
   text-align: center;
   position: relative;
-  top: -8px;
+  z-index: 10;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
 }
 
-.ring-order-shield-badge::before {
-  content: "";
-  position: absolute;
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-bottom: 7px solid;
+.ring-order-center-card--active {
+  background: linear-gradient(180deg, rgba(13, 40, 32, 0.92), rgba(8, 30, 20, 0.95));
+  border-color: rgba(33, 255, 136, 0.5);
 }
 
-.ring-order-shield-badge--active {
-  border-color: rgba(0, 230, 118, 0.45);
-  background: linear-gradient(180deg, rgba(0, 230, 118, 0.22), rgba(0, 180, 90, 0.12));
-  box-shadow:
-    0 0 24px rgba(0, 230, 118, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+.ring-order-center-card--next {
+  background: linear-gradient(180deg, rgba(40, 30, 10, 0.92), rgba(30, 20, 5, 0.95));
+  border-color: rgba(245, 166, 35, 0.5);
 }
 
-.ring-order-shield-badge--active::before {
-  border-bottom-color: rgba(0, 230, 118, 0.45);
+.ring-order-center-card--queue {
+  background: linear-gradient(180deg, rgba(40, 12, 30, 0.92), rgba(30, 8, 22, 0.95));
+  border-color: rgba(233, 30, 140, 0.4);
 }
 
-.ring-order-shield-badge--next {
-  border-color: rgba(255, 152, 0, 0.45);
-  background: linear-gradient(180deg, rgba(255, 152, 0, 0.22), rgba(200, 120, 0, 0.12));
-  box-shadow:
-    0 0 20px rgba(255, 152, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.ring-order-shield-badge--next::before {
-  border-bottom-color: rgba(255, 152, 0, 0.45);
-}
-
-.ring-order-shield-badge--queue {
-  border-color: rgba(107, 90, 138, 0.45);
-  background: linear-gradient(180deg, rgba(107, 90, 138, 0.22), rgba(80, 65, 110, 0.12));
-  box-shadow:
-    0 0 20px rgba(107, 90, 138, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.ring-order-shield-badge--queue::before {
-  border-bottom-color: rgba(107, 90, 138, 0.45);
-}
-
-.ring-order-center-vs {
-  font-family: "Teko", "Bebas Neue", "Arial Narrow", Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(1.32rem, 2.7vh, 1.95rem);
+.ring-order-center-weight {
+  font-family: 'Montserrat', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ring-center-weight-size);
   font-weight: 900;
-  letter-spacing: 0.08em;
-  color: #ffffff;
-  text-shadow: 0 2px 0 rgba(2, 6, 23, 0.32);
-  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fff;
+  line-height: 1.1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.ring-order-shield-label {
-  font-family: "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
+.ring-order-center-round {
+  font-family: 'Montserrat', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ring-center-round-size);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #ffffff;
+  line-height: 1.3;
 }
 
-.ring-order-shield-weight {
-  font-family: "Montserrat", "Inter", ui-sans-serif, system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+.ring-order-center-card--active .ring-order-center-round { color: #21FF88; }
+.ring-order-center-card--next .ring-order-center-round { color: #F5A623; }
+.ring-order-center-card--queue .ring-order-center-round { color: #E91E8C; }
+
+.ring-order-center-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+  min-width: 92%;
+  height: var(--ring-center-status-height);
+  padding: 0 8px;
+  border-radius: 9999px;
+  font-family: 'Montserrat', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ring-center-status-size);
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
+  line-height: 1;
+  color: #fff;
 }
 
-.ring-order-center-orb--queued {
-  opacity: 0.88;
+.ring-order-center-status--active {
+  background: #17C964;
+  box-shadow: 0 0 8px rgba(33, 255, 136, 0.3);
 }
 
-.ring-order-center-orb--completed {
-  border-color: rgba(103, 232, 249, 0.48);
-  background: rgba(6, 182, 212, 0.18);
-  color: #ffffff;
+.ring-order-center-status--next {
+  background: #F5A623;
+  box-shadow: 0 0 8px rgba(245, 166, 35, 0.3);
 }
 
-.ring-order-center-orb--preview {
-  border-color: rgba(125, 211, 252, 0.48);
-  background: rgba(14, 165, 233, 0.18);
-  color: #e0f2fe;
+.ring-order-center-status--queue {
+  background: #E91E8C;
+  box-shadow: 0 0 8px rgba(233, 30, 140, 0.3);
 }
 
-.ring-order-center-orb--waiting {
-  border-color: #334155;
-  background: rgba(15, 23, 42, 0.68);
-  color: #475569;
+.ring-order-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
 }
 
 .ring-order-center-pill {
@@ -1670,20 +1621,6 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes ringVsPop {
-  0% {
-    transform: scale(1);
-  }
-
-  48% {
-    transform: scale(1.15);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .ring-order-card,
   .ring-order-move,
@@ -1693,10 +1630,6 @@ onBeforeUnmount(() => {
   }
 
   .ring-order-live-dot--active {
-    animation: none !important;
-  }
-
-  .ring-order-card--on-mat .ring-order-center-orb {
     animation: none !important;
   }
 }
@@ -1733,6 +1666,13 @@ onBeforeUnmount(() => {
     --ring-flag-width: clamp(4.55rem, min(5.9vw, 7.15vh), 6.05rem);
     --ring-flag-height: clamp(3.85rem, min(4.9vw, 6.05vh), 5.15rem);
     --ring-code-width: clamp(2.2rem, min(2.7vw, 3.35vh), 2.95rem);
+    --ring-center-card-width: 7.5rem;
+    --ring-center-card-radius: 8px;
+    --ring-center-card-pad: 6px;
+    --ring-center-weight-size: 0.95rem;
+    --ring-center-round-size: 0.45rem;
+    --ring-center-status-height: 14px;
+    --ring-center-status-size: 6px;
   }
 
   .ring-order-page-title {
@@ -1754,6 +1694,7 @@ onBeforeUnmount(() => {
     --ring-flag-width: clamp(5rem, 6.1vw, 7rem);
     --ring-flag-height: clamp(4.3rem, 5.3vw, 6.1rem);
     --ring-code-width: clamp(2.4rem, 3.05vw, 3.2rem);
+    --ring-center-card-width: 8.5rem;
   }
 
   .ring-order-page-title {
@@ -1764,8 +1705,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 1080px) {
   .ring-order-page {
-    --ring-center-size: 3.2rem;
-    --ring-center-pill-min: 3.35rem;
+    --ring-center-card-width: 6.5rem;
   }
 }
 </style>

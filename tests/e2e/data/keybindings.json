@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "sourceFile": "resources/js/composables/useKeyboardShortcuts.ts",
+  "sourceLine": 46,
+  "bindings": [
+    { "action": "toggleTimer", "keys": ["Space"], "label": "Start/Pause Timer", "category": "Global" },
+    { "action": "undo", "keys": ["Backspace"], "label": "Undo", "category": "Global" },
+    { "action": "toggleBreak", "keys": ["KeyB"], "label": "Break Mode", "category": "Global" },
+    { "action": "toggleJazo", "keys": ["KeyJ"], "label": "Jazo Mode", "category": "Global" },
+    { "action": "resetTimer", "keys": ["Shift+KeyR"], "label": "Reset Timer", "category": "Global" },
+    { "action": "resetMatch", "keys": ["Shift+Escape"], "label": "Reset Match", "category": "Global" },
+    { "action": "adjustTime", "keys": ["KeyT"], "label": "Adjust Time", "category": "Global" },
+    { "action": "setStartTime", "keys": ["Shift+KeyS"], "label": "Set Start Time", "category": "Global" },
+    { "action": "player1ScoreK", "keys": ["Digit8", "Numpad8"], "label": "Score K", "category": "Player Green (Left)" },
+    { "action": "player1ScoreYO", "keys": ["Digit9", "Numpad9"], "label": "Score YO", "category": "Player Green (Left)" },
+    { "action": "player1ScoreCH", "keys": ["Digit0", "Numpad0"], "label": "Score CH", "category": "Player Green (Left)" },
+    { "action": "player1PenaltyG", "keys": ["KeyI"], "label": "Penalty G", "category": "Player Green (Left)" },
+    { "action": "player1PenaltyD", "keys": ["KeyO"], "label": "Penalty D", "category": "Player Green (Left)" },
+    { "action": "player1PenaltyT", "keys": ["KeyP"], "label": "Penalty T", "category": "Player Green (Left)" },
+    { "action": "player1Medic", "keys": ["KeyL"], "label": "Medic Timer", "category": "Player Green (Left)" },
+    { "action": "player1Winner", "keys": ["KeyM"], "label": "Winner", "category": "Player Green (Left)" },
+    { "action": "player2ScoreK", "keys": ["Digit1", "Numpad1"], "label": "Score K", "category": "Player Blue (Right)" },
+    { "action": "player2ScoreYO", "keys": ["Digit2", "Numpad2"], "label": "Score YO", "category": "Player Blue (Right)" },
+    { "action": "player2ScoreCH", "keys": ["Digit3", "Numpad3"], "label": "Score CH", "category": "Player Blue (Right)" },
+    { "action": "player2PenaltyG", "keys": ["KeyQ"], "label": "Penalty G", "category": "Player Blue (Right)" },
+    { "action": "player2PenaltyD", "keys": ["KeyW"], "label": "Penalty D", "category": "Player Blue (Right)" },
+    { "action": "player2PenaltyT", "keys": ["KeyE"], "label": "Penalty T", "category": "Player Blue (Right)" },
+    { "action": "player2Medic", "keys": ["KeyA"], "label": "Medic Timer", "category": "Player Blue (Right)" },
+    { "action": "player2Winner", "keys": ["KeyZ"], "label": "Winner", "category": "Player Blue (Right)" }
+  ]
+}

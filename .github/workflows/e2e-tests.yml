@@ -1,0 +1,112 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      electron_only:
+        description: 'Run only Electron tests (skip build)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+  PHP_VERSION: '8.2'
+
+jobs:
+  e2e-tests:
+    name: E2E Electron Tests
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            electron-app/package-lock.json
+            tests/e2e/package-lock.json
+
+      - name: Setup PHP ${{ env.PHP_VERSION }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, xml, ctype, json, bcmath, pdo_mysql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist
+
+      - name: Install Electron dependencies
+        working-directory: electron-app
+        run: npm ci
+
+      - name: Build Electron app
+        working-directory: electron-app
+        run: npm run build
+
+      - name: Install E2E test dependencies
+        working-directory: tests/e2e
+        run: npm ci
+
+      - name: Run E2E tests
+        id: e2e
+        working-directory: tests/e2e
+        run: |
+          npm test 2>&1 | Tee-Object -FilePath test-output.log
+          $LASTEXITCODE
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Generate regression summary
+        if: always()
+        working-directory: tests/e2e
+        run: node scripts/summary.mjs
+        continue-on-error: true
+
+      - name: Upload test results (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ github.run_id }}
+          path: |
+            tests/e2e/reports/
+            tests/e2e/test-output.log
+          retention-days: 30
+
+      - name: Upload test artifacts (on failure)
+        if: steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ github.run_id }}
+          path: |
+            tests/e2e/test-results/
+            tests/e2e/reports/screenshots/
+          retention-days: 14
+
+      - name: Publish test summary
+        if: always()
+        run: |
+          if (Test-Path "tests/e2e/reports/summary.md") {
+            $summary = Get-Content "tests/e2e/reports/summary.md" -Raw
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Fail if tests failed
+        if: steps.e2e.outcome == 'failure'
+        run: |
+          Write-Error "E2E tests failed. Check the test results artifact for details."
+          exit 1
+        shell: pwsh

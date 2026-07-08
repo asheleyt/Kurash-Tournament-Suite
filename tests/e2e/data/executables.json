@@ -1,0 +1,20 @@
+{
+  "applications": {
+    "main": {
+      "name": "Kurash Tournament Suite",
+      "executable": "Kurash Scoreboard.exe",
+      "path": "../../electron-app/build-output/win-unpacked/Kurash Scoreboard.exe",
+      "startupTimeout": 120000,
+      "services": {
+        "mysql": { "port": 3406 },
+        "http": { "port": 18000 },
+        "websocket": { "port": 18080 }
+      }
+    }
+  },
+  "ports": {
+    "mysql": 3406,
+    "http": 18000,
+    "websocket": 18080
+  }
+}

@@ -176,7 +176,7 @@
                                             </span>
                                             <span
                                                 v-if="isLocalData"
-                                                class="inline-flex items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-yellow-100 uppercase"
+                                                class="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-amber-100 uppercase"
                                             >
                                                 Saved local data
                                             </span>
@@ -203,7 +203,7 @@
                                             </span>
                                             <span
                                                 v-else-if="queueIsDegraded"
-                                                class="inline-flex items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-yellow-100 uppercase"
+                                                class="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-black tracking-[0.22em] text-amber-100 uppercase"
                                             >
                                                 Saved snapshot
                                             </span>
@@ -971,7 +971,7 @@
                                                 </span>
                                                 <span
                                                     v-if="queueIsDegraded"
-                                                    class="rounded border border-yellow-500/20 bg-yellow-500/10 px-2 py-0.5 text-[10px] font-black tracking-wider text-yellow-200 uppercase"
+                                                    class="rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black tracking-wider text-amber-200 uppercase"
                                                     :title="
                                                         queueDegradedReason ||
                                                         'Degraded mode'
@@ -3313,7 +3313,7 @@
                                 <span
                                     v-else
                                     class="text-gray-500 text-xs font-bold"
-                                    >N/A</span
+                                    >{{ displayedCountry2 }}</span
                                 >
                             </div>
 
@@ -3551,7 +3551,7 @@
                                 <span
                                     v-else
                                     class="text-gray-500 text-xs font-bold"
-                                    >N/A</span
+                                    >{{ displayedCountry1 }}</span
                                 >
                             </div>
                         </div>
@@ -4281,6 +4281,10 @@
                     />
                     <XCircle
                         v-else-if="toast.type === 'error'"
+                        :class="['h-5 w-5 shrink-0', toast.iconClass]"
+                    />
+                    <AlertTriangle
+                        v-else-if="toast.type === 'warning'"
                         :class="['h-5 w-5 shrink-0', toast.iconClass]"
                     />
                     <RefreshCw

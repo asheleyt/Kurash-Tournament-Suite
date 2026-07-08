@@ -1,0 +1,31 @@
+{
+  "name": "kts-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npx playwright test --project=electron",
+    "test:electron": "npx playwright test --project=electron",
+    "test:smoke": "npx playwright test --project=electron specs/smoke/",
+    "test:validation": "npx playwright test --project=electron specs/validation/",
+    "test:workflow": "npx playwright test --project=electron specs/workflow/",
+    "test:scoring": "npx playwright test --project=electron specs/workflow/scoring/",
+    "test:timer": "npx playwright test --project=electron specs/workflow/timer/",
+    "test:penalties": "npx playwright test --project=electron specs/workflow/penalties/",
+    "test:indicators": "npx playwright test --project=electron specs/workflow/indicators/",
+    "test:toasts": "npx playwright test --project=electron specs/workflow/toasts/",
+    "test:connection": "npx playwright test --project=electron specs/workflow/connection/",
+    "test:tournament": "npx playwright test --project=electron specs/workflow/tournament/",
+    "test:multiwindow": "npx playwright test --project=electron specs/workflow/multi-window/",
+    "test:browser": "npx playwright test --project=web",
+    "test:debug": "npx playwright test --debug --project=electron",
+    "test:ci": "npx playwright test --project=electron --reporter=list,json,junit && node scripts/summary.mjs",
+    "summary": "node scripts/summary.mjs",
+    "report": "npx playwright show-report reports/html",
+    "trace": "npx playwright show-trace",
+    "clean": "Remove-Item -Recurse -Force test-results,reports/html,reports/json,reports/junit,reports/screenshots -ErrorAction SilentlyContinue",
+    "install:browsers": "npx playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

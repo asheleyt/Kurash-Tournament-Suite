@@ -9,7 +9,7 @@ export type PairingResetReason =
   | 'transport_error'
 
 type AssignedTargetContentType = 'scoreboard' | 'match_order' | 'none' | 'ring_display'
-type BannerType = 'success' | 'error' | 'info'
+type BannerType = 'success' | 'error' | 'info' | 'warning'
 
 interface ControllerAssignedSetupTarget {
   content_type: AssignedTargetContentType
@@ -399,7 +399,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
     const payload = {
       code: (pairingCode.value || '').toString().trim(),
       device_id: deviceId,
-      name: controllerAuthState.value.controller_name || `Gilam Controller ${shortDeviceId}`,
+      name: controllerAuthState.value.controller_name || `Controller ${shortDeviceId}`,
       client: options.getClientMetadata(),
     }
 
@@ -599,7 +599,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
     showSuccessBanner?: boolean
   } = {}) {
     if (!controllerAuthState.value.token || !controllerAuthState.value.device_id || !options.getSyncHasServer()) return false
-    if (isControllerHeartbeatBusy.value) return true
+    if (isControllerHeartbeatBusy.value) return false
 
     const refreshAssignment = optionsForHeartbeat.refreshAssignment === true
     const allowLiveRecovery = optionsForHeartbeat.allowLiveRecovery === true
@@ -693,7 +693,7 @@ export function useRefereeControllerSession(options: UseRefereeControllerSession
       if (!reconnected) {
         if (controllerAuthState.value.token) {
           options.showBanner(
-            pairingStatusDetail.value || 'Pairing succeeded, but known-device reconnect failed.',
+            pairingStatusDetail.value || 'Pairing succeeded. Reconnecting to the Event Host...',
             'error',
             5000,
           )

@@ -544,9 +544,10 @@
                 :class="player2DisplayMedia.className"
                 alt=""
               />
+              <span v-else class="text-gray-400 font-bold text-sm sm:text-base tracking-wider">{{ player2Country }}</span>
             </div>
             <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center">
-              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">N/A</span>
+              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">{{ player2Country }}</span>
             </div>
           </div>
         </div>
@@ -675,9 +676,10 @@
                 :class="player1DisplayMedia.className"
                 alt=""
               />
+              <span v-else class="text-gray-400 font-bold text-sm sm:text-base tracking-wider">{{ player1Country }}</span>
             </div>
             <div v-else class="w-full h-full min-h-24 bg-[#2a3142]/50 rounded-2xl border border-white/5 shadow-inner overflow-hidden relative flex items-center justify-center">
-              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">N/A</span>
+              <span class="text-gray-500 font-bold text-xl sm:text-2xl tracking-wider">{{ player1Country }}</span>
             </div>
           </div>
         </div>

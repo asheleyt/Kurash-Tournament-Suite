@@ -18,6 +18,7 @@ import {
     Upload,
     CheckCircle2,
     XCircle,
+    AlertTriangle,
     User,
     Hash,
     Flag,
@@ -299,7 +300,7 @@ const logoPreviewUrl = ref<string>('');
 const clubLogoInput = ref<HTMLInputElement | null>(null);
 const showResultPopup = ref(false);
 const resultPopupMessage = ref('');
-type ControllerToastTone = 'success' | 'error' | 'info';
+type ControllerToastTone = 'success' | 'error' | 'info' | 'warning';
 type ControllerToastId = 'status' | 'result';
 const resultPopupType = ref<ControllerToastTone>('success');
 const isResultSubmitting = ref(false);
@@ -510,7 +511,7 @@ type ResultSubmitQueueMode =
 const CONTROLLER_AUTH_STORAGE_KEY = 'kurash_controller_auth_v1';
 const PENDING_RESULT_SYNC_STORAGE_KEY = 'kurash_pending_result_sync_v1';
 const ROLLBACK_SEQUENCE_CONFLICT_MESSAGE =
-    'Result was not accepted because this match changed on Event Host. The queue was refreshed. Please load the updated match before continuing.';
+    'Result was not accepted. This match has been updated since it was loaded. Please reload the match and try again.';
 
 // Initial Data
 const createInitialPlayerScore = (): PlayerScore => ({
@@ -562,6 +563,12 @@ function persistManualMatchId() {
         if (v) localStorage.setItem('manual_match_id', v);
         else localStorage.removeItem('manual_match_id');
     } catch {}
+}
+function loadManualMatchId(): string {
+    try {
+        return (localStorage.getItem('manual_match_id') || '').trim();
+    } catch {}
+    return '';
 }
 
 // ── Queue Ownership ─────────────────────────────────────────────────────
@@ -1864,6 +1871,52 @@ function evaluateSourceAndPublish() {
     publishManualQueueToGilam();
 }
 
+/**
+ * Apply a manual queue item's data to the reactive `gameState` and set the
+ * manual match ID.  Shared by the runtime activation paths
+ * (`pushManualItemToGilam`, `advanceManualQueue`) and the startup restore path
+ * so that the scoreboard controller always reflects the active ON GILAM bout.
+ */
+function applyManualItemToGameState(item: ManualQueueItem) {
+    Object.assign(gameState.player1, createInitialPlayerScore());
+    Object.assign(gameState.player2, createInitialPlayerScore());
+
+    gameState.bracketCategory = (item.bracketCategory || '').toString().trim();
+    gameState.gender = item.gender;
+    gameState.category = item.category;
+    gameState.player1.name = item.player1.name;
+    gameState.player1.clubCode = item.player1.clubCode;
+    gameState.player1.country = item.player1.country;
+    gameState.player1.flag = item.player1.flag;
+    gameState.player1.weight = item.category;
+    gameState.player2.name = item.player2.name;
+    gameState.player2.clubCode = item.player2.clubCode;
+    gameState.player2.country = item.player2.country;
+    gameState.player2.flag = item.player2.flag;
+    gameState.player2.weight = item.category;
+    gameState.winner = null;
+
+    if (item.gender === 'male') {
+        gameState.time = 240;
+        gameState.initialDuration = 240;
+    } else if (item.gender === 'female') {
+        gameState.time = 180;
+        gameState.initialDuration = 180;
+    } else {
+        gameState.time = 0;
+        gameState.initialDuration = 0;
+    }
+    gameState.isRunning = false;
+    gameState.isMedicMode = false;
+    gameState.isBreakMode = false;
+    gameState.isJazo = false;
+    gameState.savedGameTime = null;
+    gameState.timerPlayer = null;
+
+    manualMatchId.value = (item.matchId || '').toString().trim();
+    persistManualMatchId();
+}
+
 function pushManualItemToGilam(id: string) {
     const itemIndex = manualQueue.value.findIndex(i => i.id === id);
     if (itemIndex < 0) return;
@@ -1905,47 +1958,9 @@ function pushManualItemToGilam(id: string) {
         persistCompletedManualItemIds();
     }
 
-    // Always sync manualMatchId — set it from the item or clear it
-    manualMatchId.value = (item.matchId || '').toString().trim();
-    persistManualMatchId();
-
-    // Reset scores first, then apply the pushed item's match data so the
-    // active scoreboard view reflects the same bout shown on the Gilam display.
-    Object.assign(gameState.player1, createInitialPlayerScore());
-    Object.assign(gameState.player2, createInitialPlayerScore());
-
-    gameState.bracketCategory = (item.bracketCategory || '').toString().trim();
-    gameState.gender = item.gender;
-    gameState.category = item.category;
-    gameState.player1.name = item.player1.name;
-    gameState.player1.clubCode = item.player1.clubCode;
-    gameState.player1.country = item.player1.country;
-    gameState.player1.flag = item.player1.flag;
-    gameState.player1.weight = item.category;
-    gameState.player2.name = item.player2.name;
-    gameState.player2.clubCode = item.player2.clubCode;
-    gameState.player2.country = item.player2.country;
-    gameState.player2.flag = item.player2.flag;
-    gameState.player2.weight = item.category;
-    gameState.winner = null;
-
-    // Reset timer for the pushed bout's gender
-    if (item.gender === 'male') {
-        gameState.time = 240;
-        gameState.initialDuration = 240;
-    } else if (item.gender === 'female') {
-        gameState.time = 180;
-        gameState.initialDuration = 180;
-    } else {
-        gameState.time = 0;
-        gameState.initialDuration = 0;
-    }
-    gameState.isRunning = false;
-    gameState.isMedicMode = false;
-    gameState.isBreakMode = false;
-    gameState.isJazo = false;
-    gameState.savedGameTime = null;
-    gameState.timerPlayer = null;
+    // Apply the pushed item's match data so the active scoreboard view
+    // reflects the same bout shown on the Gilam display.
+    applyManualItemToGameState(item);
 
     // Publish updated queue to Gilam display and broadcast scoreboard state
     publishManualQueueToGilam();
@@ -1995,46 +2010,7 @@ function advanceManualQueue() {
     if (activeManualItemId.value) {
         const nextItem = manualQueue.value[0];
         if (nextItem) {
-            // Reset scores first, then apply the next item's data
-            Object.assign(gameState.player1, createInitialPlayerScore());
-            Object.assign(gameState.player2, createInitialPlayerScore());
-
-            gameState.bracketCategory = (nextItem.bracketCategory || '').toString().trim();
-            gameState.gender = nextItem.gender;
-            gameState.category = nextItem.category;
-            gameState.player1.name = nextItem.player1.name;
-            gameState.player1.clubCode = nextItem.player1.clubCode;
-            gameState.player1.country = nextItem.player1.country;
-            gameState.player1.flag = nextItem.player1.flag;
-            gameState.player1.weight = nextItem.category;
-            gameState.player2.name = nextItem.player2.name;
-            gameState.player2.clubCode = nextItem.player2.clubCode;
-            gameState.player2.country = nextItem.player2.country;
-            gameState.player2.flag = nextItem.player2.flag;
-            gameState.player2.weight = nextItem.category;
-
-            // Sync match ID
-            manualMatchId.value = (nextItem.matchId || '').toString().trim();
-            persistManualMatchId();
-
-            // Set timer based on gender
-            if (nextItem.gender === 'male') {
-                gameState.time = 240;
-                gameState.initialDuration = 240;
-            } else if (nextItem.gender === 'female') {
-                gameState.time = 180;
-                gameState.initialDuration = 180;
-            } else {
-                gameState.time = 0;
-                gameState.initialDuration = 0;
-            }
-            gameState.winner = null;
-            gameState.isRunning = false;
-            gameState.isMedicMode = false;
-            gameState.isBreakMode = false;
-            gameState.isJazo = false;
-            gameState.savedGameTime = null;
-            gameState.timerPlayer = null;
+            applyManualItemToGameState(nextItem);
         }
     }
 
@@ -2561,22 +2537,56 @@ const statusBanner = ref<{
 }>({ show: false, message: '', type: 'info' });
 let bannerTimer: number | null = null;
 let resultPopupTimer: number | null = null;
+
+/** Standard toast timeouts by priority level */
+const TOAST_TIMEOUTS: Record<ControllerToastTone, number> = {
+    success: 2500,
+    info: 3000,
+    warning: 4000,
+    error: 5000,
+};
+
+/** Toast deduplication: suppress same message within 5 seconds */
+const recentToastMessages = new Map<string, number>();
+const TOAST_DEDUP_WINDOW_MS = 5000;
+
+function isDuplicateToast(message: string): boolean {
+    const now = Date.now();
+    const lastSeen = recentToastMessages.get(message);
+    if (lastSeen && now - lastSeen < TOAST_DEDUP_WINDOW_MS) {
+        return true;
+    }
+    recentToastMessages.set(message, now);
+    // Clean up old entries periodically
+    if (recentToastMessages.size > 50) {
+        for (const [key, timestamp] of recentToastMessages) {
+            if (now - timestamp > TOAST_DEDUP_WINDOW_MS * 2) {
+                recentToastMessages.delete(key);
+            }
+        }
+    }
+    return false;
+}
+
 function showBanner(
     message: string,
     type: ControllerToastTone = 'info',
-    timeout = 3000,
+    timeout?: number,
 ) {
+    if (isDuplicateToast(message)) return;
+    const effectiveTimeout = timeout ?? TOAST_TIMEOUTS[type];
     statusBanner.value = { show: true, message, type };
     if (bannerTimer) clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => {
         statusBanner.value.show = false;
-    }, timeout) as unknown as number;
+    }, effectiveTimeout) as unknown as number;
 }
 function showResultToast(
     message: string,
     type: ControllerToastTone = 'success',
-    timeout = 6500,
+    timeout?: number,
 ) {
+    const effectiveTimeout = timeout ?? TOAST_TIMEOUTS[type];
     resultPopupMessage.value = message;
     resultPopupType.value = type;
     showResultPopup.value = true;
@@ -2584,7 +2594,7 @@ function showResultToast(
     resultPopupTimer = setTimeout(() => {
         showResultPopup.value = false;
         resultPopupTimer = null;
-    }, timeout) as unknown as number;
+    }, effectiveTimeout) as unknown as number;
 }
 function hideResultToast() {
     showResultPopup.value = false;
@@ -2597,11 +2607,13 @@ const controllerToastToneClasses: Record<ControllerToastTone, string> = {
     success: 'border-emerald-500/45 bg-emerald-950/85 text-emerald-50',
     error: 'border-rose-500/45 bg-rose-950/85 text-rose-50',
     info: 'border-blue-500/45 bg-slate-900/90 text-blue-50',
+    warning: 'border-amber-500/45 bg-amber-950/85 text-amber-50',
 };
 const controllerToastIconClasses: Record<ControllerToastTone, string> = {
     success: 'text-emerald-300',
     error: 'text-rose-300',
     info: 'text-blue-300',
+    warning: 'text-amber-300',
 };
 const visibleControllerToasts = computed(() => {
     const toasts: {
@@ -2892,13 +2904,13 @@ const finishMatchActionLabel = computed(() => {
                 : 'Finish Match Offline';
         default:
             return resultSubmitBlockReason.value
-                ? 'Await Event Host'
+                ? 'Awaiting connection'
                 : 'Finish Match';
     }
 });
 const resultSubmitStatusMessage = computed(() => {
     if (isResultGateChecking.value) {
-        return 'Refreshing the latest Event Host queue before recording this result.';
+        return 'Refreshing match data before recording this result.';
     }
 
     if (resultSubmitStatusDetail.value) {
@@ -2911,10 +2923,10 @@ const resultSubmitStatusMessage = computed(() => {
     ) {
         const pendingCount = pendingResultSyncCount.value;
         if (pendingCount > 0) {
-            return `Event Host unreachable. This confirmed cached bout can be finished locally. ${pendingCount} pending result${pendingCount === 1 ? '' : 's'} will replay in declaration order when the host returns.`;
+            return `Connection unavailable. This confirmed bout can be finished locally. ${pendingCount} pending result${pendingCount === 1 ? '' : 's'} will sync when the connection is restored.`;
         }
 
-        return 'Event Host unreachable. This confirmed cached bout can be finished locally and queued for sync when the host returns.';
+        return 'Connection unavailable. This confirmed bout can be finished locally and will sync when the connection is restored.';
     }
 
     return resultSubmitBlockReason.value;
@@ -3118,8 +3130,8 @@ async function clearCurrentLoadedMatchForRingMismatch(
                 : `match ${String(loadedMatchId)}`;
         showBanner(
             isWrongRing
-                ? `Cleared ${matchLabel} from Gilam ${loadedRing}; this controller is assigned to Gilam ${targetRing}.`
-                : `Cleared ${matchLabel}; it is not in the assigned Gilam ${targetRing} queue snapshot.`,
+                ? `Cleared ${matchLabel}. It belongs to a different Gilam. Please load the correct match.`
+                : `Cleared ${matchLabel}. It is not in the current queue.`,
             'info',
             6500,
         );
@@ -3141,7 +3153,7 @@ async function clearCurrentLoadedMatchForRingMismatch(
 async function clearCurrentLoadedMatchForAuthoritativeChange(
     contextLabel: string,
     message =
-        'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+        'This match was updated. Please load the updated match before continuing.',
     options: {
         announce?: boolean;
         broadcast?: boolean;
@@ -3203,7 +3215,7 @@ async function clearCurrentLoadedMatchIfAuthoritativeQueueChanged(
         contextLabel,
         options.message ||
             guard.message ||
-            'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+            'This match was updated. Please load the updated match before continuing.',
         {
             ...options,
             reasonCode: options.reasonCode || guard.reasonCode,
@@ -3706,7 +3718,7 @@ async function reconnectSyncNow() {
         if (!selectedTournamentId.value) {
             showBanner(
                 hasKnownDeviceCredentials.value
-                    ? 'Connection refreshed. Waiting for Event Host assignment or manual recovery values.'
+                    ? 'Connection refreshed. Waiting for Event Host assignment.'
                     : 'Connection refreshed. Choose a tournament to continue.',
                 'success',
                 2400,
@@ -3912,13 +3924,13 @@ function safeApiErrorMessage(
     maxLen = 220,
 ): string {
     const t = (body || '').trim();
-    if (!t) return `Request failed (HTTP ${status})`;
+    if (!t) return `Request failed. Please try again.`;
     if (
         /^<!DOCTYPE/i.test(t) ||
         /^<html/i.test(t) ||
         t.includes('INTERNAL SERVER ERROR')
     ) {
-        return `Server error (HTTP ${status}). See storage/logs/laravel.log in the app folder. If this is the .exe, rebuild so routes use /api (JSON).`;
+        return `A server error occurred. Please contact technical support.`;
     }
     try {
         const j = JSON.parse(t) as { message?: string; error?: string };
@@ -4032,14 +4044,14 @@ function formatResultSyncFailureMessage(
 
     if (normalizedRejectReason === 'match_not_ready') {
         base =
-            'Event Host says this bout is not ready yet. Reconcile the live queue before scoring again.';
+            'This bout is not ready yet. Please reload the match before scoring again.';
         usedMappedMessage = true;
     } else if (normalizedRejectReason === 'rollback_sequence_conflict') {
         base = ROLLBACK_SEQUENCE_CONFLICT_MESSAGE;
         usedMappedMessage = true;
     } else if (normalizedRejectReason === 'winner_id_invalid') {
         base =
-            'Event Host rejected the winner mapping. Reconcile the live queue before scoring again.';
+            'The winner selection was not accepted. Please reload the match and try again.';
         usedMappedMessage = true;
     } else if (normalizedFailureClass === 'network_failure') {
         base = 'Event Host unreachable. Result saved locally pending sync.';
@@ -4050,7 +4062,7 @@ function formatResultSyncFailureMessage(
         usedMappedMessage = true;
     } else if (normalizedFailureClass === 'admin_reject') {
         base =
-            'Event Host rejected this result. Reconcile the live queue before scoring again.';
+            'This result was not accepted. Please reload the match and try again.';
         usedMappedMessage = true;
     } else if (normalizedFailureClass === 'unexpected_response') {
         base =
@@ -4060,12 +4072,9 @@ function formatResultSyncFailureMessage(
 
     const extras: string[] = [];
     if (!usedMappedMessage && rejectReasonText) {
-        extras.push(`reason: ${rejectReasonText}`);
+        extras.push(`The result was rejected by the Event Host.`);
     } else if (!usedMappedMessage && failureClassText) {
-        extras.push(`class: ${failureClassText}`);
-    }
-    if (resultTraceIdText) {
-        extras.push(`trace: ${resultTraceIdText}`);
+        extras.push(`An unexpected sync issue occurred.`);
     }
     return extras.length ? `${base} (${extras.join(', ')})` : base;
 }
@@ -4316,10 +4325,10 @@ function normalizeResultSubmitResponse(submitResult: any) {
         return {
             accepted,
             message: accepted
-                ? directMessage || 'Admin accepted completed match result.'
+                ? directMessage || 'Result accepted and synced.'
                 : formatResultSyncFailureMessage(
                       directMessage ||
-                          'Admin did not confirm the completed match result.',
+                          'Result was not confirmed. Please check the Event Host connection.',
                       syncFailureClass,
                       rejectReason,
                       resultTraceId,
@@ -4550,7 +4559,7 @@ async function assessPendingResultReplayGuard(item: PendingResultSyncItem) {
             ready: false,
             reasonCode: 'rollback_sequence_missing',
             message:
-                'Pending result is missing the Event Host rollback version and must be reviewed manually.',
+                'This pending result needs to be reviewed manually before it can be synced.',
         };
     }
 
@@ -4585,7 +4594,7 @@ async function assessPendingResultReplayGuard(item: PendingResultSyncItem) {
             ready: false,
             reasonCode: 'rollback_sequence_match_missing',
             message:
-                'Pending result no longer exists in the current Event Host queue snapshot.',
+                'Pending result no longer exists in the current match list.',
         };
     }
 
@@ -4646,7 +4655,7 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
                         attempts: nextAttempt,
                         last_error:
                             replayGuard.message ||
-                            'Pending result is stale against the Event Host queue.',
+                            'Pending result is outdated and needs review.',
                         last_status: 409,
                         updated_at: new Date().toISOString(),
                         sync_state: 'blocked',
@@ -4731,7 +4740,7 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
                     retryStopped = true;
                     if (!options.silent) {
                         showBanner(
-                            `Pending Admin result sync is still waiting: ${message}`,
+                            `Result sync is still pending: ${message}`,
                             'info',
                             4500,
                         );
@@ -4745,7 +4754,7 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
 
         if (syncedCount > 0) {
             showBanner(
-                `${syncedCount} pending Admin result${syncedCount === 1 ? '' : 's'} synced.`,
+                `${syncedCount} queued result${syncedCount === 1 ? '' : 's'} synced successfully.`,
                 'success',
                 3200,
             );
@@ -4764,7 +4773,7 @@ async function syncPendingResultSyncQueue(options: { silent?: boolean } = {}) {
             }
         } else if (blockedCount > 0 && !options.silent && !retryStopped) {
             showBanner(
-                `${blockedCount} pending result${blockedCount === 1 ? '' : 's'} need manual sync review.`,
+                `${blockedCount} result${blockedCount === 1 ? '' : 's'} could not be synced. Check the Event Host connection.`,
                 'error',
                 6000,
             );
@@ -4801,7 +4810,7 @@ function reportFetchFailure(
         if (signature !== lastFetchFailureSignature) {
             lastFetchFailureSignature = signature;
             showBanner(
-                `${contextLabel}: ${message} (HTTP ${status})`,
+                `${contextLabel}: ${message}`,
                 'error',
                 6500,
             );
@@ -4856,7 +4865,7 @@ function getDisplayClassBadgeClass(
 }
 
 function getQueueRoleLabel(role: RingDisplayRole) {
-    if (role === 'ON_MAT') return 'On Gilam';
+    if (role === 'ON_MAT') return 'On Mat';
     if (role === 'ON_DECK') return 'On Deck';
     if (role === 'IN_QUEUE') return 'In Queue';
     return 'Empty';
@@ -5086,12 +5095,12 @@ function getAutoLoadPausedReason(
     );
 
     if (needsConfirmation.length) {
-        return 'Auto-load paused: next cached matches still need Event Host confirmation.';
+        return 'No ready matches available. Waiting for the next bout to be confirmed.';
     }
 
     if (!unresolved.length)
-        return 'Auto-load paused: cached queue is inconsistent. Reconnect Event Host to reconcile.';
-    return `Auto-load paused: ${unresolved.length} next match${unresolved.length === 1 ? '' : 'es'} still unresolved (TBD/BYE).`;
+        return 'No ready matches available. Please check the Event Host connection.';
+    return `Next ${unresolved.length} match${unresolved.length === 1 ? '' : 'es'} not yet set (TBD/BYE). Waiting for confirmed bouts.`;
 }
 
 function shouldPreserveOfflineQueueState(
@@ -5421,7 +5430,7 @@ async function autoDetectApiBase() {
             adminBase.value = normalized;
             persistAdminBase();
             isOnline.value = true;
-            showBanner(`Detected API: ${normalized}`, 'success', 2000);
+            showBanner(`Event Host connection detected successfully.`, 'success', 2000);
             return;
         } catch {}
     }
@@ -5839,7 +5848,7 @@ function assessMatchQueueEligibility(
             reasonCode: 'missing_match',
             message: requireExplicitSignals
                 ? 'This bout is not confirmed in the latest queue snapshot yet.'
-                : 'Waiting for the latest Admin queue confirmation for this bout.',
+                : 'Waiting for the latest queue confirmation for this bout.',
             state: null,
             requireExplicitSignals,
         };
@@ -5855,7 +5864,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'moved_to_different_match',
             message:
-                'Event Host moved the ring to a different bout. Reconcile the queue before recording another result.',
+                'The loaded match has changed. Please reload the match before recording another result.',
             state,
             requireExplicitSignals,
         };
@@ -5874,7 +5883,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'unresolved_competitors',
             message: requireExplicitSignals
-                ? 'This bout is unresolved in the saved queue snapshot. Do not continue until Event Host confirms both competitors.'
+                ? 'This bout is unresolved. Do not continue until both competitors are confirmed.'
                 : 'Waiting for both competitors to be resolved in the live queue.',
             state,
             requireExplicitSignals,
@@ -5885,7 +5894,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'needs_server_confirmation',
             message:
-                'This bout depends on a fresh Event Host confirmation that never reached the controller snapshot.',
+                'This bout is not yet confirmed. Please wait for the latest match data.',
             state,
             requireExplicitSignals,
         };
@@ -5895,7 +5904,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'participants_unconfirmed',
             message:
-                'Waiting for Event Host to confirm both competitors for this bout.',
+                'Waiting for both competitors to be confirmed for this bout.',
             state,
             requireExplicitSignals,
         };
@@ -5905,7 +5914,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'not_displayable',
             message:
-                'Waiting for Event Host to mark this bout ready in the queue.',
+                'Waiting for this bout to be marked ready.',
             state,
             requireExplicitSignals,
         };
@@ -5918,7 +5927,7 @@ function assessMatchQueueEligibility(
             ready: false,
             reasonCode: 'missing_canonical_ids',
             message:
-                'Waiting for canonical competitor IDs from the Event Host queue.',
+                'Waiting for competitor IDs to be confirmed.',
             state,
             requireExplicitSignals,
         };
@@ -5958,7 +5967,7 @@ function assessCurrentLoadedMatchRollbackGuard(match: any | null = null) {
             ready: false,
             reasonCode: 'missing_loaded_match',
             message:
-                'Load the latest Event Host queue match before recording this result.',
+                'Load the latest match data before recording this result.',
         };
     }
 
@@ -5981,7 +5990,7 @@ function assessCurrentLoadedMatchRollbackGuard(match: any | null = null) {
             ready: false,
             reasonCode: 'rollback_sequence_stale',
             message:
-                'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.',
+                'This match was updated. Please load the updated match before continuing.',
         };
     }
 
@@ -6353,7 +6362,7 @@ async function reconcileAuthoritativeNextMatch(
     if (conflictKey !== lastNextMatchConflictBannerKey) {
         lastNextMatchConflictBannerKey = conflictKey;
         showBanner(
-            `Live queue changed. Current match stays loaded; Admin next match is ${getMatchSummaryLabel(candidate)}.`,
+            `The queue has updated. Current match stays loaded. Next available: ${getMatchSummaryLabel(candidate)}.`,
             'info',
             5200,
         );
@@ -6499,7 +6508,7 @@ async function refreshCurrentMatchSubmitGate(
                 ? error.message
                 : 'Failed to refresh the live queue.';
         if ((error as any)?.controllerAssignmentBlocked) {
-            const detail = `Event Host assignment is not ready for this controller. ${message}`;
+            const detail = `This controller is not yet assigned to a Gilam. ${message}`;
             markResultSubmitReconcileRequired(
                 detail,
                 'controller_assignment_unavailable',
@@ -6529,7 +6538,7 @@ async function refreshCurrentMatchSubmitGate(
 
             if (options.announceFailures) {
                 showBanner(
-                    'Event Host unavailable. Using the last confirmed cached bout for offline continuation.',
+                    'Event Host unavailable. Using the locally saved match.',
                     options.bannerType ?? 'info',
                     5200,
                 );
@@ -6543,9 +6552,7 @@ async function refreshCurrentMatchSubmitGate(
             };
         }
 
-        const detail = fallbackAssessment.message
-            ? `Event Host unreachable. ${fallbackAssessment.message}`
-            : `Event Host unreachable. ${message}`;
+        const detail = `Event Host unreachable. Please check your connection and try again.`;
         markResultSubmitOfflineContinuation(
             detail,
             fallbackAssessment.reasonCode || 'offline_cached_insufficient',
@@ -6853,8 +6860,8 @@ async function reconcileRejectedResultSubmission(config: {
         resultSubmitStatusReasonCode.value = null;
         showBanner(
             resultSubmitQueueMode.value === 'offline_degraded'
-                ? `${config.message} Event Host is offline again. The controller is holding on the last confirmed cached bout.`
-                : `${config.message} Live queue refreshed. Review the bout and finish again once ready.`,
+                ? `${config.message} Event Host is offline. Using the locally saved match.`
+                : `${config.message} This match was updated. Please review the bout and finish again when ready.`,
             'info',
             6500,
         );
@@ -6961,7 +6968,7 @@ async function loadMatch(m: any): Promise<boolean> {
         const matchRingText = getMatchRingText(m);
         if (matchRingText && matchRingText !== selectedRingText) {
             showBanner(
-                `Cannot load match: it is assigned to Gilam ${matchRingText}, but this controller is on Gilam ${selectedRingText}.`,
+                `Cannot load match: it is assigned to Gilam ${matchRingText}, but this controller is set to Gilam ${selectedRingText}.`,
                 'error',
                 6500,
             );
@@ -7062,6 +7069,13 @@ async function loadMatch(m: any): Promise<boolean> {
     currentMatchId.value = getRemoteMatchId(m);
     // Event Host match loaded — claim controller ownership
     setActiveQueueSource('event-host');
+    // Clear manual override so Event Host projection can resume
+    if (manualOverrideItemId.value) {
+        manualOverrideItemId.value = null;
+        persistManualOverrideItemId();
+    }
+    // Publish updated Gilam projection — manual queue items show as "On Hold"
+    evaluateSourceAndPublish();
     // Clear stale Manual Queue snapshot — the operator is explicitly loading
     // a new Event Host match, so the previous snapshot is no longer valid.
     eventHostPreManualSnapshot.value = null;
@@ -7178,6 +7192,21 @@ onMounted(() => {
         activeQueueSource.value = restoredSource;
     }
     nextTick(() => evaluateSourceAndPublish());
+
+    // Restore manualMatchId and reconstruct gameState from the active manual item
+    // so the scoreboard controller reflects the same bout shown on the Gilam display.
+    manualMatchId.value = loadManualMatchId();
+    if (isManualSource() && activeManualItemId.value) {
+        const activeItem = manualQueue.value.find(i => i.id === activeManualItemId.value);
+        if (activeItem) {
+            applyManualItemToGameState(activeItem);
+            void nextTick(() => {
+                void broadcastAll().catch((e) => {
+                    console.error('Broadcast failed during startup restore:', e);
+                });
+            });
+        }
+    }
 
     try {
         const ua = (navigator.userAgent || '').toLowerCase();
@@ -7298,7 +7327,7 @@ onMounted(() => {
 
 async function openClubLogoModal() {
     showBanner(
-        'Club branding now comes from Kurash System fetch.',
+        'Club branding is now managed automatically.',
         'info',
         3500,
     );
@@ -7359,7 +7388,7 @@ function processClubLogoFile(file: File | null) {
 }
 async function confirmUploadClubLogo() {
     showBanner(
-        'Local club logo and club code saving is disabled. Fetch branding from Kurash System.',
+        'Club branding is managed automatically and cannot be changed locally.',
         'info',
         4500,
     );
@@ -7447,7 +7476,7 @@ async function handleSubmitResult() {
             if (!rollbackGuard.ready) {
                 const message =
                     rollbackGuard.message ||
-                    'Event Host changed this match. The queue was refreshed. Please load the updated match before continuing.';
+                    'This match was updated. Please load the updated match before continuing.';
                 markResultSubmitReconcileRequired(
                     message,
                     rollbackGuard.reasonCode,
@@ -7875,7 +7904,7 @@ async function handleSubmitResult() {
                     'local_first_pending_admin_sync',
                 );
                 showBanner(
-                    'Result saved locally. Event Host sync will run in the background when the Event Host is reachable.',
+                    'Result saved locally. It will sync when the Event Host is available.',
                     'info',
                     5200,
                 );
@@ -7922,7 +7951,7 @@ async function handleSubmitResult() {
                         remoteError ?? adminSyncMsg,
                     );
                     showBanner(
-                        `Result saved locally. Match ${matchLabel} will sync to Admin when the Event Host reconnects.`,
+                        `Result saved locally. It will sync when the Event Host reconnects.`,
                         'info',
                         6500,
                     );
@@ -7944,11 +7973,8 @@ async function handleSubmitResult() {
                     });
                     return;
                 } else {
-                    const traceSuffix = remoteResultTraceId
-                        ? ` (trace: ${remoteResultTraceId})`
-                        : '';
                     showBanner(
-                        `Result was not recorded for Match ${matchLabel}: ${adminSyncMsg || 'Sync failed'}${traceSuffix}`,
+                        `Result was not recorded for Match ${matchLabel}. The queue was refreshed. Please load the updated match before continuing.`,
                         'error',
                         6500,
                     );
@@ -8063,7 +8089,7 @@ async function handleSubmitResult() {
 
             showResultToast(
                 resultQueuedForAdminReplay
-                    ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally and queued for Event Host sync.`
+                    ? `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`
                     : adminSyncOk
                       ? `Match ended! Winner: ${winnerNameForPopup}. Result recorded.`
                       : `Match ended! Winner: ${winnerNameForPopup}. Result saved locally.`,
@@ -8146,6 +8172,11 @@ async function handleSubmitResult() {
                         if (currentMatchId.value) {
                             // Event Host already has a match loaded — switch back to it
                             setActiveQueueSource('event-host');
+                            if (manualOverrideItemId.value) {
+                                manualOverrideItemId.value = null;
+                                persistManualOverrideItemId();
+                            }
+                            evaluateSourceAndPublish();
                             await clearCompletedBoutToWaitingState(
                                 getWaitingForNextBoutMessage(matchIdForSync),
                             );
@@ -8163,6 +8194,11 @@ async function handleSubmitResult() {
                                     );
                                 if (fallbackAdvanced) {
                                     setActiveQueueSource('event-host');
+                                    if (manualOverrideItemId.value) {
+                                        manualOverrideItemId.value = null;
+                                        persistManualOverrideItemId();
+                                    }
+                                    evaluateSourceAndPublish();
                                 }
                             } catch (error) {
                                 console.warn(
@@ -8175,6 +8211,11 @@ async function handleSubmitResult() {
                         // Final fallback: if nothing loaded and not manual, show waiting state
                         if (!currentMatchId.value && !isManualSource()) {
                             setActiveQueueSource('event-host');
+                            if (manualOverrideItemId.value) {
+                                manualOverrideItemId.value = null;
+                                persistManualOverrideItemId();
+                            }
+                            evaluateSourceAndPublish();
                             await clearCompletedBoutToWaitingState(
                                 getWaitingForNextBoutMessage(matchIdForSync),
                             );
@@ -8234,6 +8275,11 @@ async function handleSubmitResult() {
         if (submissionSource === 'manual' && manualQueue.value.length === 0) {
             restoreEventHostFromSnapshot();
             setActiveQueueSource('event-host');
+            if (manualOverrideItemId.value) {
+                manualOverrideItemId.value = null;
+                persistManualOverrideItemId();
+            }
+            evaluateSourceAndPublish();
             if (selectedTournamentId.value && currentMatchRingNumber.value) {
                 void maybeAutoLoadAssignedMatch(
                     selectedTournamentId.value,

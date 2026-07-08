@@ -9,7 +9,9 @@ import type {
 } from '@/composables/refereeDisplayTypes'
 import type { ElectronDisplayRole } from '@/composables/useRingMatchOrderProjection'
 
-type BannerType = 'success' | 'error' | 'info'
+type BannerType = 'success' | 'error' | 'info' | 'warning'
+
+const DISPLAY_UNAVAILABLE_MESSAGE = 'Display controls are only available in the Electron desktop app.'
 
 interface UseRefereeDisplayManagementOptions {
   getDisplayBridge: () => ElectronDisplayManagementBridge | null
@@ -411,7 +413,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return 'Some saved Gilam Match Order selections are unavailable right now.'
     }
     return selectedRingMatchOrderDisplayIds.value.length > 1
-      ? 'The selected screens will receive the same Event Host ring projection.'
+      ? 'The selected screens will receive the same Event Host Gilam projection.'
       : 'This screen will be used when you launch Gilam Match Order.'
   })
   const shouldAutoExpandRingMatchOrderPanel = computed(() =>
@@ -446,7 +448,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     if (isControllerDisplay(displayId)) {
       return status.selected
         ? 'Controller screen is included in Gilam Match Order output. The Event Host projection will also appear here.'
-        : 'Controller stays active here. Usually left free unless this screen should also host the ring projection.'
+        : 'Controller stays active here. Usually left free unless this screen should also host the Gilam projection.'
     }
     if (status.live) {
       return 'This screen is currently showing the Event Host Gilam Match Order projection.'
@@ -545,9 +547,8 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   async function runDisplayAction(action: () => Promise<ElectronDisplayState>, fallbackMessage: string) {
     const bridge = options.getDisplayBridge()
     if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
+      displayErrorMessage.value = DISPLAY_UNAVAILABLE_MESSAGE
+      options.showBanner(DISPLAY_UNAVAILABLE_MESSAGE, 'error', 4500)
       return null
     }
 
@@ -572,9 +573,8 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   ) {
     const bridge = options.getDisplayBridge()
     if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
+      displayErrorMessage.value = DISPLAY_UNAVAILABLE_MESSAGE
+      options.showBanner(DISPLAY_UNAVAILABLE_MESSAGE, 'error', 4500)
       return null
     }
 
@@ -593,31 +593,15 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function setScoreboardOutputMode(mode: 'single' | 'broadcast') {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.setOutputMode(mode),
+      () => options.getDisplayBridge()!.setOutputMode(mode),
       'Failed to change the public output mode.',
     )
   }
 
   async function syncSelectedDisplayTargets(displayIds: string[]) {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.setSelectedDisplays(displayIds),
+      () => options.getDisplayBridge()!.setSelectedDisplays(displayIds),
       'Failed to update the selected screens.',
     )
   }
@@ -633,31 +617,15 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function selectAllExternalDisplayTargets() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.selectAllExternalDisplays(),
+      () => options.getDisplayBridge()!.selectAllExternalDisplays(),
       'Failed to select all external screens.',
     )
   }
 
   async function clearSelectedDisplayTargets() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.clearSelectedDisplays(),
+      () => options.getDisplayBridge()!.clearSelectedDisplays(),
       'Failed to clear the selected screens.',
     )
   }
@@ -667,14 +635,6 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function launchSelectedScoreboards() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!selectedScoreboardDisplayIds.value.length) {
       const message = isBroadcastMode.value
         ? 'Choose one or more scoreboard screens first.'
@@ -688,7 +648,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     if (!(await options.prepareScoreboardOutputChange())) return
 
     const nextState = await runDisplayAction(
-      () => bridge.launchBroadcast(),
+      () => options.getDisplayBridge()!.launchBroadcast(),
       'Failed to launch the selected scoreboard screens.',
     )
 
@@ -696,14 +656,6 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function testSelectedScreens() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!selectedScoreboardDisplayIds.value.length) {
       const message = isBroadcastMode.value
         ? 'Choose one or more scoreboard screens first.'
@@ -716,22 +668,14 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     if (!ensureControllerOutputConfirmation()) return
 
     await runDisplayAction(
-      () => bridge.testSelectedDisplays(),
+      () => options.getDisplayBridge()!.testSelectedDisplays(),
       'Failed to test the selected screens.',
     )
   }
 
   async function stopBroadcastOutputs() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.stopBroadcast(),
+      () => options.getDisplayBridge()!.stopBroadcast(),
       'Failed to stop the live scoreboard outputs.',
     )
   }
@@ -804,7 +748,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
     // The manual queue provides its own projection data locally.
     const hasSyncConfig = options.getSyncConfigurationReady() && options.getRingMatchOrderProjectionKey()
     if (!hasSyncConfig && !options.hasManualQueueItems()) {
-      const message = 'Configure Event Host, recovery tournament, and recovery gilam first — or add bouts to the manual queue so Gilam Match Order has data to display.'
+      const message = 'Set up the Event Host connection and tournament first, or add bouts to the manual queue to have data to display.'
       displayErrorMessage.value = message
       options.showBanner(message, 'error', 4500)
       return
@@ -833,31 +777,15 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function reAddDisplayToBroadcast(displayId: string) {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!(await options.prepareScoreboardOutputChange())) return
 
     await runDisplayAction(
-      () => bridge.reAddScoreboardDisplay(displayId),
+      () => options.getDisplayBridge()!.reAddScoreboardDisplay(displayId),
       'Failed to re-add the selected screen to the live broadcast.',
     )
   }
 
   async function saveCurrentBroadcastProfile() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!newBroadcastProfileName.value.trim()) {
       const message = 'Enter a profile name first.'
       displayErrorMessage.value = message
@@ -874,7 +802,7 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
 
     const savedProfileName = newBroadcastProfileName.value.trim()
     const nextState = await runDisplayAction(
-      () => bridge.saveBroadcastProfile(savedProfileName),
+      () => options.getDisplayBridge()!.saveBroadcastProfile(savedProfileName),
       'Failed to save the current screen profile.',
     )
 
@@ -886,31 +814,15 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
   }
 
   async function applyBroadcastProfile(profileId: string) {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.applyBroadcastProfile(profileId),
+      () => options.getDisplayBridge()!.applyBroadcastProfile(profileId),
       'Failed to apply the selected screen profile.',
     )
   }
 
   async function deleteBroadcastProfile(profileId: string) {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.deleteBroadcastProfile(profileId),
+      () => options.getDisplayBridge()!.deleteBroadcastProfile(profileId),
       'Failed to delete the selected screen profile.',
     )
   }
@@ -945,18 +857,10 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return
     }
 
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!(await options.prepareScoreboardOutputChange())) return
 
     await runDisplayAction(
-      () => bridge.moveScoreboardToDisplay(selectedScoreboardDisplayId.value),
+      () => options.getDisplayBridge()!.moveScoreboardToDisplay(selectedScoreboardDisplayId.value),
       'Failed to move the scoreboard.',
     )
   }
@@ -969,16 +873,8 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return
     }
 
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.moveControllerToDisplay(selectedScoreboardDisplayId.value),
+      () => options.getDisplayBridge()!.moveControllerToDisplay(selectedScoreboardDisplayId.value),
       'Failed to move the controller.',
     )
   }
@@ -991,18 +887,10 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return
     }
 
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!(await options.prepareScoreboardOutputChange())) return
 
     const nextState = await runDisplayAction(
-      () => bridge.launchScoreboardOnDisplay(selectedScoreboardDisplayId.value),
+      () => options.getDisplayBridge()!.launchScoreboardOnDisplay(selectedScoreboardDisplayId.value),
       'Failed to launch the scoreboard.',
     )
 
@@ -1017,78 +905,38 @@ export function useRefereeDisplayManagement(options: UseRefereeDisplayManagement
       return
     }
 
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.testScoreboardDisplay(selectedScoreboardDisplayId.value),
+      () => options.getDisplayBridge()!.testScoreboardDisplay(selectedScoreboardDisplayId.value),
       'Failed to test the selected display.',
     )
   }
 
   async function bringScoreboardToMainDisplay() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     if (!(await options.prepareScoreboardOutputChange())) return
 
     await runDisplayAction(
-      () => bridge.moveScoreboardToPrimary(),
+      () => options.getDisplayBridge()!.moveScoreboardToPrimary(),
       'Failed to bring the scoreboard to the main display.',
     )
   }
 
   async function closeScoreboardWindow() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.closeScoreboard(),
+      () => options.getDisplayBridge()!.closeScoreboard(),
       'Failed to close the scoreboard.',
     )
   }
 
   async function swapDisplayAssignments() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.swapDisplays(),
+      () => options.getDisplayBridge()!.swapDisplays(),
       'Failed to swap controller and scoreboard displays.',
     )
   }
 
   async function rescanDisplayAssignments() {
-    const bridge = options.getDisplayBridge()
-    if (!bridge) {
-      const message = 'Display controls are only available in the Electron desktop app.'
-      displayErrorMessage.value = message
-      options.showBanner(message, 'error', 4500)
-      return
-    }
-
     await runDisplayAction(
-      () => bridge.rescanDisplays(),
+      () => options.getDisplayBridge()!.rescanDisplays(),
       'Failed to re-scan displays.',
     )
   }
