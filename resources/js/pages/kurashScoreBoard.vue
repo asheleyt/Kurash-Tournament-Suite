@@ -38,7 +38,7 @@
               <div class="broadcast-pop__border absolute inset-0 rounded-2xl pointer-events-none"></div>
 
               <!-- Surface -->
-              <div class="broadcast-pop__surface w-full h-full rounded-2xl flex flex-col items-center justify-center gap-8 sm:gap-10 p-8 sm:p-16 relative overflow-hidden text-center">
+              <div class="broadcast-pop__surface w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3 sm:gap-5 md:gap-6 p-5 sm:p-8 md:p-10 relative overflow-hidden text-center">
                 <!-- Animated Light Sweep -->
                 <div class="broadcast-pop__shine-wrap absolute inset-0 pointer-events-none overflow-hidden rounded-2xl z-0">
                   <div class="broadcast-pop__shine-bar absolute top-0 left-0 w-full h-full"></div>
@@ -59,25 +59,25 @@
                 <div class="broadcast-pop__bg-glow absolute inset-0 pointer-events-none"></div>
 
                 <div class="sb-pop__icon-wrap relative">
-                  <div class="sb-pop__icon-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-52 sm:h-52 rounded-full"></div>
+                  <div class="sb-pop__icon-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full"></div>
                   <img
                     src="/images/breaktime.png"
                     alt="Break Time"
-                    class="sb-pop__icon w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] object-contain"
+                    class="sb-pop__icon w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 lg:w-52 lg:h-52 object-contain"
                   />
                 </div>
 
-                <div class="sb-pop__headline text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400">
-                  BREAK TIME
-                </div>
-
-                <div v-if="time > 0" class="sb-pop__timer text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-mono font-bold tracking-widest mt-1"
+                <div v-if="time > 0" class="sb-pop__timer text-[8rem] sm:text-[12rem] md:text-[16rem] lg:text-[20rem] xl:text-[24rem] font-mono font-bold tracking-widest"
                      :class="isRunning ? 'text-green-400 drop-shadow-[0_0_30px_rgba(34,197,94,0.5)]' : 'text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.5)]'">
                   <span class="inline-flex items-baseline justify-center">
                     <span class="tabular-nums">{{ timeParts.mm }}</span>
                     <span class="tabular-nums leading-none tracking-normal mx-[0.05em]">:</span>
                     <span class="tabular-nums">{{ timeParts.ss }}</span>
                   </span>
+                </div>
+
+                <div class="sb-pop__headline text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-[0.1em] sm:tracking-[0.15em] text-yellow-400">
+                  BREAK TIME
                 </div>
               </div>
               </div>
@@ -97,7 +97,7 @@
               <div class="broadcast-pop__border absolute inset-0 rounded-2xl pointer-events-none"></div>
 
             <!-- Surface -->
-            <div class="broadcast-pop__surface w-full h-full rounded-2xl flex flex-col items-center justify-center gap-8 sm:gap-10 p-8 sm:p-16 relative overflow-hidden text-center">
+            <div class="broadcast-pop__surface w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3 sm:gap-5 md:gap-6 p-5 sm:p-8 md:p-10 relative overflow-hidden text-center">
               <!-- Animated Light Sweep -->
               <div class="broadcast-pop__shine-wrap absolute inset-0 pointer-events-none overflow-hidden rounded-2xl z-0">
                 <div class="broadcast-pop__shine-bar absolute top-0 left-0 w-full h-full"></div>
@@ -117,25 +117,25 @@
               <div class="broadcast-pop__bg-glow absolute inset-0 pointer-events-none"></div>
 
               <div class="sb-pop__icon-wrap relative">
-                <div class="sb-pop__icon-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 sm:w-52 sm:h-52 rounded-full"></div>
+                <div class="sb-pop__icon-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full"></div>
                 <img
                   src="/images/medic.png"
                   alt="Medic"
-                  class="sb-pop__icon w-48 h-48 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-[28rem] lg:h-[28rem] object-contain"
+                  class="sb-pop__icon w-28 h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 lg:w-52 lg:h-52 object-contain"
                 />
               </div>
 
-              <div class="sb-pop__headline text-5xl sm:text-7xl md:text-8xl lg:text-[10rem] font-extrabold tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[0.25em] text-yellow-400 drop-shadow-[0_0_18px_rgba(250,204,21,0.55)]">
-                MEDIC
-              </div>
-
-              <div class="sb-pop__timer text-[5rem] sm:text-[8rem] md:text-[10rem] lg:text-[14rem] xl:text-[16rem] font-bold tabular-nums leading-none mt-1"
+              <div class="sb-pop__timer text-[8rem] sm:text-[12rem] md:text-[16rem] lg:text-[20rem] xl:text-[24rem] font-bold tabular-nums leading-none"
                    :class="isRunning ? 'text-green-400' : 'text-red-500'">
                 <span class="inline-flex items-baseline justify-center">
                   <span class="tabular-nums">{{ timeParts.mm }}</span>
                   <span class="tabular-nums leading-none tracking-normal mx-[0.05em]">:</span>
                   <span class="tabular-nums">{{ timeParts.ss }}</span>
                 </span>
+              </div>
+
+              <div class="sb-pop__headline text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-[0.1em] sm:tracking-[0.15em] text-yellow-400 drop-shadow-[0_0_18px_rgba(250,204,21,0.55)]">
+                MEDIC
               </div>
             </div>
             </div>
@@ -2111,25 +2111,25 @@ onBeforeUnmount(() => {
   .sb-fit-card--jazo .broadcast-pop__surface,
   .sb-fit-card--winner .broadcast-pop__surface,
   .sb-fit-card--medic .broadcast-pop__surface {
-    gap: 1rem;
-    padding: 1.2rem 1.4rem;
+    gap: 0.5rem;
+    padding: 0.8rem 1rem;
     box-shadow: 0 0 44px -18px var(--pop-accent-glow, rgba(34, 211, 238, 0.4));
   }
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 18rem;
-    height: 18rem;
+    width: 8rem;
+    height: 8rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 6.5rem;
+    font-size: 4rem;
     line-height: 1;
   }
 
   .sb-fit-card--break .sb-pop__timer {
-    font-size: 6rem;
+    font-size: 11rem;
     margin-top: 0;
   }
 
@@ -2177,17 +2177,17 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 14rem;
-    height: 14rem;
+    width: 7rem;
+    height: 7rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 5rem;
+    font-size: 3.5rem;
     line-height: 1;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 6rem;
+    font-size: 11rem;
     margin-top: 0;
   }
 }
@@ -2199,8 +2199,8 @@ onBeforeUnmount(() => {
 
   .sb-fit-card--winner .broadcast-pop__surface,
   .sb-fit-card--medic .broadcast-pop__surface {
-    gap: 1rem;
-    padding: 1.25rem 1.4rem;
+    gap: 0.4rem;
+    padding: 0.6rem 0.8rem;
   }
 
   .sb-fit-card--winner .winner-pop__trophy {
@@ -2230,16 +2230,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 13rem;
-    height: 13rem;
+    width: 6rem;
+    height: 6rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 4.8rem;
+    font-size: 3rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 6rem;
+    font-size: 9rem;
   }
 }
 
@@ -2261,24 +2261,24 @@ onBeforeUnmount(() => {
   .sb-fit-card--jazo .broadcast-pop__surface,
   .sb-fit-card--winner .broadcast-pop__surface,
   .sb-fit-card--medic .broadcast-pop__surface {
-    gap: 0.85rem;
-    padding: 1rem 1.1rem;
+    gap: 0.3rem;
+    padding: 0.5rem 0.7rem;
     box-shadow: 0 0 32px -18px var(--pop-accent-glow, rgba(34, 211, 238, 0.4));
   }
 
   .sb-fit-card--break .sb-pop__icon,
   .sb-fit-card--jazo .sb-pop__icon {
-    width: 14rem;
-    height: 14rem;
+    width: 6rem;
+    height: 6rem;
   }
 
   .sb-fit-card--break .sb-pop__headline,
   .sb-fit-card--jazo .sb-pop__headline {
-    font-size: 5.2rem;
+    font-size: 3.5rem;
   }
 
   .sb-fit-card--break .sb-pop__timer {
-    font-size: 5rem;
+    font-size: 8rem;
   }
 
   .sb-fit-card--winner .winner-pop__title {
@@ -2304,16 +2304,16 @@ onBeforeUnmount(() => {
   }
 
   .sb-fit-card--medic .sb-pop__icon {
-    width: 11rem;
-    height: 11rem;
+    width: 5rem;
+    height: 5rem;
   }
 
   .sb-fit-card--medic .sb-pop__headline {
-    font-size: 4rem;
+    font-size: 2.5rem;
   }
 
   .sb-fit-card--medic .sb-pop__timer {
-    font-size: 5.2rem;
+    font-size: 8rem;
   }
 }
 
@@ -2321,59 +2321,59 @@ onBeforeUnmount(() => {
 .sb-fit-card--jazo .broadcast-pop__surface,
 .sb-fit-card--medic .broadcast-pop__surface,
 .sb-fit-card--winner .broadcast-pop__surface {
-  padding: 3.75rem 4.5rem;
+  padding: 1.5rem 2rem;
 }
 
 .sb-fit-card--break .broadcast-pop__surface,
 .sb-fit-card--jazo .broadcast-pop__surface {
-  gap: 2.5rem;
+  gap: 0.8rem;
 }
 
 .sb-fit-card--break .sb-pop__icon,
 .sb-fit-card--jazo .sb-pop__icon {
-  width: 20rem;
-  height: 20rem;
+  width: 10rem;
+  height: 10rem;
 }
 
 .sb-fit-card--break .sb-pop__icon-glow,
 .sb-fit-card--jazo .sb-pop__icon-glow {
-  width: 20rem;
-  height: 20rem;
+  width: 10rem;
+  height: 10rem;
 }
 
 .sb-fit-card--break .sb-pop__headline,
 .sb-fit-card--jazo .sb-pop__headline {
   max-width: 88%;
-  font-size: 7.5rem;
+  font-size: 4.5rem;
   line-height: 0.95;
 }
 
 .sb-fit-card--break .sb-pop__timer {
-  font-size: 7rem;
+  font-size: 14rem;
   margin-top: 0.2rem;
 }
 
 .sb-fit-card--medic .broadcast-pop__surface {
-  gap: 2.5rem;
+  gap: 0.8rem;
 }
 
 .sb-fit-card--medic .sb-pop__icon {
-  width: 15rem;
-  height: 15rem;
+  width: 8rem;
+  height: 8rem;
 }
 
 .sb-fit-card--medic .sb-pop__icon-glow {
-  width: 15rem;
-  height: 15rem;
+  width: 8rem;
+  height: 8rem;
 }
 
 .sb-fit-card--medic .sb-pop__headline {
-  font-size: 6.5rem;
+  font-size: 4rem;
   line-height: 0.94;
 }
 
 .sb-fit-card--medic .sb-pop__timer {
-  font-size: 7.5rem;
+  font-size: 14rem;
   margin-top: 0.25rem;
 }
 
